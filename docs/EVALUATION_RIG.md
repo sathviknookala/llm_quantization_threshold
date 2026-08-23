@@ -85,7 +85,8 @@ deliberately so: here the shared prefix is the same token sequence by constructi
 no returned distribution, and it is what makes ten passes affordable. Prefix caching remains disabled
 for all serving runs (H7).
 
-**Contexts are drawn from the same corpus and the same 512-token chunking as the serving workload**,
+**Contexts are drawn from the same corpus and the same 512-token chunking as the serving workload**
+(corpus itself is open gate **D16**),
 so quality and serving are measured on the same distribution. Narrowing to one workload removes the
 need to stratify KL across context-length buckets: one stratum, sampled along the generation axis
 instead of across prompt lengths.

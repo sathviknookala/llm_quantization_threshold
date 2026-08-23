@@ -531,3 +531,42 @@ views might miss, not to produce a leaderboard. Resist expansion; see D12's reas
 families, which applies equally to task families.
 
 ---
+
+---
+
+## D16 — Prompt corpus for serving workloads and KL contexts
+
+**Status:** OPEN (raised 2026-08-23) — blocks the pilot
+
+D10 requires prompts drawn from "a fixed held-out corpus, tokenized and chunked to exactly 512
+tokens, prefix-disjoint, distinct per request, seeded". No corpus was ever named, so the corpus prep
+script cannot be written and the pilot cannot run.
+
+**Hard constraint — calibration leakage.** The FP4 rung was calibrated on 128 samples from
+`HuggingFaceH4/ultrachat_200k` (D7). `Quality-run validity` in `EXPERIMENTAL_CONTRACT.md` lists
+calibration data leaking into an evaluation set as invalidating. Ultrachat is therefore excluded from
+both the serving prompts and the KL contexts.
+
+**The fork to resolve:**
+
+```text
+(a) real text for both arms       keeps D10's link between quality and serving distributions;
+                                  costs a corpus choice and a prep script
+(b) random token IDs for serving  `vllm bench serve --dataset-name random` gives exact lengths and
+    real text for quality only    guaranteed prefix-disjointness with no prep, but breaks the claim
+                                  that quality and serving are measured on the same distribution
+```
+
+For pure serving timing the token content is irrelevant — with `ignore_eos` and fixed lengths, decode
+cost is content-independent — so (b) is defensible on measurement grounds alone. The cost is
+narrative, not numerical.
+
+**Recommendation: (a), C4 `en` validation.** It preserves the link cheaply, it is general web text
+rather than chat-formatted so it sidesteps the `chat_template` deviation, and it is cleanly disjoint
+from ultrachat.
+
+**Relationship to D14.** This gate covers the serving prompts and the KL contexts. D14's perplexity
+corpus is a separate choice and may differ — wikitext is the conventional pick there for
+comparability with published numbers — without disturbing this one.
+
+---

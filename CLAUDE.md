@@ -112,7 +112,8 @@ A valid result may favor BF16, FP8, FP4, different choices for different workloa
 **The workload and concurrency contract is locked. Phase 1 is a memory-focused study.** Model
 qualification is complete, the precision ladder is locked, and D10/D11 are now resolved: one primary
 decode-dominated workload swept across concurrency, with an explicit latency SLO as the saturation
-criterion. **No final benchmark collection has started** — the next step is a pilot, then the harness.
+criterion. **No final benchmark collection has started, and no harness code exists** — the next steps
+are the corpus gate (D16), then the harness, then the pilot.
 
 Current conclusions:
 
@@ -151,10 +152,18 @@ FP4 (NVFP4)    5.65 GiB   14.57 GiB     119,360         46  /  77         SM120 
 and exit criteria; it validates the contract's free parameters and produces no results.
 
 ```text
-1. serving harness + pilot (P1-P5) + KL correctness gate   <- current step
+0. resolve D16 (prompt corpus) + close the pilot's open items   <- current step
+1. build the serving harness, then run pilot P1-P5 + KL correctness gate
 2. serving sweep                                            overnight, GPU-exclusive
 3. quality run                                              KL first; PPL/tasks need D14/D15
 ```
+
+**The pilot is fully specified but has no code behind it.** `scripts/` holds a 60-line
+single-request smoke. Readiness was checked on 2026-08-23 and is recorded in
+`EXPERIMENTAL_CONTRACT.md`: checkpoints are on disk, the GPU is idle, `vllm bench serve` ships with
+the flags the contract needs, and every counter D11 requires already exists in `vllm/v1/metrics/`.
+What is missing is the harness itself, the corpus (D16), and pass/fail criteria for four of the five
+pilot jobs.
 
 The correctness gate sits *before* the sweep, not after: timing a corrupted checkpoint wastes the
 most expensive resource in the project. The quality harness can be **written** while the sweep runs;
@@ -192,6 +201,15 @@ Phase 1 deliverable is the quality-loss vs sustainable-concurrency curve for thi
   being bandwidth-bound and nothing had measured that.
 - Opened D14 (perplexity corpus and token budget) and D15 (downstream task set), converting the last
   unowned `TBD`s in the quality rig into tracked gates.
+- Checked pilot readiness against the installed stack rather than the docs. Good news: all four D11
+  counters (`num_preempted_reqs`, `recomputed_tokens`, `kv_cache_usage`, `num_waiting_reqs`) already
+  exist in `vllm/v1/metrics/`, which was P5's largest unknown. `vllm bench serve` supplies the request
+  driver but not the warmup gate, steady-state entry, or cell abort.
+- Recorded eight open items inside the pilot specification — four jobs have no pass/fail criterion,
+  P4's obvious measurement method is circular with P1, `PREFILL_PROBE` plumbing is unchecked, and SLO
+  feasibility is only tested incidentally.
+- Opened D16 (prompt corpus), which blocks the pilot. Ultrachat is excluded by calibration leakage
+  since it calibrated the FP4 rung.
 
 ## Known issues / unresolved premises
 
@@ -219,6 +237,14 @@ Phase 1 deliverable is the quality-loss vs sustainable-concurrency curve for thi
   if the ratio decays before the BF16 wall at 15, the decomposition must be reopened.
 - **The quality arm has two open gates.** D14 (perplexity corpus and token budget) and D15 (downstream
   task set) are unresolved, and chat-formatted tasks stay blocked by the `chat_template` deviation.
+- **The pilot cannot run yet.** No harness code exists, the prompt corpus is unnamed (D16), and four
+  of the five pilot jobs have no pass/fail criterion. All eight open items are listed under `Pilot`
+  in `EXPERIMENTAL_CONTRACT.md`.
+- **P4's bandwidth measurement must be independent of P1.** Deriving bandwidth from decode throughput
+  and then using it to validate a bandwidth-derived throughput prediction would be circular.
+- **The 50 ms TPOT SLO is unverified above batch 1.** It was chosen from a batch-1 estimate of ~25 ms.
+  If BF16 breaches it by concurrency 8-12, its max-concurrency-at-SLO collapses and the headline
+  comparison distorts.
 - **Calibration sensitivity is untested, and applies only to FP4.** FP8 needs no calibration, so the
   calibration-robustness study is FP4-only. The single FP4 draw used 128 ultrachat samples, seed 0.
 - **FP4's first load pays a ~61 s flashinfer JIT build.** Cached now, but it must never leak into a

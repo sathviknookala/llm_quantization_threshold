@@ -311,6 +311,61 @@ The sweep may start when P1-P5 pass and the correctness gate is clean. P1 or P2 
 reason to proceed with an adjusted interpretation — both feed decisions (D10's prediction, D11's
 bracketing) that would have to be reopened first.
 
+### Readiness — checked 2026-08-23
+
+Present and verified on this machine:
+
+- both quantized checkpoints on disk (`checkpoints/`, FP8 8.5 GB, NVFP4 5.7 GB);
+- GPU idle (15 MiB used, 0% utilisation, 5 W);
+- `vllm/benchmarks/serve.py` ships in this build with `--max-concurrency`, `--random-input-len`,
+  `--random-output-len`, `--ignore-eos`, `--request-rate`;
+- **every counter D11 requires already exists** in `vllm/v1/metrics/`: `num_preempted_reqs`,
+  `recomputed_tokens`, `kv_cache_usage`, `num_waiting_reqs`. This was P5's largest unknown and it
+  resolves favourably in advance — `recomputed_tokens` in particular is what makes H8's
+  preemption-by-recompute loop measurable rather than inferred. P5 still has to confirm they emit
+  correctly under load.
+
+Not present:
+
+- **No harness code.** `scripts/` holds a 60-line single-request qualification smoke with no
+  concurrency, warmup, or counter scraping. Four pieces are needed: sweep driver, corpus prep,
+  bandwidth measurement, and adaptation of the existing KL scripts to real contexts.
+- **The stock client is partial.** `vllm bench serve`'s `--max-concurrency` is a semaphore over a
+  fixed `--num-prompts`. It has no warmup-discard window, no steady-state entry, and no cell abort,
+  so the contract's rules must wrap it rather than configure it.
+- **The prompt corpus is unnamed** — open gate D16.
+
+### Open items in this specification
+
+Each is a job with no pass/fail criterion. Left open they get decided ad hoc mid-run, which is the
+failure mode the contract exists to prevent.
+
+1. **P4 names no measurement method, and the obvious one is circular.** Deriving bandwidth from decode
+   throughput cannot then be used to validate a bandwidth-derived prediction. P4 needs a measurement
+   independent of P1.
+2. **P3 has no threshold.** "Large relative to the FP8-to-FP4 gap" does not say what ratio triggers
+   raising the repetition count above 3.
+3. **P2 has no tolerance.** "Materially outside" the 15-25 band is undefined. Note the band's lower
+   edge is tight: at concurrency 15 BF16 needs 38,400 of 39,664 KV tokens, so the true wall is at
+   15-16.
+4. **The correctness gate has no trigger value.** Section E of `EVALUATION_RIG.md` leaves the
+   tolerance metric-specific, which is defensible, but a gate cannot stop anything without a number.
+5. **P5 covers `DECODE_PRIMARY` only.** `PREFILL_PROBE` plumbing is unchecked, and its 8,192-token
+   prompt is the shape where H7's prefix-caching hazard bites hardest.
+6. **SLO feasibility is tested only incidentally.** The 50 ms TPOT P95 bound came from a batch-1
+   estimate of roughly 25 ms. Whether BF16 still holds it at concurrency 8-12 is unverified; if it
+   does not, BF16's max-concurrency-at-SLO collapses and the headline comparison distorts. P1 already
+   runs at those points — make recording TPOT P95 against the SLO an explicit part of it.
+7. **No pilot artifact path or schema.** Pilot outputs may not be quoted but must still be tracked;
+   `Result identity` covers final results only.
+8. **No cost estimate.** Rough order once the harness exists: 2.5-4 hours, GPU-exclusive.
+
+### What the pilot will not tell you even if it passes
+
+P3 estimates variance from short runs. The sweep is 6-8 hours, over which the card heats and clocks
+fall (H6). Short-run spread is a floor on long-run spread, not an estimate of it — which is why run
+ordering is counterbalanced by rule rather than trusted to the variance figure.
+
 ## GPU state and telemetry
 
 Before every final timed run:
