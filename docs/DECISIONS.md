@@ -198,13 +198,85 @@ Final counts must be frozen in `EXPERIMENTAL_CONTRACT.md` before final data coll
 
 ## D11 — Concurrency strategy
 
-**Status:** PROVISIONAL
+**Status:** PROVISIONAL — strategy settled, exact points still to freeze
 
 Sweep from low concurrency toward saturation rather than benchmark one arbitrary concurrency level.
 
-Exact points may be selected after pilots, then frozen before final runs.
+**Why:** Quantization changes both compute cost and available KV-cache capacity, so its value depends
+strongly on load. At a single concurrency point these two effects are indistinguishable.
 
-**Why:** Quantization may change both latency/throughput and available KV-cache capacity, so its value can depend strongly on load.
+### The sweep must decompose the compute benefit from the capacity benefit
+
+A quantization step delivers two different things at once:
+
+```text
+compute benefit    lower-precision GEMMs execute faster
+capacity benefit   smaller weights free VRAM -> more KV -> larger batches
+```
+
+Both are real and a deployment gets both, so the **headline result is the combined benefit**. But the
+two do not generalize equally: the compute benefit travels to other hardware, while the capacity
+benefit is a function of this machine's 24 GiB ceiling (see `LIMITATIONS.md`). A result that cannot
+separate them cannot say which part a reader should expect to reproduce.
+
+**The separation is already present in the shape of a single sweep** and does not require a second
+experimental arm:
+
+- **Below BF16's KV limit**, every configuration holds every sequence. KV binds for no one, so the
+  throughput gap is the **compute benefit alone**.
+- **Above BF16's KV limit**, BF16 begins queuing and preempting while FP8/FP4 keep batching. The gap
+  *widens*, and that widening is the **capacity contribution**.
+
+Concurrency at which each configuration becomes KV-limited, from measured KV capacity
+(39,664 / 92,608 / 119,360 tokens — `results/qualification/qualification_summary.json`):
+
+```text
+ ctx tokens |   BF16    FP8  NVFP4 | BF16-starved but others not
+        512 |     77    180    233 | 78..233
+       1024 |     38     90    116 | 39..116
+       2048 |     19     45     58 | 20..58
+       4096 |      9     22     29 | 10..29
+       8192 |      4     11     14 | 5..14
+      16384 |      2      5      7 | 3..7
+      32768 |      1      2      3 | 2..3
+```
+
+### Consequences for freezing the points
+
+1. **The sweep must bracket the BF16 threshold.** At 2048-token contexts all the structure lives
+   between concurrency 19 and 58. A sweep of 1/2/4/8 sits wholly in the compute-only region and would
+   report the benefit as ~1.7x while missing the capacity effect entirely. A sweep that starts at 64
+   sits wholly past it and would attribute the whole gain to precision.
+
+2. **Concurrency points must be chosen per workload, not shared across workloads.** The thresholds
+   above move with context length, so one shared list cannot bracket all three workload classes. This
+   cuts against the natural instinct to sweep identical values everywhere.
+
+3. **The long-context workload cannot decompose the two effects.** At 32k contexts BF16 holds one
+   sequence, so capacity binds immediately at concurrency 2 and there is no compute-only region to
+   measure. The decomposition is available at short and medium contexts and structurally unavailable
+   at long ones. Report the long-context result as combined-only rather than implying a split that the
+   data cannot support.
+
+4. **Log per point whether each configuration was KV-limited, plus preemption counts.** vLLM exposes
+   both. Without them the two regions cannot be told apart after the fact, and the decomposition
+   becomes an argument instead of a measurement.
+
+### Rejected alternative — do not re-litigate
+
+A two-arm design was considered and rejected: one arm with KV pinned to the BF16-feasible budget for
+all configurations (isolating compute), one arm with KV floating (deployment-realistic).
+
+Rejected because it doubles the sweep to buy a portability claim that D4 already places out of
+scope, and because the pinned arm measures a configuration nobody would deploy — it deliberately
+handicaps FP8/FP4 and would understate the real benefit, risking a knee in the wrong place. The
+single floating-KV sweep is both the deployment-realistic measurement and, read by region, the
+decomposition. `num_gpu_blocks_override` is the mechanism that would pin KV if this is ever revisited
+(see hazard H5 in `EXPERIMENTAL_CONTRACT.md`).
+
+**Unlock condition:** freeze exact per-workload concurrency points here and in
+`EXPERIMENTAL_CONTRACT.md` together with D10's token counts. The two decisions are not separable —
+the thresholds above are a function of context length, so token counts must be fixed first.
 
 ---
 
