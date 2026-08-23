@@ -85,7 +85,12 @@ Desired capability coverage may include:
 - mathematical reasoning;
 - instruction following if appropriate.
 
-Task set: **TBD after model selection.**
+Task set: **still TBD, but no longer blocked** — the model is selected (Llama 3.1 8B Instruct,
+D6). Note the constraint from checkpoint provenance: the current tokenizer carries a non-official
+`chat_template`, so any chat-formatted task yields scores that are internally comparable across
+BF16/FP8/FP4 but **not** comparable to published Llama 3.1 numbers until the official
+`tokenizer_config.json` is re-pinned. Prefer tasks scored from raw token continuations, or defer
+chat-formatted tasks until the license lands.
 
 Rules:
 

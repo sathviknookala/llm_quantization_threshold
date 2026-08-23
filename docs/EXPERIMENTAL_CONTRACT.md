@@ -14,9 +14,18 @@ Primary study:
 Machine:           profiled single-GPU workstation in HARDWARE_PROFILE.md
 GPU count:         1
 Power policy:      stock/default 145 W limit unless a later decision changes it
-Inference backend: TBD
-Software pins:     TBD
+Inference backend: vLLM 0.19.1  (LOCKED, D9)
+Software pins:     Python 3.12.13, torch 2.10.0+cu128, compressed-tensors 0.15.0.1,
+                   driver 575.64.03, CUDA toolkit 12.9; conda env `qnt`
+                   checkpoint production: llmcompressor 0.10.0.3; conda env `qnt-quant`
+Model:             Llama 3.1 8B Instruct, 8,030,261,248 params  (LOCKED, D6)
+Configurations:    BF16_REFERENCE, FP8_PRIMARY, FP4_PRIMARY  (LOCKED, D5)
+KV-cache precision: BF16 for all configurations (held constant, not a variable)
 ```
+
+Full environment artifacts: `results/system/env_qnt_2026-08-22.json`,
+`results/system/env_qnt-quant_2026-08-22.json`. Machine profile:
+`results/system/profile_2026-08-22.txt`.
 
 Final runs must record:
 
@@ -125,9 +134,19 @@ Do not stop a concurrency sweep merely because one configuration “looks fast e
 
 ## Warmup
 
-**TBD after backend selection.**
+**Backend is now selected (vLLM 0.19.1), so this gate is unblocked. Minimum rules already
+established by measurement — see hazards H1 and H2:**
 
-The final contract must specify:
+- **Discard the first request against every engine instance.** No timed measurement may come from
+  the first generate call after engine init. Measured basis: the BF16 qualification run reported
+  2.7 tok/s on its first workload and 35.4 tok/s on the next against the same engine.
+- **Exclude engine startup entirely**, and prefer reusing one engine process across measurements for
+  a configuration. Cold start is unequal across the ladder (BF16 ~39 s graph-memory profiling,
+  FP8 ~2 s, FP4 ~61 s flashinfer JIT), so a shared warmup budget would silently favour FP8.
+- **Never let the FP4 flashinfer JIT build enter a serving metric.** It is cached at
+  `~/.cache/flashinfer/0.6.6/120a/cached_ops/fp4_gemm_cutlass_sm120/` and must be warm before timing.
+
+The final contract must still specify:
 
 - model-load exclusion;
 - number or duration of warmup requests;
