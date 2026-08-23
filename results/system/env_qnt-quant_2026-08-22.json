@@ -1,0 +1,38 @@
+{
+  "driver": "575.64.03",
+  "nvidia_smi_cuda": "NVIDIA RTX PRO 4000 Blackwell",
+  "nvcc": "Cuda compilation tools, release 12.9, V12.9.86",
+  "python": "3.12.13",
+  "torch": "2.10.0+cu128",
+  "torch_cuda_build": "12.8",
+  "cuda_available": true,
+  "gpu_name": "NVIDIA RTX PRO 4000 Blackwell",
+  "capability": [
+    12,
+    0
+  ],
+  "total_memory_bytes": 25151537152,
+  "total_memory_GiB": 23.424,
+  "multi_processor_count": 70,
+  "vllm": "absent (No module named 'vllm')",
+  "compressed_tensors": "0.14.0.1",
+  "llmcompressor": "0.10.0.3",
+  "preset_schemes": [
+    "FP8",
+    "FP8_BLOCK",
+    "FP8_DYNAMIC",
+    "INT8",
+    "MXFP4",
+    "MXFP4A16",
+    "NVFP4",
+    "NVFP4A16",
+    "UNQUANTIZED",
+    "W4A16",
+    "W4A16_ASYM",
+    "W4A8",
+    "W4AFP8",
+    "W8A16",
+    "W8A8"
+  ],
+  "transformers": "4.57.6"
+}
