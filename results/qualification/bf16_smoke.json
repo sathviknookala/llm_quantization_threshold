@@ -1,0 +1,83 @@
+{
+  "label": "BF16_REFERENCE",
+  "model": "/home/sathvik/.cache/huggingface/hub/models--NousResearch--Meta-Llama-3.1-8B-Instruct/snapshots/d10aef7999a2b5ba950ab3974312feeedbfe0b77",
+  "max_model_len": 32768,
+  "gpu_memory_utilization": 0.9,
+  "kv_cache_dtype": "auto",
+  "mem_before": {
+    "mem_used_mib": "15",
+    "mem_total_mib": "24467",
+    "util_pct": "0",
+    "power_w": "4.81",
+    "sm_clock_mhz": "22",
+    "temp_c": "36"
+  },
+  "load_seconds": 67.33,
+  "mem_after_load": {
+    "mem_used_mib": "21949",
+    "mem_total_mib": "24467",
+    "util_pct": "28",
+    "power_w": "98.17",
+    "sm_clock_mhz": "2272",
+    "temp_c": "51"
+  },
+  "workloads": [
+    {
+      "workload": "short",
+      "prompt_tokens": 128,
+      "output_tokens": 64,
+      "wall_seconds": 23.711,
+      "decode_tok_per_s": 2.7,
+      "text_head": " technology. The history of computing hardware spans several distinct eras of te",
+      "mem": {
+        "mem_used_mib": "21949",
+        "mem_total_mib": "24467",
+        "util_pct": "100",
+        "power_w": "144.12",
+        "sm_clock_mhz": "1695",
+        "temp_c": "53"
+      }
+    },
+    {
+      "workload": "medium",
+      "prompt_tokens": 2048,
+      "output_tokens": 128,
+      "wall_seconds": 3.615,
+      "decode_tok_per_s": 35.41,
+      "text_head": " distinct eras of technology. The history of computing hardware spans several di",
+      "mem": {
+        "mem_used_mib": "21949",
+        "mem_total_mib": "24467",
+        "util_pct": "100",
+        "power_w": "145.00",
+        "sm_clock_mhz": "1680",
+        "temp_c": "57"
+      }
+    },
+    {
+      "workload": "long",
+      "prompt_tokens": 16384,
+      "output_tokens": 128,
+      "wall_seconds": 6.686,
+      "decode_tok_per_s": 19.14,
+      "text_head": " hardware spans several distinct eras of technology. The history of computing ha",
+      "mem": {
+        "mem_used_mib": "22845",
+        "mem_total_mib": "24467",
+        "util_pct": "100",
+        "power_w": "145.00",
+        "sm_clock_mhz": "1657",
+        "temp_c": "62"
+      }
+    }
+  ],
+  "mem_peak_after_all": {
+    "mem_used_mib": "22845",
+    "mem_total_mib": "24467",
+    "util_pct": "100",
+    "power_w": "145.00",
+    "sm_clock_mhz": "1657",
+    "temp_c": "62"
+  },
+  "torch_max_mem_alloc_GiB": 0.0
+}

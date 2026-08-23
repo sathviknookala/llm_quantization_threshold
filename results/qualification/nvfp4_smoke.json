@@ -1,0 +1,83 @@
+{
+  "label": "NVFP4",
+  "model": "checkpoints/llama31-8b-instruct-NVFP4",
+  "max_model_len": 32768,
+  "gpu_memory_utilization": 0.9,
+  "kv_cache_dtype": "auto",
+  "mem_before": {
+    "mem_used_mib": "15",
+    "mem_total_mib": "24467",
+    "util_pct": "0",
+    "power_w": "5.05",
+    "sm_clock_mhz": "22",
+    "temp_c": "37"
+  },
+  "load_seconds": 83.92,
+  "mem_after_load": {
+    "mem_used_mib": "22457",
+    "mem_total_mib": "24467",
+    "util_pct": "32",
+    "power_w": "55.71",
+    "sm_clock_mhz": "2422",
+    "temp_c": "48"
+  },
+  "workloads": [
+    {
+      "workload": "short",
+      "prompt_tokens": 128,
+      "output_tokens": 64,
+      "wall_seconds": 1.061,
+      "decode_tok_per_s": 60.31,
+      "text_head": " technology. The history of computing hardware spans several distinct eras of te",
+      "mem": {
+        "mem_used_mib": "22457",
+        "mem_total_mib": "24467",
+        "util_pct": "0",
+        "power_w": "108.64",
+        "sm_clock_mhz": "2220",
+        "temp_c": "53"
+      }
+    },
+    {
+      "workload": "medium",
+      "prompt_tokens": 2048,
+      "output_tokens": 128,
+      "wall_seconds": 1.524,
+      "decode_tok_per_s": 83.99,
+      "text_head": " distinct eras of technology. The history of computing hardware spans several di",
+      "mem": {
+        "mem_used_mib": "22457",
+        "mem_total_mib": "24467",
+        "util_pct": "100",
+        "power_w": "145.02",
+        "sm_clock_mhz": "2025",
+        "temp_c": "54"
+      }
+    },
+    {
+      "workload": "long",
+      "prompt_tokens": 16384,
+      "output_tokens": 128,
+      "wall_seconds": 3.393,
+      "decode_tok_per_s": 37.73,
+      "text_head": " hardware spans several distinct eras of technology. The history of computing ha",
+      "mem": {
+        "mem_used_mib": "23353",
+        "mem_total_mib": "24467",
+        "util_pct": "100",
+        "power_w": "145.00",
+        "sm_clock_mhz": "1980",
+        "temp_c": "57"
+      }
+    }
+  ],
+  "mem_peak_after_all": {
+    "mem_used_mib": "23353",
+    "mem_total_mib": "24467",
+    "util_pct": "100",
+    "power_w": "142.11",
+    "sm_clock_mhz": "1980",
+    "temp_c": "57"
+  },
+  "torch_max_mem_alloc_GiB": 0.0
+}

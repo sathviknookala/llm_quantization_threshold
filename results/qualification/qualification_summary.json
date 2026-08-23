@@ -1,0 +1,110 @@
+{
+  "qualification_date": "2026-08-22",
+  "gpu": "NVIDIA RTX PRO 4000 Blackwell (SM120, 24467 MiB)",
+  "driver": "575.64.03",
+  "backend": "vLLM 0.19.1",
+  "torch": "2.10.0+cu128",
+  "model": {
+    "name": "Llama 3.1 8B Instruct",
+    "params": 8030261248,
+    "served_repo": "NousResearch/Meta-Llama-3.1-8B-Instruct",
+    "served_revision": "d10aef7999a2b5ba950ab3974312feeedbfe0b77",
+    "official_repo": "meta-llama/Llama-3.1-8B-Instruct",
+    "official_revision": "0e9e39f249a16976918f6564b8830bc894c89659",
+    "weights_sha256_match_official": true,
+    "tokenizer_config_deviation": "chat_template only; tokenizer.json identical"
+  },
+  "shared_controls": {
+    "kv_cache_dtype": "BF16 for all configurations",
+    "kv_bytes_per_token": 131072,
+    "max_model_len": 32768,
+    "gpu_memory_utilization": 0.9
+  },
+  "configurations": {
+    "BF16_REFERENCE": {
+      "weights_resident_GiB": 14.99,
+      "kv_cache_GiB": 4.84,
+      "kv_cache_tokens": 39664,
+      "max_concurrency_at_32k": 1.21,
+      "peak_process_VRAM_MiB": 22845,
+      "load_seconds": 67.33,
+      "kernel_path": "default BF16 GEMM",
+      "coarse_decode_tok_per_s": {
+        "short": 2.7,
+        "medium": 35.41,
+        "long": 19.14
+      },
+      "all_workloads_succeeded": true,
+      "artifact": "results/qualification/bf16_smoke.json"
+    },
+    "FP8_PRIMARY": {
+      "weights_resident_GiB": 8.49,
+      "kv_cache_GiB": 11.31,
+      "kv_cache_tokens": 92608,
+      "max_concurrency_at_32k": 2.83,
+      "peak_process_VRAM_MiB": 22739,
+      "load_seconds": 24.98,
+      "kernel_path": "CutlassFP8ScaledMMLinearKernel (CompressedTensorsW8A8Fp8)",
+      "coarse_decode_tok_per_s": {
+        "short": 64.69,
+        "medium": 61.05,
+        "long": 29.23
+      },
+      "all_workloads_succeeded": true,
+      "artifact": "results/qualification/fp8_smoke.json"
+    },
+    "FP4_PRIMARY": {
+      "weights_resident_GiB": 5.65,
+      "kv_cache_GiB": 14.57,
+      "kv_cache_tokens": 119360,
+      "max_concurrency_at_32k": 3.64,
+      "peak_process_VRAM_MiB": 23353,
+      "load_seconds": 83.92,
+      "kernel_path": "NvFp4LinearBackend.FLASHINFER_CUTLASS -> gen_gemm_sm120_module_cutlass_fp4",
+      "coarse_decode_tok_per_s": {
+        "short": 60.31,
+        "medium": 83.99,
+        "long": 37.73
+      },
+      "all_workloads_succeeded": true,
+      "artifact": "results/qualification/nvfp4_smoke.json"
+    }
+  },
+  "quality_rig": {
+    "full_vocab_logits_accessible": true,
+    "vocab_size": 128256,
+    "context_token_identity_across_configs": true,
+    "bytes_per_context_fp16": 256512,
+    "reference_storage_GiB": {
+      "1k_contexts": 0.24,
+      "10k_contexts": 2.39,
+      "100k_contexts": 23.89
+    },
+    "kl_nats": {
+      "BF16||FP8": {
+        "mean": 0.0004841013913093321,
+        "median": 0.000432327081186084,
+        "top1_agreement": 1.0
+      },
+      "BF16||NVFP4": {
+        "mean": 0.0020180751854689586,
+        "median": 0.0020673044822187943,
+        "top1_agreement": 1.0
+      },
+      "FP8||NVFP4": {
+        "mean": 0.0019518435292004384,
+        "median": 0.001660980339944156,
+        "top1_agreement": null
+      }
+    },
+    "artifact": "results/qualification/kl_feasibility.json",
+    "CAVEAT": "KL values are a FEASIBILITY DEMONSTRATION on 16 highly repetitive synthetic contexts. They are NOT a quality result and must not be cited as measured degradation."
+  },
+  "known_measurement_hazards": [
+    "BF16 short-workload decode rate (2.7 tok/s) is first-call warmup/CUDA-graph-capture contamination, not a real rate. Warmup policy must be enforced per EXPERIMENTAL_CONTRACT before any timed run.",
+    "torch.cuda.max_memory_allocated() reads 0.0 in the parent process because vLLM v1 runs the model in a separate EngineCore process. GPU memory must be measured via nvidia-smi or in-worker.",
+    "Coarse decode rates here are single-request, single-run, no warmup, no repetition. They are qualification sanity checks only.",
+    "GPU is power-limited at 145 W and SM clock fell from 2272 to ~1657-1980 MHz under load, so sustained-clock behavior must be recorded in final runs.",
+    "vLLM prints \"Engine core proc EngineCore died unexpectedly\" during normal interpreter shutdown; it is a shutdown race, not a run failure. Do not treat it as an error."
+  ]
+}
