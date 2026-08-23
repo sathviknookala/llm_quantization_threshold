@@ -282,10 +282,11 @@ are reported as a supporting observation rather than as part of the tradeoff cur
 
 Token counts alone do not define a workload. Each of the following can invalidate the sweep silently:
 
-1. **Prefix caching OFF.** vLLM V1 enables automatic prefix caching by default. With shared prompt
-   prefixes it makes prefill nearly free after the first request, producing a fast, clean,
-   successful-looking run that measures cache hits. Launch with prefix caching disabled and log the
-   hit rate regardless. See hazard H7.
+1. **Prefix caching OFF for serving runs.** vLLM V1 enables automatic prefix caching by default. With
+   shared prompt prefixes it makes prefill nearly free after the first request, producing a fast,
+   clean, successful-looking run that measures cache hits. Launch with prefix caching disabled and log
+   the hit rate regardless. See hazard H7. The quality rig deliberately enables it (D13,
+   `EVALUATION_RIG.md`); that exception does not extend to anything timed.
 2. **Real prompt corpus, prefix-disjoint.** Prompts are drawn from a fixed held-out corpus,
    tokenized and chunked to exactly 512 tokens, distinct per request, seeded, and reused
    byte-identically across all three configurations. The repeating filler sentence used during
@@ -461,6 +462,72 @@ configuration is then streamed against them, so only one reference set is ever h
 **Feed token IDs, not text.** Contexts are supplied as `prompt_token_ids` so tokenization cannot
 drift between configurations. `compute_kl.py` aborts if the stored contexts are not token-identical.
 
-**Note on scope:** this is a next-token-distribution rig (one distribution per context). If dense
-per-position KL is wanted later, `prompt_logprobs` returns every prompt position in one pass and
-would raise storage by roughly the context length — re-evaluate before adopting.
+**Extended 2026-08-23 for position-resolved KL.** D10's decode-dominated workload made
+single-position KL insufficient — it would evaluate quality at position 1 of a 2,048-position
+generation. The rig now measures teacher-forced KL at ten strided positions along a BF16-generated
+continuation, using **truncated prefixes**: for each position `p`, feed `prompt_token_ids[:p]` and
+read the next-token distribution through this same proven path. Full policy in `EVALUATION_RIG.md`.
+
+**`prompt_logprobs` was specified first and then measured infeasible (vLLM 0.19.1, 2026-08-23).** The
+earlier note here suggested it as the natural route to per-position KL. It is not:
+
+- full-vocab prompt logprobs over a 2,560-position context returns 328,335,360 `Logprob` objects per
+  context, on the order of 16 GB of host RAM in flight per request;
+- `sampling_params.py:425` sets `skip_reading_prefix_cache = self.prompt_logprobs is not None`, so it
+  also forfeits prefix-cache reuse of the repeated prefill.
+
+Ten truncated-prefix passes cost 1.28 million objects (~64 MB) and keep prefix caching available.
+Do not reintroduce the one-pass formulation.
+
+---
+
+## D14 — Perplexity corpus and token budget
+
+**Status:** OPEN (raised 2026-08-23)
+
+`EVALUATION_RIG.md` requires perplexity against fixed held-out corpora but has never named them. This
+gate is now explicit rather than an unowned `TBD`, because the quality arm cannot be built without it.
+
+To decide:
+
+- corpus or corpora, and the exact revision/slice;
+- token budget per configuration;
+- chunking and stride policy, which must match the KL rig's 512-token chunking unless there is a
+  stated reason to diverge;
+- whether perplexity is computed from the serving engine (consistent with D13's reasoning that
+  quality must belong to the deployed configuration) or from a separate path.
+
+**Constraint carried from D13.** The same argument that forced KL through the serving engine applies
+here: perplexity computed under a path that does not exercise the CUTLASS FP8/FP4 kernels would not
+be the perplexity of the deployed configuration. Do not resolve this by reaching for a transformers
+scoring script.
+
+**Constraint carried from the checkpoint deviation.** The corpus should be scored from raw token
+continuations, not chat-formatted prompts, while the `chat_template` provenance issue is open.
+
+---
+
+## D15 — Downstream task set
+
+**Status:** OPEN (raised 2026-08-23)
+
+`EVALUATION_RIG.md` calls for a deliberately limited suite spanning distinct capabilities and records
+that model selection no longer blocks the choice. The set itself is still unchosen.
+
+To decide:
+
+- which tasks, and how many;
+- harness and scoring implementation;
+- whether any are deferred until the license lands.
+
+**Blocked in part.** The served checkpoint carries a non-official `chat_template` (348 chars against
+the official multi-KB template). Chat-formatted task scores would be internally comparable across
+BF16/FP8/FP4 but not comparable to published Llama 3.1 numbers. Either prefer tasks scored from raw
+token continuations, or defer chat-formatted tasks until `meta-llama/Llama-3.1-8B-Instruct`
+@ `0e9e39f2` can be re-pinned.
+
+**Scope discipline.** The suite exists to detect capability-level degradation the KL and perplexity
+views might miss, not to produce a leaderboard. Resist expansion; see D12's reasoning about method
+families, which applies equally to task families.
+
+---

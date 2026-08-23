@@ -48,21 +48,42 @@ position from a 512-token context would evaluate quality at **position 1 of a 2,
 generation**. That gap was peripheral under a mixed-workload design; under a decode-dominated one it
 is central, and the rig is extended accordingly.
 
-**Teacher-forced continuation KL at strided positions.**
+**Teacher-forced continuation KL at strided positions, via truncated prefixes.**
 
 1. Generate a continuation from the BF16 reference for each context (512 prompt + 2048 generated).
-2. Feed the *same* token sequence to all three configurations as `prompt_token_ids`.
-3. Recover per-position distributions in one pass with `prompt_logprobs` (D13 already notes this
-   returns every prompt position per pass).
-4. Retain only the strided positions:
+   This token sequence is the fixed evaluation context; it is stored and reused byte-identically.
+2. For each strided position `p`, feed `prompt_token_ids[:p]` to every configuration and take the
+   next-token distribution with the ordinary `SamplingParams(logprobs=128256)` call proven in D13.
+3. Strided positions:
 
 ```text
 1, 8, 32, 64, 128, 256, 512, 1024, 1536, 2048
 ```
 
-**Why strided and not dense.** Storing every position is out of reach — 250 KiB x 2,560 positions is
-640 MiB per context, 64 GiB at 100 contexts. Ten retained positions is 2.5 MiB per context and
-250 MiB at 100 contexts, which is tractable on the same terms D13 established.
+Ten passes per context per configuration. Feeding the prefix that ends at `p` and reading the
+next-token distribution is exactly teacher-forced KL at position `p`, so this is equivalent to the
+one-pass formulation and not an approximation of it.
+
+**Why not `prompt_logprobs` in a single pass — measured against vLLM 0.19.1, 2026-08-23.** The
+one-pass formulation was specified first and does not work at this scale:
+
+- Full-vocab prompt logprobs over a 2,560-position context returns **328,335,360 `Logprob` objects
+  per context** — on the order of 16 GB of host RAM in flight per request even at an optimistic
+  50 bytes per entry. There is no cap preventing the request; `max_logprobs` is already 128256. It
+  simply is not feasible.
+- `sampling_params.py:425` sets `skip_reading_prefix_cache = self.prompt_logprobs is not None`, so
+  requesting prompt logprobs also disables prefix-cache reads and the repeated prefill cannot be
+  amortized.
+
+The truncated-prefix formulation costs 10 x 128,256 = 1.28 million objects per context (~64 MB) and,
+because it uses `logprobs` rather than `prompt_logprobs`, keeps prefix caching available — so the ten
+passes over a shared context reuse the prefill. Storage is unchanged at 250 KiB per retained
+position, 2.5 MiB per context, 250 MiB at 100 contexts.
+
+**Prefix caching is ENABLED for the quality rig.** This is the opposite of the serving contract, and
+deliberately so: here the shared prefix is the same token sequence by construction, caching changes
+no returned distribution, and it is what makes ten passes affordable. Prefix caching remains disabled
+for all serving runs (H7).
 
 **Contexts are drawn from the same corpus and the same 512-token chunking as the serving workload**,
 so quality and serving are measured on the same distribution. Narrowing to one workload removes the
@@ -102,7 +123,10 @@ absolute Delta PPL
 relative Delta PPL where useful
 ```
 
-The corpus/corpora and token budget remain **TBD**.
+The corpus/corpora and token budget are an open tracked gate: **D14**. Two constraints already bind
+the answer — perplexity must be computed through the serving engine for the same reason D13 requires
+it of KL, and the corpus should be scored from raw token continuations while the `chat_template`
+provenance deviation is open.
 
 ## 3. Downstream tasks
 
@@ -116,8 +140,8 @@ Desired capability coverage may include:
 - mathematical reasoning;
 - instruction following if appropriate.
 
-Task set: **still TBD, but no longer blocked** — the model is selected (Llama 3.1 8B Instruct,
-D6). Note the constraint from checkpoint provenance: the current tokenizer carries a non-official
+Task set: open tracked gate **D15** — no longer blocked by model selection (Llama 3.1 8B Instruct,
+D6), but partly blocked by checkpoint provenance: the current tokenizer carries a non-official
 `chat_template`, so any chat-formatted task yields scores that are internally comparable across
 BF16/FP8/FP4 but **not** comparable to published Llama 3.1 numbers until the official
 `tokenizer_config.json` is re-pinned. Prefer tasks scored from raw token continuations, or defer

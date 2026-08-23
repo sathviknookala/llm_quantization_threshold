@@ -147,11 +147,21 @@ FP8            8.49 GiB   11.31 GiB      92,608         36  /  60         Cutlas
 FP4 (NVFP4)    5.65 GiB   14.57 GiB     119,360         46  /  77         SM120 CUTLASS FP4 (flashinfer)
 ```
 
-**Next:** run the pilot. Its jobs are to test D10's falsifiable prediction (below the wall, throughput
-ratio should equal weight-size ratio), confirm the BF16 wall appears in the 15-25 band, measure
-run-to-run variance against the provisional 3 repetitions, and record achievable memory bandwidth.
-Then build the quality + serving harness under the locked warmup and steady-state rules. Phase 1
-deliverable is the quality-loss vs sustainable-concurrency curve for this one model.
+**Next — planned order.** The pilot is defined in `EXPERIMENTAL_CONTRACT.md` with five jobs (P1-P5)
+and exit criteria; it validates the contract's free parameters and produces no results.
+
+```text
+1. serving harness + pilot (P1-P5) + KL correctness gate   <- current step
+2. serving sweep                                            overnight, GPU-exclusive
+3. quality run                                              KL first; PPL/tasks need D14/D15
+```
+
+The correctness gate sits *before* the sweep, not after: timing a corrupted checkpoint wastes the
+most expensive resource in the project. The quality harness can be **written** while the sweep runs;
+only its execution serializes on the GPU. Inside the quality arm the BF16 continuations and reference
+distributions must be produced first, then each quantized configuration streams against them.
+
+Phase 1 deliverable is the quality-loss vs sustainable-concurrency curve for this one model.
 
 ## Last session
 
@@ -173,6 +183,15 @@ deliverable is the quality-loss vs sustainable-concurrency curve for this one mo
   the KV wall is a band and preemption-by-recompute makes degradation superlinear).
 - Extended the quality rig to teacher-forced KL at ten strided positions across the 2,048-token
   generation, since measuring quality at position 1 of a 2,048-position workload was the central gap.
+- Then measured the first formulation of that rig infeasible and replaced it. Full-vocab
+  `prompt_logprobs` over 2,560 positions returns 328M `Logprob` objects (~16 GB host RAM per request)
+  and disables prefix-cache reads. Ten truncated-prefix passes over the already-proven D13 path cost
+  ~64 MB and keep caching. Recorded in D13 so it is not reintroduced.
+- Defined the pilot formally (P1-P5 plus a KL correctness gate) and added the sub-wall bandwidth-bound
+  check: P1 now runs at concurrency 1, 8 and 12, because D11's whole decomposition rests on the sweep
+  being bandwidth-bound and nothing had measured that.
+- Opened D14 (perplexity corpus and token budget) and D15 (downstream task set), converting the last
+  unowned `TBD`s in the quality rig into tracked gates.
 
 ## Known issues / unresolved premises
 
@@ -195,6 +214,11 @@ deliverable is the quality-loss vs sustainable-concurrency curve for this one mo
 - **The teacher-forced KL rig measures divergence given BF16's trajectory**, not free-running drift of
   each configuration's own generation. Whether divergence compounds through the sampling loop is
   untested.
+- **The sweep is assumed memory-bandwidth-bound throughout, and that is not yet measured.** D11's
+  bandwidth-vs-capacity decomposition depends on it. Pilot job P1 tests it at concurrency 1, 8 and 12;
+  if the ratio decays before the BF16 wall at 15, the decomposition must be reopened.
+- **The quality arm has two open gates.** D14 (perplexity corpus and token budget) and D15 (downstream
+  task set) are unresolved, and chat-formatted tasks stay blocked by the `chat_template` deviation.
 - **Calibration sensitivity is untested, and applies only to FP4.** FP8 needs no calibration, so the
   calibration-robustness study is FP4-only. The single FP4 draw used 128 ultrachat samples, seed 0.
 - **FP4's first load pays a ~61 s flashinfer JIT build.** Cached now, but it must never leak into a

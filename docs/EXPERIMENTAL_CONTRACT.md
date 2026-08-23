@@ -252,6 +252,65 @@ The repetition count is provisional precisely because pilot variance has not bee
 run-to-run spread is large relative to the FP8-to-FP4 gap, raise it before final collection rather
 than reporting an unresolved difference.
 
+## Pilot
+
+**Defined 2026-08-23.** Several rules in this document are marked provisional "after pilot". This
+section says what the pilot is, so that phrase has a referent.
+
+The pilot exists to **validate the free parameters of the contract**, not to produce a small version
+of the experiment. Nothing it measures is a result, and no pilot number may be quoted as one.
+
+### Jobs
+
+**P1 — Test the weight-size-ratio prediction below the wall.** D10 predicts that in the
+bandwidth-bound region the throughput ratio between configurations equals the weight-size ratio
+(BF16:FP8:FP4 = 16.10 : 9.12 : 6.07 GB, so 1.77x and 2.65x over BF16). Run at concurrency
+**1, 8, and 12** — not batch 1 alone.
+
+Running it at several sub-wall points is the substance of the check, not a refinement of it. The
+entire bandwidth-vs-capacity decomposition in D11 assumes the sweep is memory-bandwidth-bound
+throughout, and that assumption is currently supported by an arithmetic-intensity argument with no
+measurement behind it. If the ratio holds at concurrency 1 but decays by 12, the card is entering
+compute saturation before the BF16 KV wall at 15, the below-wall region stops being a clean bandwidth
+reading, and D11's decomposition needs revisiting before the sweep runs.
+
+**P2 — Confirm the BF16 KV wall.** It should appear between concurrency 15 (peak footprint basis) and
+25 (mean occupancy basis). Confirm by observing preemption onset and KV-block saturation, not by
+throughput shape alone. If the wall is materially outside that band the D11 concurrency points do not
+bracket it and must be re-chosen.
+
+**P3 — Measure run-to-run variance.** The 3-repetition rule is provisional. Estimate the run-level
+spread at two or three concurrency points and compare it to the FP8-to-FP4 gap. If spread is large
+relative to that gap, raise the repetition count before final collection rather than reporting an
+unresolved difference.
+
+**P4 — Record achievable memory bandwidth.** The governing hardware constant for this study is absent
+from `HARDWARE_PROFILE.md`. Capture the vendor spec figure and an achieved measurement on this card.
+
+**P5 — Verify the workload plumbing.** Prefix-cache hit rate is zero, output length is exactly 2048
+for every request, prompts are prefix-disjoint, the steady-state gate fires as specified, and the
+per-point counters required by D11 (preemption, recompute, queue depth, KV-block utilisation) are
+actually emitted by this vLLM build.
+
+### Correctness gate — runs with the pilot, before the sweep
+
+Section E of `EVALUATION_RIG.md` requires a correctness gate before any timing is treated as
+meaningful. It belongs here rather than after the sweep: timing a corrupted checkpoint wastes the
+most expensive resource in the project.
+
+Run a small KL smoke — order 16-32 contexts, position 1 only — across BF16/FP8/FP4. This is a
+**sanity gate, not a quality result**, and reuses the D13 path. An implausibly large divergence means
+a broken checkpoint or an unintended execution path, and the sweep must not start.
+
+Confirm alongside it that each configuration still dispatches to its intended kernel, since the
+qualification evidence predates any harness code.
+
+### Exit criteria
+
+The sweep may start when P1-P5 pass and the correctness gate is clean. P1 or P2 failing is not a
+reason to proceed with an adjusted interpretation — both feed decisions (D10's prediction, D11's
+bracketing) that would have to be reopened first.
+
 ## GPU state and telemetry
 
 Before every final timed run:
@@ -415,8 +474,13 @@ almost nothing. A `PREFILL_PROBE` run under those conditions measures cache hits
 reports an 8,192-token prompt as nearly free. `DECODE_PRIMARY` is less exposed because its prompt is
 short, but a cached prefix also perturbs KV occupancy and therefore the wall position.
 
-**Rule:** disable prefix caching for all final runs, use a prefix-disjoint prompt corpus, and log the
-hit rate regardless. A non-zero hit rate invalidates the cell.
+**Rule:** disable prefix caching for all **serving** runs, use a prefix-disjoint prompt corpus, and
+log the hit rate regardless. A non-zero hit rate invalidates the cell.
+
+**The quality rig is the deliberate exception.** `EVALUATION_RIG.md` enables prefix caching for
+teacher-forced KL, where the shared prefix is the same token sequence by construction, caching changes
+no returned distribution, and it is what makes ten truncated-prefix passes affordable. That exception
+does not extend to anything timed.
 
 ### H8 — KV occupancy grows during the run, so the KV wall is a band and preemption is superlinear
 
