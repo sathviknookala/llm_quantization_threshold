@@ -1,0 +1,12 @@
+# Model checkpoints and derived quantized artifacts (tens of GB)
+checkpoints/
+models/
+
+# Raw logits tensors: large, binary, and regenerable from scripts/ at a fixed seed.
+# The tracked JSON summaries carry the numbers and the context identity checks.
+*.npy
+
+# OS / editor cruft
+.DS_Store
+__pycache__/
+*.pyc
