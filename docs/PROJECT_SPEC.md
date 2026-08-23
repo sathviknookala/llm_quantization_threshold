@@ -234,32 +234,44 @@ Serve each deployment configuration through the same inference stack and measure
 - P99 latency where sample count supports it;
 - maximum sustainable concurrency.
 
-### Workload regimes
+### Workload regimes — narrowed 2026-08-23 (D10)
 
-The primary study should include three predeclared workload shapes:
+Phase 1 adopts a **memory-focused lens** and one primary workload rather than a trio of shapes:
 
 ```text
-prefill-heavy: long prompt, short generation
-decode-heavy:  short prompt, long generation
-balanced:      moderate prompt, moderate generation
+DECODE_PRIMARY    512 in / 2048 out    primary, full concurrency sweep
+PREFILL_PROBE    8192 in /   32 out    supporting observation only
 ```
 
-Exact token counts are intentionally not locked yet. They belong in `EXPERIMENTAL_CONTRACT.md` once selected.
+This is a deliberate scope change from the earlier prefill-heavy / balanced / decode-heavy design,
+recorded as a tracked decision. The reasoning: the memory lens needs **resolution near the KV wall**
+more than it needs shape variety, and dropping workload breadth is what pays for that resolution
+within the same GPU-time budget. Full justification, wall arithmetic, and rejected alternatives are
+in D10.
+
+Workload shape is therefore not a primary experimental variable in phase 1. The tradeoff curve is
+traced along concurrency alone.
 
 ### Concurrency sweep
 
-Sweep concurrency from low load toward saturation, for example:
+Locked in D11 and `EXPERIMENTAL_CONTRACT.md`:
 
 ```text
-1 -> 4 -> 8 -> 16 -> ... -> saturation
+DECODE_PRIMARY:  1, 4, 8, 12, 16, 24, 32, 48, 64, 96
 ```
 
-The exact levels may change after pilot measurements. Final levels must be locked before final benchmark collection.
+Dense through 12-48, where all three configurations' KV walls sit. Saturation is defined by an
+explicit SLO (`TPOT P95 <= 50 ms`), not by inspecting a throughput curve.
 
-The concurrency sweep is important because quantization can create serving value through both:
+The concurrency sweep carries the whole decomposition, because under a bandwidth-bound decode
+workload both halves of quantization's benefit come from weight residency shrinking:
 
-1. faster compute / memory movement; and
-2. lower model-resident memory, leaving more room for KV cache and concurrent requests.
+1. **bandwidth** — fewer weight bytes read per decode step; visible below the KV wall;
+2. **capacity** — fewer weight bytes resident, leaving more KV for concurrent sequences; visible as
+   the widening gap above the KV wall.
+
+Because the sweep stays bandwidth-bound throughout, it does not measure the arithmetic/tensor-core
+benefit of low precision. `PREFILL_PROBE` supplies a bounded observation of that instead.
 
 ---
 

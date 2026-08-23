@@ -43,9 +43,11 @@ Primary experimental variables:
 
 ```text
 Deployment configuration: BF16 / FP8 / FP4 recipe
-Workload profile:         prefill-heavy / balanced / decode-heavy
-Concurrency:              selected sweep through saturation
+Concurrency:              locked sweep through the SLO boundary (D11)
 ```
+
+Workload shape is **not** a primary variable in phase 1. D10 narrows the study to one primary
+workload plus a supporting probe, so the tradeoff curve is traced along concurrency alone.
 
 Conditional variable:
 
@@ -90,47 +92,107 @@ Hold constant within quality comparisons:
 
 ## Workload profiles
 
-Exact token counts are not yet locked.
+**LOCKED 2026-08-23 (D10).** Phase 1 is a memory-focused study with one primary workload and one
+supporting probe. The earlier prefill-heavy / balanced / decode-heavy trio is superseded.
 
-### PREFILL_HEAVY
-
-```text
-Input tokens:   TBD — long
-Output tokens:  TBD — short
-Purpose:        emphasize prompt processing / prefill
-```
-
-### BALANCED
+### DECODE_PRIMARY
 
 ```text
-Input tokens:   TBD — moderate
-Output tokens:  TBD — moderate
-Purpose:        representative mixed serving regime
+Input tokens:    512  exact
+Output tokens:  2048  exact, ignore_eos=True
+Peak KV/seq:    2,560 tokens = 0.3125 GiB   (128 KiB per token)
+Purpose:        primary tradeoff curve; bandwidth-bound decode across the KV wall
 ```
 
-### DECODE_HEAVY
+Concurrency at which each configuration becomes KV-limited:
 
 ```text
-Input tokens:   TBD — short
-Output tokens:  TBD — long
-Purpose:        emphasize autoregressive decode
+              KV wall (peak)   KV wall (mean occupancy, 1,536 tok)
+BF16                      15                                   25
+FP8                       36                                   60
+FP4                       46                                   77
 ```
 
-Token counts should be selected after pilot runs but **before** final comparisons. Do not tune them separately for each precision configuration.
+Occupancy grows 5x over a sequence's life, so the wall is a band between these two columns rather
+than a single concurrency. See hazard H8.
+
+### PREFILL_PROBE
+
+```text
+Input tokens:   8192  exact
+Output tokens:    32  exact, ignore_eos=True
+Purpose:        bounded observation of the arithmetic benefit, which DECODE_PRIMARY cannot see
+Scope:          concurrency 1, 2, 4, 8. No repetition structure. Not part of the tradeoff curve.
+```
+
+### Workload definitions frozen alongside the token counts
+
+These are part of the workload, not harness details. Any one of them can invalidate a sweep silently.
+
+- **Prefix caching disabled.** Launch with automatic prefix caching off and log the hit rate anyway.
+  See hazard H7.
+- **Prompt corpus.** Fixed held-out corpus, tokenized and chunked to exactly 512 (or 8192) tokens,
+  prefix-disjoint, distinct per request, seeded, and reused byte-identically across all
+  configurations. The repeating filler sentence used at qualification is not acceptable for final
+  runs.
+- **`ignore_eos=True` with exact output length.** Otherwise output length becomes a dependent
+  variable of precision.
+- **Fixed-exact lengths, not sampled.** Homogeneous batches; the realism cost is recorded in
+  `LIMITATIONS.md`.
+- **Greedy decoding** (`temperature=0`) for serving runs, so sampling variance does not enter timing.
+
+Token counts are not tuned per precision configuration.
 
 ## Concurrency sweep
 
-Current candidate structure:
+**LOCKED 2026-08-23 (D11).**
 
 ```text
-1 -> 4 -> 8 -> 16 -> ... -> saturation
+DECODE_PRIMARY:  1, 4, 8, 12, 16, 24, 32, 48, 64, 96
+PREFILL_PROBE:   1, 2, 4, 8
 ```
 
-Exact points: **TBD after pilot**.
+Ten points for the primary workload, dense through 12-48 where all three KV walls sit.
+3 configurations x 10 points x 3 repetitions = 90 timed cells.
 
-Define “saturation” before final runs. A usable definition should be based on an observable serving condition such as throughput flattening while latency grows rapidly, backend queue saturation, memory capacity, or an explicit SLO boundary.
+### Saturation criterion
 
-Do not stop a concurrency sweep merely because one configuration “looks fast enough.”
+Saturation is defined by an explicit SLO, not by inspection of a throughput curve:
+
+```text
+SLO:  TPOT P95 <= 50 ms   (20 output tok/s per user)
+```
+
+The headline capacity metric per configuration is **maximum concurrency sustained within the SLO**.
+
+### Cell-abort rule
+
+Predeclared so the decision is never made ad hoc mid-run:
+
+- A cell is aborted and recorded as `SLO_VIOLATED` if TPOT P95 exceeds **10x the SLO** (500 ms) or if
+  the cell exceeds its wall-clock cap of **15 minutes**.
+- Once a configuration violates the SLO at concurrency C, higher concurrency points for that
+  configuration are skipped and recorded as `SKIPPED_PAST_SLO`.
+
+Aborted and skipped cells are results and must be written to the artifact, not omitted. Do not stop a
+sweep merely because one configuration "looks fast enough."
+
+### Per-point logging requirements
+
+Without these the bandwidth region and the capacity region cannot be distinguished after the fact:
+
+- whether the configuration was KV-limited at that point;
+- preemption count;
+- recomputed-token count;
+- queue depth and time-in-queue;
+- KV-block utilisation;
+- prefix-cache hit rate (expected zero; a non-zero value invalidates the cell).
+
+### Run ordering
+
+Configurations must be **counterbalanced or randomized across repetitions**, not run in a fixed
+BF16 -> FP8 -> FP4 order. Over a multi-hour sweep the card heats and clocks fall (H6), so a fixed
+order systematically favours whichever configuration always runs first on a cool card.
 
 ## Warmup
 
@@ -146,28 +208,49 @@ established by measurement — see hazards H1 and H2:**
 - **Never let the FP4 flashinfer JIT build enter a serving metric.** It is cached at
   `~/.cache/flashinfer/0.6.6/120a/cached_ops/fp4_gemm_cutlass_sm120/` and must be warm before timing.
 
-The final contract must still specify:
+**Locked 2026-08-23 — steady-state entry.** `DECODE_PRIMARY` needs more than first-call warmup,
+because per-sequence KV occupancy grows 5x over a sequence's life (H8). A run begins un-limited and
+only becomes KV-limited partway through, so a window opened too early measures the transient rather
+than the regime.
 
-- model-load exclusion;
-- number or duration of warmup requests;
-- whether CUDA graph / compilation / kernel autotuning warmup is required;
-- whether warmup is repeated after changing workload shape or concurrency;
-- what cache state is allowed at the start of timed runs.
+- **Model load and engine init are excluded** from every metric. Reuse one engine process across all
+  concurrency points for a configuration.
+- **Warmup requests:** discard all completions until the client has held the target concurrency for
+  at least **one full sequence lifetime** (2,048 output tokens at the observed rate), then discard
+  one further generation per slot. Only after that does the timed window open.
+- **Steady-state gate:** the timed window may not open until KV-block utilisation has been
+  non-decreasing across two consecutive 10 s telemetry samples, or has reached its ceiling.
+- **Warmup is repeated after every change of concurrency**, not only after engine start. Changing
+  concurrency changes the steady-state occupancy, so the previous steady state does not carry over.
+- **Cache state:** prefix caching disabled; flashinfer JIT artifacts warm before timing.
 
-Warmup must be sufficient to exclude one-time initialization from steady-state serving results.
+Warmup must be sufficient to exclude both one-time initialization and the occupancy transient from
+steady-state serving results.
 
 ## Repetitions and duration
 
-**TBD after pilot variance measurement.**
+**Provisional 2026-08-23 — 3 repetitions, confirm against pilot variance before final collection.**
 
-The final rule must specify:
+- **Repetitions:** 3 independent runs per cell, each with its own warmup and its own engine-process
+  restart between repetitions of the same configuration. Repetitions are counterbalanced against
+  configuration order (see "Run ordering").
+- **Timed window:** `max(120 s, 4 x concurrency completed requests)`, capped by the 15-minute
+  cell-abort limit. The request-count floor matters at low concurrency, where a single BF16 request
+  takes roughly 51 s; the duration floor matters at high concurrency, where requests complete fast
+  enough that a count-based window would be too short to be a regime measurement.
+- **Aggregation:** report the median across repetitions with the full spread; the run-level sample
+  size is 3, not the number of requests inside a run. Do not treat thousands of requests inside one
+  process as thousands of independent hardware experiments.
+- **Latency percentiles** are computed within a run across requests, then summarised across runs.
+  Note that `DECODE_PRIMARY` yields 2,048 inter-token samples per request, so TPOT percentiles are
+  well resolved even at concurrency 1; TTFT and end-to-end percentiles are the ones limited by
+  request count.
+- **Outliers:** no run is discarded for being slow. A run is discarded only if it meets a
+  `Run validity` failure condition, and it is retained in the artifact marked invalid.
 
-- number of independent benchmark repetitions;
-- timed duration or completed-request count per repetition;
-- how median / mean and confidence intervals are computed;
-- whether outlier runs are ever discarded and, if so, under what predeclared rule.
-
-Do not choose repetition count solely from convenience. Use pilot variance to determine what is needed to resolve effects of practical interest.
+The repetition count is provisional precisely because pilot variance has not been measured. If pilot
+run-to-run spread is large relative to the FP8-to-FP4 gap, raise it before final collection rather
+than reporting an unresolved difference.
 
 ## GPU state and telemetry
 
@@ -188,7 +271,10 @@ During final serving runs, collect enough telemetry to observe at least:
 - memory clock;
 - PCIe link generation/width at least during validation or representative load.
 
-The exact sampling tool/cadence is **TBD**.
+**Cadence locked 2026-08-23: 10 s.** The steady-state gate in "Warmup" is defined in terms of two
+consecutive telemetry samples, so the cadence is part of the contract rather than a harness choice.
+Engine-side counters (KV-block utilisation, preemption, recompute, queue depth) are sampled on the
+same 10 s tick so GPU telemetry and scheduler state can be aligned per point.
 
 ## Run validity
 
@@ -202,7 +288,14 @@ A final serving run is invalid if any of the following occurs:
 - the benchmark client cannot supply requests fast enough to sustain the target load;
 - thermal/power behavior is clearly abnormal relative to the locked environment;
 - result rows are missing or only partially written;
-- the run uses different software/configuration without being labeled as a separate treatment.
+- the run uses different software/configuration without being labeled as a separate treatment;
+- the prefix-cache hit rate is non-zero (H7);
+- the timed window opened before the occupancy transient settled (H8);
+- the requested output length was not enforced exactly, so the output-token count varies with
+  configuration.
+
+A cell recorded as `SLO_VIOLATED` or `SKIPPED_PAST_SLO` under the cell-abort rule is a **valid
+result**, not an invalid run.
 
 Invalid runs should be preserved or logged as invalid rather than silently deleted when they reveal a systematic failure mode.
 
@@ -306,6 +399,47 @@ not at fixed clocks.
 
 **Rule:** record power, SM clock, and temperature per run (the qualification harness already does)
 so a clock-limited run can be distinguished from a genuine configuration difference.
+
+## Measurement hazards identified during workload design (2026-08-23)
+
+These were not observed at qualification. They are consequences of the locked `DECODE_PRIMARY` shape
+and were identified while resolving D10/D11. Both produce runs that look successful.
+
+### H7 — Automatic prefix caching can silently delete the workload
+
+vLLM V1 enables automatic prefix caching by default. The qualification harness drove every request
+with the same repeating filler sentence, so requests shared long prefixes.
+
+With caching on and shared prefixes, prefill after the first request is served from cache and costs
+almost nothing. A `PREFILL_PROBE` run under those conditions measures cache hits, not prefill, and
+reports an 8,192-token prompt as nearly free. `DECODE_PRIMARY` is less exposed because its prompt is
+short, but a cached prefix also perturbs KV occupancy and therefore the wall position.
+
+**Rule:** disable prefix caching for all final runs, use a prefix-disjoint prompt corpus, and log the
+hit rate regardless. A non-zero hit rate invalidates the cell.
+
+### H8 — KV occupancy grows during the run, so the KV wall is a band and preemption is superlinear
+
+Under `DECODE_PRIMARY` a sequence's footprint grows 5x over its life, from 512 to 2,560 tokens. Two
+consequences:
+
+**The wall is not a threshold.** At fixed concurrency the system starts un-limited and becomes
+KV-limited partway through. The BF16 wall is at concurrency 15 by peak footprint but 25 by mean
+occupancy, and the true onset lies between. Reporting a single "wall concurrency" without saying
+which basis was used is a category error.
+
+**Degradation past the wall is superlinear, not a plateau.** vLLM's default preemption mode is
+recomputation, so a preempted sequence discards its KV and redoes its prefill. Past the wall this
+creates a feedback loop: preemption causes recompute, recompute consumes throughput, which lengthens
+residency, which causes more preemption.
+
+This is the effect the memory lens exists to measure — but only if it is logged. Preemption count and
+recomputed-token count must be recorded per point (D11). Without them the collapse is indistinguishable
+from a generic slowdown and the capacity contribution becomes an argument instead of a measurement.
+
+**Rule:** open the timed window only after the occupancy transient has settled (see "Warmup"), record
+preemption and recompute counters per point, and state which basis (peak or mean) any quoted wall
+concurrency uses.
 
 ## Result identity
 

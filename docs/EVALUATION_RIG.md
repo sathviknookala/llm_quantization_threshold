@@ -41,6 +41,37 @@ At minimum, save enough data to report:
 
 Do not retain only a single mean if doing so prevents tail or uncertainty analysis later.
 
+### Context and position policy — LOCKED 2026-08-23
+
+D10 makes the primary workload 512 input / 2048 output tokens. A next-token KL measured at a single
+position from a 512-token context would evaluate quality at **position 1 of a 2,048-position
+generation**. That gap was peripheral under a mixed-workload design; under a decode-dominated one it
+is central, and the rig is extended accordingly.
+
+**Teacher-forced continuation KL at strided positions.**
+
+1. Generate a continuation from the BF16 reference for each context (512 prompt + 2048 generated).
+2. Feed the *same* token sequence to all three configurations as `prompt_token_ids`.
+3. Recover per-position distributions in one pass with `prompt_logprobs` (D13 already notes this
+   returns every prompt position per pass).
+4. Retain only the strided positions:
+
+```text
+1, 8, 32, 64, 128, 256, 512, 1024, 1536, 2048
+```
+
+**Why strided and not dense.** Storing every position is out of reach — 250 KiB x 2,560 positions is
+640 MiB per context, 64 GiB at 100 contexts. Ten retained positions is 2.5 MiB per context and
+250 MiB at 100 contexts, which is tractable on the same terms D13 established.
+
+**Contexts are drawn from the same corpus and the same 512-token chunking as the serving workload**,
+so quality and serving are measured on the same distribution. Narrowing to one workload removes the
+need to stratify KL across context-length buckets: one stratum, sampled along the generation axis
+instead of across prompt lengths.
+
+**Report KL as a function of position**, not only pooled. Whether degradation is flat or accumulates
+over a long generation is a first-order question for a decode-heavy deployment, and pooling hides it.
+
 ### Comparisons
 
 Primary:
@@ -162,14 +193,35 @@ Do not summarize an entire serving regime with one latency number if quantizatio
 
 ## 4. Concurrency / saturation
 
-Sweep the locked concurrency values from low load through saturation.
+Sweep the locked D11 concurrency values through the SLO boundary.
 
-The analysis should reveal both:
+### Headline serving metric — LOCKED 2026-08-23
 
-- how quickly a single/few requests are served;
-- how much aggregate load the configuration can sustain.
+```text
+maximum concurrency sustained within  TPOT P95 <= 50 ms
+```
 
-Lower precision may create its largest practical advantage by freeing VRAM for more concurrent KV cache rather than by reducing single-request latency.
+Under a memory-focused lens this, not raw tok/s, is the primary serving quantity: "maximum
+sustainable concurrency" has no meaning without a latency bound, because concurrency can always be
+raised by accepting worse latency. The deliverable sentence is *BF16 serves N concurrent users at
+20 tok/s each; FP8 serves N'; FP4 serves N''.*
+
+Aggregate throughput at the SLO boundary is reported alongside it.
+
+### Read the sweep by region
+
+```text
+below the BF16 KV wall   throughput gap = bandwidth benefit  (fewer weight bytes read per step)
+above the BF16 KV wall   widening gap   = capacity benefit   (fewer weight bytes resident -> more KV)
+```
+
+Both halves are consequences of weight residency shrinking. The below-wall region carries a
+falsifiable prediction from D10: the throughput ratio there should equal the weight-size ratio. Test
+it explicitly rather than assuming it.
+
+Because the sweep is bandwidth-bound throughout, it does **not** measure the arithmetic benefit of
+low precision. `PREFILL_PROBE` supplies a bounded observation of that; do not extrapolate it into the
+tradeoff curve.
 
 ---
 
@@ -197,15 +249,23 @@ Possible final visualization:
 
 ```text
 x-axis: serving improvement
-        throughput / latency / memory / concurrency view
+        primary:   max concurrency sustained at TPOT P95 <= 50 ms
+        secondary: aggregate throughput at the SLO boundary; KV tokens resident
 
 y-axis: model-quality degradation
-        KL / PPL / task view
+        KL (pooled and by generation position) / PPL / task view
 points: BF16, FP8, FP4 configurations
-facets: workload and, if adopted, model
+facets: generation position, and, if adopted, model
 ```
 
-A single universal “knee” may not exist. The result may instead be a workload-dependent boundary.
+The workload facet is gone in phase 1 — D10 narrows the study to one primary workload, so the curve
+is traced along concurrency rather than across shapes. The facet that replaces it is **generation
+position**, which asks whether the quality cost of a step is constant over a long generation or grows
+with it.
+
+A single universal “knee” may not exist. The result may instead be a concurrency-dependent boundary:
+a step that is not worth taking at low load may be clearly worth taking past the BF16 KV wall,
+because the capacity benefit only exists there.
 
 ---
 

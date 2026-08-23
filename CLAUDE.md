@@ -109,56 +109,70 @@ A valid result may favor BF16, FP8, FP4, different choices for different workloa
 
 ## Current focus
 
-**Model qualification is complete and the precision ladder is locked.** Llama 3.1 8B Instruct is
-QUALIFIED as the phase-1 primary model. BF16, FP8 (W8A8 E4M3) and FP4 (NVFP4 W4A4) all build from
-one verified checkpoint, serve on the target GPU, and each dispatches to its intended native kernel.
-The quality rig's full-logits/KL path is measured feasible. **No final benchmark collection has
-started** — workload token counts and concurrency points are still open.
+**The workload and concurrency contract is locked. Phase 1 is a memory-focused study.** Model
+qualification is complete, the precision ladder is locked, and D10/D11 are now resolved: one primary
+decode-dominated workload swept across concurrency, with an explicit latency SLO as the saturation
+criterion. **No final benchmark collection has started** — the next step is a pilot, then the harness.
 
 Current conclusions:
 
 1. The core experimental dimension is the quantization/deployment configuration.
 2. BF16 is the common high-precision reference; it is not the maximum precision supported by the GPU.
 3. BF16 fit is the binding constraint, and at 8B it is genuinely tight: 14.99 GiB of weights leaves
-   4.84 GiB of KV cache (1.21x concurrency at 32k). This is the regime where quantization buys
-   capacity, not just speed.
+   4.84 GiB of KV cache. This is the regime where quantization buys capacity, not just speed.
 4. The ladder is locked: BF16 -> FP8 -> NVFP4, all three natively executed on SM120.
 5. KV-cache precision is held at BF16 across the whole ladder, so measured capacity gains are
-   attributable to weight residency alone.
+   attributable to weight residency alone. FP8 KV cache is the natural phase 2, not a phase-1 gap.
 6. Hardware is fixed experimental context/control, not an independent variable.
 7. The driver (575.64.03 / CUDA 12.9) caps the serving stack at vLLM 0.19.1. This costs nothing the
    ladder needs — SM120 CUTLASS FP8 and FP4 are both present in that build.
+8. **Both halves of the benefit come from weight residency shrinking.** Under the locked workload the
+   sweep is memory-bandwidth-bound throughout, so the split is bandwidth vs capacity, not compute vs
+   capacity. This supersedes the earlier compute-vs-capacity framing in D11.
 
-Measured at qualification (coarse — see hazards H1/H2 in `EXPERIMENTAL_CONTRACT.md`):
+Locked workload and sweep (D10, D11):
 
 ```text
-              weights     KV cache    KV tokens   conc@32k   kernel
-BF16          14.99 GiB    4.84 GiB      39,664     1.21x    default BF16 GEMM
-FP8            8.49 GiB   11.31 GiB      92,608     2.83x    CutlassFP8ScaledMMLinearKernel
-FP4 (NVFP4)    5.65 GiB   14.57 GiB     119,360     3.64x    SM120 CUTLASS FP4 (flashinfer)
+DECODE_PRIMARY    512 in / 2048 out    concurrency 1,4,8,12,16,24,32,48,64,96   3 repetitions
+PREFILL_PROBE    8192 in /   32 out    concurrency 1,2,4,8                       no repetitions
+SLO               TPOT P95 <= 50 ms    defines saturation and the headline capacity metric
 ```
 
-**Next:** freeze workload token counts (D10) and concurrency points (D11) in
-`EXPERIMENTAL_CONTRACT.md`, then build the real quality + serving harness under the warmup rules.
-Phase 1 deliverable is the quality-loss vs serving-throughput curve for this one model.
+KV wall per configuration under `DECODE_PRIMARY` (2,560-token peak footprint, 128 KiB KV/token):
+
+```text
+              weights     KV cache    KV tokens   KV wall (peak / mean)   kernel
+BF16          14.99 GiB    4.84 GiB      39,664         15  /  25         default BF16 GEMM
+FP8            8.49 GiB   11.31 GiB      92,608         36  /  60         CutlassFP8ScaledMMLinearKernel
+FP4 (NVFP4)    5.65 GiB   14.57 GiB     119,360         46  /  77         SM120 CUTLASS FP4 (flashinfer)
+```
+
+**Next:** run the pilot. Its jobs are to test D10's falsifiable prediction (below the wall, throughput
+ratio should equal weight-size ratio), confirm the BF16 wall appears in the 15-25 band, measure
+run-to-run variance against the provisional 3 repetitions, and record achievable memory bandwidth.
+Then build the quality + serving harness under the locked warmup and steady-state rules. Phase 1
+deliverable is the quality-loss vs sustainable-concurrency curve for this one model.
 
 ## Last session
 
-**Session 2 — environment build and model qualification.**
+**Session 3 — resolved D10 and D11; narrowed phase 1 to a memory-focused lens.**
 
-- Built two conda envs: `qnt` (vLLM 0.19.1 serving) and `qnt-quant` (llmcompressor 0.10.0.3),
-  split because their `compressed-tensors` pins are irreconcilable.
-- Discovered the driver ceiling: CUDA 13 wheels do not run on driver 575, capping vLLM at 0.19.1.
-  Established this costs nothing, since SM120 CUTLASS FP8/FP4 exist in that build.
-- Qualified Llama 3.1 8B Instruct: locked exact identity (8,030,261,248 params, all BF16).
-- Worked around the gated repo by verifying an ungated mirror byte-identical by SHA256 against the
-  official checksums, recomputed locally. License request still pending.
-- Built and served FP8 and NVFP4 from the same checkpoint; captured explicit kernel-dispatch
-  evidence for both and confirmed the NVFP4 emulation path was unused.
-- Proved the KL rig: full 128,256-entry logits from the serving engine, token-identical contexts,
-  250 KiB/context storage.
-- Recorded six measurement hazards found in the process, including a first-call warmup artifact that
-  would have made BF16 look 24x slower than FP8.
+- Adopted a memory-focused lens and locked one primary workload, 512 in / 2048 out, replacing the
+  prefill-heavy / balanced / decode-heavy trio. `BALANCED` dropped; a cheap `PREFILL_PROBE` kept so
+  the arithmetic benefit is observed in bounded form rather than not at all.
+- Established that decode arithmetic intensity is approximately batch size, so the whole sweep stays
+  bandwidth-bound and the KV walls (15 / 36 / 46) sit clear of compute saturation by construction.
+- Reframed the D11 decomposition from compute-vs-capacity to **bandwidth-vs-capacity**, which also
+  strengthens the portability argument: every GPU reads weights, not every GPU has FP4 tensor cores.
+- Derived from the coarse smoke artifacts that all three configurations decode at ~620-660 GB/s, so
+  the batch-1 speedup may be fully explained by weight bytes. Recorded as a falsifiable pilot
+  prediction, explicitly not as a result.
+- Locked the concurrency points, an explicit TPOT P95 <= 50 ms SLO as the saturation criterion, a
+  cell-abort rule, steady-state warmup rules, and run-order counterbalancing.
+- Added hazards H7 (prefix caching can silently delete the workload) and H8 (occupancy grows 5x, so
+  the KV wall is a band and preemption-by-recompute makes degradation superlinear).
+- Extended the quality rig to teacher-forced KL at ten strided positions across the 2,048-token
+  generation, since measuring quality at position 1 of a 2,048-position workload was the central gap.
 
 ## Known issues / unresolved premises
 
@@ -169,10 +183,18 @@ Phase 1 deliverable is the quality-loss vs serving-throughput curve for this one
   when the license is approved.
 - **Qualification serving numbers are not benchmark numbers.** They are single-request, single-run,
   no warmup, no repetition. The BF16 short-workload figure (2.7 tok/s) is warmup contamination.
+- **The ~620-660 GB/s bandwidth finding is derived, not measured.** It comes from a two-point prefill
+  subtraction over coarse smoke artifacts and assumes decode cost is equal at 2k and 16k context. It
+  is a pilot prediction and must not be quoted as a result.
+- **Memory bandwidth is not recorded in `HARDWARE_PROFILE.md`.** Under a memory-focused lens it is the
+  governing hardware constant, and neither the spec figure nor an achieved measurement exists yet.
 - **Qualification KL values are a feasibility demo, not a quality result.** 16 highly repetitive
   synthetic contexts. They must not be cited as measured degradation.
-- **Workload and concurrency definitions are still open (D10, D11).** Nothing may be collected as
-  final data until they are frozen.
+- **Repetition count is provisional at 3.** Pilot variance has not been measured; raise it if
+  run-to-run spread is large relative to the FP8-to-FP4 gap.
+- **The teacher-forced KL rig measures divergence given BF16's trajectory**, not free-running drift of
+  each configuration's own generation. Whether divergence compounds through the sampling loop is
+  untested.
 - **Calibration sensitivity is untested, and applies only to FP4.** FP8 needs no calibration, so the
   calibration-robustness study is FP4-only. The single FP4 draw used 128 ultrachat samples, seed 0.
 - **FP4's first load pays a ~61 s flashinfer JIT build.** Cached now, but it must never leak into a
@@ -180,6 +202,8 @@ Phase 1 deliverable is the quality-loss vs serving-throughput curve for this one
 - **Idle PCIe state is not benchmark state.** Negotiated link generation still unverified under load.
 - **The GPU is power-limited at 145 W** and clocks fall under load, so throughput is measured under a
   power ceiling rather than at fixed clocks.
+- **Phase 1 measures one workload shape.** The arithmetic benefit of low precision is not measured by
+  the sweep, and prefill-dominated deployments are out of scope. See `LIMITATIONS.md`.
 - **No quality or serving outcome is predetermined.** The ladder being natively executable says
   nothing about whether FP4's degradation is worth its gain.
 

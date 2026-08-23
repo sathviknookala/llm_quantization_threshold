@@ -42,6 +42,23 @@ Memory clock:      405 MHz
 
 Therefore the Gen1 reading should be treated as an **idle power-management state**, not the final benchmark link state. Verify negotiated PCIe generation again under sustained load before final measurements.
 
+### Memory bandwidth — NOT YET RECORDED
+
+Phase 1 is a memory-focused study (D10), which makes memory bandwidth the governing hardware constant
+for the entire below-the-wall region of the concurrency sweep. It is currently the one such constant
+this profile does not record: memory clock is captured (14,001 MHz) but bus width and bandwidth are
+not.
+
+Required before final collection:
+
+- vendor spec bandwidth (bus width x effective memory clock);
+- an **achieved** bandwidth measurement on this card, not only the spec figure.
+
+Indicative context from qualification (coarse, derived — see D10, not a measurement): dividing weight
+bytes by derived batch-1 decode rate implies roughly 620-660 GB/s for all three configurations. If
+that is close to the card's achievable bandwidth, batch-1 decode is bandwidth-saturated and the
+below-wall result is fully explained by weight bytes. Confirming or refuting this is a pilot task.
+
 ## GPU clocks / power state
 
 ```text
@@ -173,9 +190,13 @@ Lower model-resident memory can leave more VRAM for KV cache and therefore incre
 The serving side of the project should therefore treat at least these as separate outcomes:
 
 ```text
-compute / latency benefit
-memory / concurrency benefit
+bandwidth benefit   fewer weight bytes read per decode step -> faster per-token
+capacity benefit    fewer weight bytes resident -> more KV  -> more concurrent sequences
 ```
+
+Both are consequences of weight residency shrinking. Under the locked decode-dominated workload
+(D10) the sweep is memory-bandwidth-bound throughout, so the below-wall half is bandwidth rather
+than arithmetic; the arithmetic path is observed only by `PREFILL_PROBE`.
 
 ### 4. Hardware capability is not equivalent to backend capability
 
@@ -215,6 +236,7 @@ Outstanding:
 - exact FP4 deployment recipe and the kernel actually dispatched at runtime;
 - low-precision KV-cache policy;
 - that a `qnt-quant` checkpoint loads in `qnt` (cross-environment compressed-tensors compatibility);
+- memory bandwidth: spec figure and achieved measurement (see above);
 - negotiated PCIe generation under sustained load;
 - whether host-side request generation becomes visible at high concurrency;
 - sustained thermals / clocks / power behavior during long benchmark runs.

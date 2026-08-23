@@ -20,7 +20,7 @@ Those ratios depend on the small denominator. The KV *gain* is created by weight
 ```text
 this machine (24 GiB):  BF16 KV headroom is the binding constraint -> capacity gain is large
 a larger card (80 GiB): an 8B BF16 model already has ample KV room  -> capacity gain shrinks
-                        toward irrelevance, and the case for quantization rests on compute alone
+                        toward irrelevance, and the case for quantization rests on bandwidth alone
 ```
 
 This cuts in a specific direction: **the study is biased toward making quantization look
@@ -30,8 +30,9 @@ Consequences for the final claim:
 
 - Do not present the concurrency/capacity multiplier as a property of FP8 or FP4. It is a property of
   this model at this precision *on a 24 GiB GPU*.
-- Report the compute/latency benefit and the memory/capacity benefit separately, as
-  `HARDWARE_PROFILE.md` implication 3 requires. The compute half travels better than the memory half.
+- Report the bandwidth benefit and the capacity benefit separately, as `HARDWARE_PROFILE.md`
+  implication 3 requires. Under the locked decode workload the below-wall half is bandwidth, not
+  compute, and it travels better than the capacity half (see below).
 - A knee located mainly by capacity gains is the most hardware-specific result this project can
   produce, and should be labelled as such.
 
@@ -64,11 +65,62 @@ Quantization value may differ between:
 
 A single quoted speedup should never be treated as the whole serving result unless the workload is named.
 
+### Phase 1 measures one workload, and it is decode-dominated
+
+D10 narrows phase 1 to `DECODE_PRIMARY` (512 in / 2048 out) plus a supporting prefill probe. This
+buys concurrency resolution near the KV wall at the cost of workload breadth, and the cost must be
+stated plainly:
+
+- **The study does not measure the arithmetic benefit of low precision.** Decode arithmetic intensity
+  is approximately the batch size, so across the whole locked sweep (concurrency 1-96) an 8B model is
+  memory-bandwidth-bound and nowhere near the roofline crossover. What is measured below the KV wall
+  is fewer weight *bytes read*, not fewer FLOPs. `PREFILL_PROBE` gives a bounded observation of the
+  arithmetic path at concurrency 1-8; it is not a sweep and must not be extrapolated into the
+  tradeoff curve.
+- **Prefill-dominated deployments are out of scope.** RAG, long-document summarization, and
+  large-context agentic prefill are exactly the regimes the primary workload does not cover.
+- **No balanced/mixed shape is measured**, so nothing is known about how the boundary moves between
+  the two regimes.
+- **The result is a concurrency-dependent boundary for one shape**, not a workload-dependent map.
+
+### The bandwidth half travels better than the compute framing suggested
+
+An earlier version of D11 argued that the compute half of the benefit generalizes to other hardware
+while the capacity half does not. Under a bandwidth-bound decode workload the below-wall benefit is
+bandwidth, not FLOPs, and that generalizes *more* strongly: every GPU must read weights, whereas FP4
+tensor-core support is specific to recent architectures.
+
+This is a limitation stated in the favourable direction, and it should not be overread. It says the
+below-wall *mechanism* is portable, not that the numbers are. The realized ratio still depends on the
+target card's achievable bandwidth and on whether that card's decode regime is also bandwidth-bound
+at the concurrency of interest.
+
+### The workload is synthetic in two controlled ways
+
+- **`ignore_eos=True` with exact output lengths.** Required so that output length does not become a
+  dependent variable of precision, but real deployments have variable-length generations and a
+  distribution of early stops.
+- **Fixed-exact, homogeneous prompt and output lengths.** Real traces are heterogeneous. Homogeneous
+  batches make the scheduler's job easier and likely overstate throughput — hopefully near-equally
+  for all three configurations, but that equality is an assumption, not a measurement.
+
 ## Precision labels are underspecified
 
 `BF16`, `FP8`, and `FP4` do not uniquely identify a deployment. Weight precision, activation precision, KV-cache precision, scale format, group/block size, calibration method, backend, and kernel path can all change the result.
 
 Final conclusions must refer to configuration IDs from `QUANTIZATION_CONFIGS.md`.
+
+## Quality is sampled along the generation, not measured densely
+
+The KL rig retains ten strided positions out of a 2,048-token generation (`EVALUATION_RIG.md`).
+Degradation between retained positions is interpolated, not observed, and any behavior that appears
+and resolves inside a stride interval is invisible.
+
+More fundamentally, teacher-forced KL against a BF16-generated continuation measures divergence
+*given BF16's trajectory*. It does not measure how far a quantized configuration's own free-running
+generation drifts from BF16's, which is the quantity a user of a decode-heavy deployment actually
+experiences. The two coincide only if divergence does not compound through the sampling loop, which
+this study does not test.
 
 ## Quality metrics are incomplete views of behavior
 
