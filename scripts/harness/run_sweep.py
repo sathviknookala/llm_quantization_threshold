@@ -83,21 +83,13 @@ _LIVE = []
 
 
 def _teardown_all():
+    """Only engines this process started. Never a blanket kill of whatever holds the GPU."""
     while _LIVE:
         srv = _LIVE.pop()
         try:
             srv.stop()
         except Exception:
             pass
-    try:
-        from harness.server import gpu_holder_pids, kill_gpu_holders
-        if gpu_holder_pids():
-            kill_gpu_holders()
-    except Exception:
-        pass
-
-
-atexit.register(_teardown_all)
 
 
 def spec_hash():
@@ -280,6 +272,74 @@ def refine_group(config_id, env, manifest, prompts, cells, args):
                 _LIVE.remove(srv)
 
 
+def refine_slo_group(config_id, env, manifest, prompts, cells, args):
+    """Bisect the SLO crossing, which is the headline metric and a different transition.
+
+    SWEEP_REFINE bisects KV pressure. The deliverable is "maximum concurrency sustained within
+    the SLO", and that crossing sits elsewhere: BF16 preempts from C~17 but still meets the
+    50 ms bound there, breaching it only above C=18. Reporting the ladder point (16) leaves the
+    headline uncertain across 17-23, which is a ~45% band on the number the study exists to
+    produce. Additive, repetition 1, and it does not touch D11's locked points.
+    """
+    job = "SWEEP_REFINE_SLO"
+    workload = "DECODE_PRIMARY"
+    mine = [r for r in cells if r.get("configuration_id") == config_id
+            and r.get("workload") == workload and r.get("status") in ("OK", "SLO_VIOLATED")
+            and r.get("meets_slo") is not None]
+    passing = sorted({r["concurrency"] for r in mine if r["meets_slo"]})
+    failing = sorted({r["concurrency"] for r in mine if not r["meets_slo"]})
+    if not passing or not failing:
+        print(f"refine-slo {config_id}: no SLO crossing observed "
+              f"(pass={passing} fail={failing}); nothing to bisect", flush=True)
+        return
+    lo = max(passing)
+    above = [c for c in failing if c > lo]
+    if not above:
+        print(f"refine-slo {config_id}: no failing point above C={lo}", flush=True)
+        return
+    hi = min(above)
+    if hi - lo <= 1:
+        print(f"refine-slo {config_id}: crossing already bracketed [{lo},{hi}]", flush=True)
+        return
+    print(f"refine-slo {config_id}: bisecting SLO crossing in [{lo},{hi}]", flush=True)
+    srv = None
+    try:
+        srv = launch(config_id, 1, workload, phase="refine_slo")
+    except (LaunchError, RuntimeError) as exc:
+        print(f"LAUNCH FAILED refine-slo {config_id}: {exc}", flush=True)
+        return
+    try:
+        while hi - lo > 1:
+            mid = (lo + hi) // 2
+            key = (job, config_id, workload, mid, 1)
+            done = {(r["job"], r["configuration_id"], r["workload"], r["concurrency"],
+                     r["repetition"]): r for r in orch.read_cells(CELLS)}
+            if key in done:
+                rec = done[key]
+            else:
+                if not srv.wait_drained():
+                    srv.stop()
+                    if srv in _LIVE:
+                        _LIVE.remove(srv)
+                    srv = launch(config_id, 1, workload, phase="refine_slo", warm_ok=True)
+                rec = orch.run_one(CELLS, job, srv, config_id, prompts, manifest, env, workload,
+                                   mid, 1, cell_kwargs(workload),
+                                   extra={"sweep_config_hash": spec_hash(),
+                                          "refine_slo_bracket": [lo, hi]})
+                cells.append(rec)
+            if rec.get("meets_slo"):
+                lo = mid
+            else:
+                hi = mid
+        print(f"refine-slo {config_id}: max concurrency within SLO = {lo} "
+              f"(first breach at {hi})", flush=True)
+    finally:
+        if srv is not None:
+            srv.stop()
+            if srv in _LIVE:
+                _LIVE.remove(srv)
+
+
 def projected_seconds(C, tput, n_out):
     period = n_out * C / float(tput)
     return 6.5 * period + 110.0
@@ -333,7 +393,7 @@ def guard_spec():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--job", default="all", choices=["decode", "prefill", "refine", "all"])
+    ap.add_argument("--job", default="all", choices=["decode", "prefill", "refine", "refine-slo", "all"])
     ap.add_argument("--reps", default="1,2,3")
     ap.add_argument("--configs", default="")
     ap.add_argument("--ladder", default="")
@@ -386,8 +446,18 @@ def main():
                 continue
             refine_group(cfg, env, manifest, prompts, orch.read_cells(CELLS), args)
 
+    if args.job in ("refine-slo", "all"):
+        prompts, manifest = orch.load_prompts("DECODE_PRIMARY")
+        for cfg in ("BF16_REFERENCE", "FP8_PRIMARY", "FP4_PRIMARY"):
+            if configs and cfg not in configs:
+                continue
+            refine_slo_group(cfg, env, manifest, prompts, orch.read_cells(CELLS), args)
+
     print("sweep phase complete", flush=True)
 
 
 if __name__ == "__main__":
+    # armed only for a real run: importing this module (tests, hash checks) must never register
+    # a teardown that could reach a sweep running in another process
+    atexit.register(_teardown_all)
     main()

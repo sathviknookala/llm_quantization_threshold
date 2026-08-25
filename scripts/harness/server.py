@@ -39,16 +39,28 @@ def gpu_holder_pids():
     return [int(x) for x in out.split() if x.strip().isdigit()]
 
 
-def kill_gpu_holders():
-    """Precise teardown: only the processes the driver reports as holding device memory."""
-    pids = gpu_holder_pids()
-    for pid in pids:
+def kill_gpu_holders(pgid=None):
+    """Teardown scoped to our own engine tree.
+
+    Without the pgid filter this kills any process holding the GPU -- including a sweep running
+    in another process. That is not hypothetical: an unrelated short-lived import of this module
+    once tore down a live sweep's EngineCore.
+    """
+    killed = []
+    for pid in gpu_holder_pids():
+        if pgid is not None:
+            try:
+                if os.getpgid(pid) != pgid:
+                    continue
+            except OSError:
+                continue
         try:
             os.kill(pid, signal.SIGKILL)
+            killed.append(pid)
             print(f"  killed stray GPU holder pid={pid}", flush=True)
         except OSError:
             pass
-    return pids
+    return killed
 
 
 def wait_for_gpu_release(timeout=300, threshold_mib=512, poll=3.0):
@@ -161,6 +173,10 @@ class VllmServer:
         if self.proc is None:
             return
         try:
+            pgid = os.getpgid(self.proc.pid)
+        except OSError:
+            pgid = None
+        try:
             os.killpg(os.getpgid(self.proc.pid), signal.SIGINT)
             self.proc.wait(timeout=timeout)
         except Exception:
@@ -179,5 +195,5 @@ class VllmServer:
         if not wait_for_gpu_release(release_timeout):
             # `pkill -f 'vllm serve'` never matched: v1 renames the child to VLLM::EngineCore, so
             # the old fallback was dead code. Ask the driver which PIDs actually hold the GPU.
-            kill_gpu_holders()
+            kill_gpu_holders(pgid)
             wait_for_gpu_release(120)
