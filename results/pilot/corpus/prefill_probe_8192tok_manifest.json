@@ -1,0 +1,25 @@
+{
+  "corpus_version": "c4-en-validation-shard0-v1",
+  "workload": "PREFILL_PROBE",
+  "decision": "D16 resolved to option (a), C4 en validation",
+  "dataset_repo": "allenai/c4",
+  "dataset_file": "en/c4-validation.00000-of-00008.json.gz",
+  "local_source_file": "/home/sathvik/.cache/huggingface/hub/datasets--allenai--c4/snapshots/1588ec454efa1a09f29cd18ddd04fe05fc8653a2/en/c4-validation.00000-of-00008.json.gz",
+  "lines_scanned": 60000,
+  "seed": 20260823,
+  "n_prompts": 64,
+  "tokens_per_prompt": 8192,
+  "bos_token_id": 128000,
+  "tokenizer_source": "/home/sathvik/.cache/huggingface/hub/models--NousResearch--Meta-Llama-3.1-8B-Instruct/snapshots/d10aef7999a2b5ba950ab3974312feeedbfe0b77",
+  "tokenizer_name_or_path": "/home/sathvik/.cache/huggingface/hub/models--NousResearch--Meta-Llama-3.1-8B-Instruct/snapshots/d10aef7999a2b5ba950ab3974312feeedbfe0b77",
+  "vocab_size": 128256,
+  "prefix_hash_tokens": 64,
+  "prefix_hash_unique": true,
+  "source_docs_disjoint": true,
+  "excluded_datasets": [
+    "HuggingFaceH4/ultrachat_200k (FP4 calibration draw, D7)"
+  ],
+  "prompt_set_hash": "ead1b35968a2bd3a267996ba250603c45fe47e5ff97505637f774f1493813f07",
+  "prefix_hashes_hash": "57d617a53bde4629251ca73a2c7dcc9258ab13c504f6339a6c051d3699f670ec",
+  "built_at": "2026-08-23T15:35:08-0400"
+}

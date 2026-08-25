@@ -536,37 +536,45 @@ families, which applies equally to task families.
 
 ## D16 — Prompt corpus for serving workloads and KL contexts
 
-**Status:** OPEN (raised 2026-08-23) — blocks the pilot
+**Status:** RESOLVED (2026-08-23) — option (a), C4 `en` validation
 
-D10 requires prompts drawn from "a fixed held-out corpus, tokenized and chunked to exactly 512
-tokens, prefix-disjoint, distinct per request, seeded". No corpus was ever named, so the corpus prep
-script cannot be written and the pilot cannot run.
-
-**Hard constraint — calibration leakage.** The FP4 rung was calibrated on 128 samples from
-`HuggingFaceH4/ultrachat_200k` (D7). `Quality-run validity` in `EXPERIMENTAL_CONTRACT.md` lists
-calibration data leaking into an evaluation set as invalidating. Ultrachat is therefore excluded from
-both the serving prompts and the KL contexts.
-
-**The fork to resolve:**
+**Decision.** Serving prompts and KL contexts are drawn from `allenai/c4`, file
+`en/c4-validation.00000-of-00008.json.gz`, tokenized with the served tokenizer and chunked to
+exactly the workload's input length.
 
 ```text
-(a) real text for both arms       keeps D10's link between quality and serving distributions;
-                                  costs a corpus choice and a prep script
-(b) random token IDs for serving  `vllm bench serve --dataset-name random` gives exact lengths and
-    real text for quality only    guaranteed prefix-disjointness with no prep, but breaks the claim
-                                  that quality and serving are measured on the same distribution
+Corpus version:      c4-en-validation-shard0-v1
+Selection seed:      20260823          (deterministic shuffle over the first 60,000 documents)
+DECODE_PRIMARY:      512 prompts x exactly 512 tokens   = [BOS] + 511 content tokens
+PREFILL_PROBE:        64 prompts x exactly 8192 tokens  = [BOS] + 8191 content tokens
+Prompt-set hash:     2681c604332813f2e893b252bc512efaac15316874d22352917492e5a40b130f  (512 tok)
+                     ead1b35968a2bd3a267996ba250603c45fe47e5ff97505637f774f1493813f07  (8192 tok)
+Prefix-disjointness: SHA256 over the first 64 content token IDs, uniqueness enforced
+Source disjointness: no C4 document is reused across prompts; each 512-token prompt is one document
 ```
 
-For pure serving timing the token content is irrelevant — with `ignore_eos` and fixed lengths, decode
-cost is content-independent — so (b) is defensible on measurement grounds alone. The cost is
-narrative, not numerical.
+Artifacts: `results/pilot/corpus/*_manifest.json`. Body files hold the token IDs and are gitignored
+as regenerable at the fixed seed; the manifests carry the hashes that make a run reproducible.
+Reproduce with `python scripts/pilot/corpus.py --workload DECODE_PRIMARY`.
 
-**Recommendation: (a), C4 `en` validation.** It preserves the link cheaply, it is general web text
-rather than chat-formatted so it sidesteps the `chat_template` deviation, and it is cleanly disjoint
-from ultrachat.
+**Why (a) and not (b).** For pure serving timing the token content is irrelevant, so random token
+IDs would have been defensible on measurement grounds. Real text is chosen because it costs one prep
+script and preserves D10's link between the quality and serving distributions — the KL contexts are
+literally the first 32 serving prompts, same corpus, same chunking.
 
-**Relationship to D14.** This gate covers the serving prompts and the KL contexts. D14's perplexity
-corpus is a separate choice and may differ — wikitext is the conventional pick there for
-comparability with published numbers — without disturbing this one.
+**Why C4 and not something else.** General web text rather than chat-formatted, so it sidesteps the
+`chat_template` provenance deviation; cleanly disjoint from `HuggingFaceH4/ultrachat_200k`, which
+calibrated the FP4 rung (D7) and is therefore excluded by the calibration-leakage rule in
+`EXPERIMENTAL_CONTRACT.md`.
+
+**Exact-length construction.** Prompts are emitted as **token IDs**, not text, so tokenization
+cannot drift between configurations. One slot is reserved for BOS because the completions endpoint
+passes `prompt_token_ids` through without adding it — so the count is exact rather than
+exact-plus-or-minus-one. The 8192-token probe prompts concatenate consecutive distinct documents,
+since C4 documents are rarely that long; document identity is still disjoint across prompts.
+
+**Relationship to D14.** This gate covers the serving prompts and the KL contexts only. D14's
+perplexity corpus remains a separate open choice.
 
 ---
+
