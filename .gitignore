@@ -10,3 +10,10 @@ models/
 .DS_Store
 __pycache__/
 *.pyc
+
+# Pilot corpus bodies (token IDs, regenerable at a fixed seed) and gate logits.
+# The tracked manifests carry the hashes that make a run reproducible.
+results/pilot/corpus/*.json
+!results/pilot/corpus/*_manifest.json
+results/pilot/gate_logits/
+results/pilot/server_logs/
