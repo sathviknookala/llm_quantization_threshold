@@ -218,8 +218,15 @@ than the regime.
 - **Warmup requests:** discard all completions until the client has held the target concurrency for
   at least **one full sequence lifetime** (2,048 output tokens at the observed rate), then discard
   one further generation per slot. Only after that does the timed window open.
-- **Steady-state gate:** the timed window may not open until KV-block utilisation has been
-  non-decreasing across two consecutive 10 s telemetry samples, or has reached its ceiling.
+- **Steady-state gate — revised 2026-08-23 after H9.** The timed window may not open until *both*:
+  (a) KV-block utilisation has been non-decreasing across two consecutive 10 s telemetry samples, or
+  has reached its ceiling; and (b) output throughput is **stationary** — the mean over the last k
+  telemetry intervals is within 6% of the mean over the k intervals before, with k sized to span at
+  least one oscillation period. Do **not** require throughput to be *flat*: this workload is periodic
+  (H9) and a flatness test over part of a period can never fire. Measured example: drift 0.11% while
+  instantaneous 10 s windows swung 588 / 575 / 685 tok/s.
+- **Timed windows must span whole periods.** At least 4 sequence lifetimes, with
+  `periods_in_window` recorded per cell, so the sawtooth averages out instead of biasing the mean.
 - **Warmup is repeated after every change of concurrency**, not only after engine start. Changing
   concurrency changes the steady-state occupancy, so the previous steady state does not carry over.
 - **Cache state:** prefix caching disabled; flashinfer JIT artifacts warm before timing.
@@ -229,7 +236,25 @@ steady-state serving results.
 
 ## Repetitions and duration
 
-**Provisional 2026-08-23 — 3 repetitions, confirm against pilot variance before final collection.**
+**LOCKED 2026-08-23 — 3 repetitions, confirmed by pilot P3.**
+
+Pilot P3 measured run-to-run spread against the FP8-to-FP4 gap it must resolve
+(`results/pilot/p3_repeatability.csv`):
+
+```text
+point            C    FP8        FP4        delta     95% half-width   rho = H/delta
+sub-wall         8    449.99     566.99     117.00    0.238            0.0020
+high-concurrency 24  1000.30    1187.81     187.51    1.201            0.0064
+```
+
+Criterion was rho <= 0.25; measured rho clears it by 39-122x. Per-cell CV is 0.012-0.152% at n=3.
+Three repetitions therefore resolve the FP8-vs-FP4 serving difference with very large margin.
+
+**Caveat that the number does not capture.** P3 estimates variance from ~2-6 minute windows. The
+sweep runs 6-8 hours, over which the card heats and clocks fall (H6) — the pilot already saw SM clock
+move 1885 -> 1728 MHz between concurrency points under a pinned 145 W cap. Short-run spread is a
+floor on long-run spread, not an estimate of it, which is why counterbalanced run ordering remains a
+rule rather than something the variance figure lets us skip.
 
 - **Repetitions:** 3 independent runs per cell, each with its own warmup and its own engine-process
   restart between repetitions of the same configuration. Repetitions are counterbalanced against
@@ -262,10 +287,13 @@ of the experiment. Nothing it measures is a result, and no pilot number may be q
 
 ### Jobs
 
-**P1 — Test the weight-size-ratio prediction below the wall.** D10 predicts that in the
-bandwidth-bound region the throughput ratio between configurations equals the weight-size ratio
-(BF16:FP8:FP4 = 16.10 : 9.12 : 6.07 GB, so 1.77x and 2.65x over BF16). Run at concurrency
-**1, 8, and 12** — not batch 1 alone.
+**P1 — Test the weight-size-ratio prediction below the wall. RUN 2026-08-23: FAILED.** D10 predicted
+that in the bandwidth-bound region the throughput ratio between configurations equals the weight-size
+ratio (BF16:FP8:FP4 = 16.10 : 9.12 : 6.07 GB, so 1.77x and 2.65x over BF16). Measured at concurrency
+1, 8 and 12, three repetitions: 1.83x / 2.44x falling to 1.62x / 2.00x. The prediction is falsified —
+per-step traffic is `weights + KV + other` and the KV term is common across the ladder, so the ratio
+is concurrency-dependent and below the weight-size ratio. The region is still memory-bound. See D10
+for the corrected interpretation and `results/pilot/PILOT_DECISION.md` for the evidence.
 
 Running it at several sub-wall points is the substance of the check, not a refinement of it. The
 entire bandwidth-vs-capacity decomposition in D11 assumes the sweep is memory-bandwidth-bound
@@ -319,11 +347,13 @@ Present and verified on this machine:
 - GPU idle (15 MiB used, 0% utilisation, 5 W);
 - `vllm/benchmarks/serve.py` ships in this build with `--max-concurrency`, `--random-input-len`,
   `--random-output-len`, `--ignore-eos`, `--request-rate`;
-- **every counter D11 requires already exists** in `vllm/v1/metrics/`: `num_preempted_reqs`,
-  `recomputed_tokens`, `kv_cache_usage`, `num_waiting_reqs`. This was P5's largest unknown and it
-  resolves favourably in advance — `recomputed_tokens` in particular is what makes H8's
-  preemption-by-recompute loop measurable rather than inferred. P5 still has to confirm they emit
-  correctly under load.
+- the counter *names* D11 requires exist in `vllm/v1/metrics/`. **Superseded by measurement — see
+  hazard H11.** Three of the four emit usable values (`num_preemptions`, `kv_cache_usage`,
+  `num_waiting_reqs`); `recomputed_tokens` measures a one-token prefix-cache artifact, not
+  preemption recompute, and is structurally always zero once prefix caching is disabled. The
+  earlier claim here that it makes H8's loop "measurable rather than inferred" was wrong.
+  Note also that Prometheus exposes counters with a `_total` suffix, so scraping the source-level
+  name returns nothing.
 
 Not present:
 
@@ -335,30 +365,31 @@ Not present:
   so the contract's rules must wrap it rather than configure it.
 - **The prompt corpus is unnamed** — open gate D16.
 
-### Open items in this specification
+### Open items — all resolved by the pilot run of 2026-08-23
 
-Each is a job with no pass/fail criterion. Left open they get decided ad hoc mid-run, which is the
-failure mode the contract exists to prevent.
-
-1. **P4 names no measurement method, and the obvious one is circular.** Deriving bandwidth from decode
-   throughput cannot then be used to validate a bandwidth-derived prediction. P4 needs a measurement
-   independent of P1.
-2. **P3 has no threshold.** "Large relative to the FP8-to-FP4 gap" does not say what ratio triggers
-   raising the repetition count above 3.
-3. **P2 has no tolerance.** "Materially outside" the 15-25 band is undefined. Note the band's lower
-   edge is tight: at concurrency 15 BF16 needs 38,400 of 39,664 KV tokens, so the true wall is at
-   15-16.
-4. **The correctness gate has no trigger value.** Section E of `EVALUATION_RIG.md` leaves the
-   tolerance metric-specific, which is defensible, but a gate cannot stop anything without a number.
-5. **P5 covers `DECODE_PRIMARY` only.** `PREFILL_PROBE` plumbing is unchecked, and its 8,192-token
-   prompt is the shape where H7's prefix-caching hazard bites hardest.
-6. **SLO feasibility is tested only incidentally.** The 50 ms TPOT P95 bound came from a batch-1
-   estimate of roughly 25 ms. Whether BF16 still holds it at concurrency 8-12 is unverified; if it
-   does not, BF16's max-concurrency-at-SLO collapses and the headline comparison distorts. P1 already
-   runs at those points — make recording TPOT P95 against the SLO an explicit part of it.
-7. **No pilot artifact path or schema.** Pilot outputs may not be quoted but must still be tracked;
-   `Result identity` covers final results only.
-8. **No cost estimate.** Rough order once the harness exists: 2.5-4 hours, GPU-exclusive.
+1. **P4 measurement method.** Resolved: a standalone CUDA `float4` streaming microbenchmark
+   (copy / triad / read), CUDA-event timed, 1 GiB arrays against a 48 MiB L2. Independent of decode
+   throughput, so it is not circular with P1. Result 620.1 GB/s read, 92.3% of the 672.0 GB/s figure
+   derived from driver-reported bus width and memory clock. `results/pilot/p4_hbm_bandwidth.json`.
+2. **P3 threshold.** Resolved: rho = H/delta <= 0.25, escalating 3 -> 5 -> 7 repetitions. Measured
+   rho = 0.0020 / 0.0064. Repetition count locked at 3.
+3. **P2 tolerance.** Resolved: the transition must fall inside the pre-registered 15-25 band.
+   Measured bracket [17, 18], reproducible on both sides. PASS.
+4. **Correctness-gate trigger values.** Resolved and pre-registered before running: BF16 self-KL
+   median <= 1e-6 and max <= 1e-4 nats; FP8 median KL <= 0.1; FP4 median KL <= 0.5; top-1 agreement
+   >= 0.90 (FP8) and >= 0.75 (FP4); probability mass normalized to 1e-3. All passed.
+   `results/pilot/correctness_gate.json`.
+5. **`PREFILL_PROBE` plumbing.** Resolved: one C=1 cell per configuration at 8192 in / 32 out, all
+   `OK` with zero prefix-cache hits — the H7 hazard is the one that bites hardest on this shape.
+6. **SLO feasibility above batch 1.** Resolved favourably: BF16 TPOT P95 is 29.6 ms at C=8 and
+   31.3 ms at C=12, inside the 50 ms bound. BF16 first breaches the SLO between C=17 (39.8 ms) and
+   C=18 (41.3 ms), i.e. essentially at its own KV wall, so its max-concurrency-at-SLO does not
+   collapse below the wall and the headline comparison is not distorted.
+7. **Pilot artifact path and schema.** Resolved: `results/pilot/` with `manifest.json`, one CSV per
+   job, `p4_hbm_bandwidth.json`, `p5_harness_validation.json`, `correctness_gate.json`,
+   `PILOT_DECISION.md`, and `cells.jsonl` carrying full per-cell identity.
+8. **Cost estimate.** Actual: 43 cells, about 5 hours GPU-exclusive including engine restarts, plus
+   roughly 1 hour discarded to a gate correction (H9) and a teardown stall.
 
 ### What the pilot will not tell you even if it passes
 
@@ -559,6 +590,122 @@ from a generic slowdown and the capacity contribution becomes an argument instea
 **Rule:** open the timed window only after the occupancy transient has settled (see "Warmup"), record
 preemption and recompute counters per point, and state which basis (peak or mean) any quoted wall
 concurrency uses.
+
+### H9 — Phase-aligned slots make this workload periodic, not flat — measured 2026-08-23
+
+Observed during the pilot on `DECODE_PRIMARY` at FP8, concurrency 12. Engine-reported output
+throughput does not settle to a constant. It oscillates with a stable period and a flat mean:
+
+```text
+669.6  620.4  578.4 | 628.5  667.1  616.8  576.0 | 635.9  664.8  614.4  574.8 | 641.9 ...
+peak ~665 tok/s   trough ~570 tok/s   amplitude +/-7.7%   period ~40 s
+```
+
+The pattern is unchanged 300 s apart, so this is neither a warmup transient nor thermal drift.
+
+**Cause.** In a closed-loop driver every slot starts a new request the instant the previous one
+finishes, and every request is exactly 2,048 output tokens. The slots therefore stay phase-aligned:
+all sequences grow 512 -> 2,560 tokens together, decode-attention traffic grows with them, throughput
+sags; then all sequences retire together and it snaps back. The period is one sequence lifetime,
+
+```text
+period = output_tokens x concurrency / output_throughput
+```
+
+which predicted 39.8 s against the ~40 s observed.
+
+**Consequence 1 — "steady state" must be defined per period.** A gate that requires throughput to be
+flat within a few percent over a fraction of a period can never fire, and the cell fails for a
+definitional reason rather than a physical one. This happened once in the pilot before the rule was
+corrected. Steady state here means **stationary**, not flat: compare the mean over the last k
+telemetry intervals against the mean over the k before, with k spanning at least one period.
+
+**Consequence 2 — timed windows must span whole periods.** A window ending mid-period is biased by
+up to the oscillation amplitude. The pilot requires at least 4 periods per window and records
+`periods_in_window` per cell.
+
+**Consequence 3 — this is part of why the KV wall is a band.** H8 derives the band from occupancy
+growth within a sequence. H9 adds that at fixed concurrency the *aggregate* footprint sweeps the
+same range every period, so preemption onset is periodic near the wall rather than sustained.
+Preemption must therefore be judged over whole periods too, which is why the pressure test counts
+the number of telemetry samples showing preemption rather than a single non-zero reading.
+
+**Rule:** gate on stationarity over at least one period, size timed windows to an integer number of
+periods, and record `period_estimate_s`, `periods_in_window` and `oscillation_amplitude_rel` per
+cell. Staggering slot start times would remove the oscillation and is worth considering for the
+sweep, but it changes the locked workload definition and is therefore a tracked decision, not a
+harness choice.
+
+### H10 — The serving path allocates more KV than the offline path, and a contaminated launch allocates less — measured 2026-08-23
+
+Reported KV capacity for the same configuration and flags is **not** the qualification figure:
+
+```text
+                offline LLM path      serving path (vllm serve)
+BF16            39,664 tokens         44,688 tokens   (4.84 -> 5.46 GiB)
+FP8             92,608 tokens         97,888 tokens
+FP4            119,360 tokens        116,960 / 120,944 tokens
+```
+
+Across the nine engine launches of pilot P1, BF16 reported 44,688 tokens on **every** launch and FP8
+reported 97,888 on every launch. Only FP4 varied, between 116,960 and 120,944 (3.4%), which is
+consistent with its JIT-compiled GEMM affecting the memory-profiling peak.
+
+**One outlier is explained, and is a warning.** An early BF16 serving launch reported 40,432 tokens,
+10% below the reproducible 44,688. That launch began while a previous engine process was still
+releasing VRAM. vLLM v1 runs `EngineCore` in a separate process, so the parent can exit while the GPU
+is still occupied, and the memory-profiling step then sizes the KV cache against whatever is left.
+This is silent: the engine starts, serves correctly, and reports a smaller cache.
+
+**Rules.**
+
+- Wait for the GPU to be genuinely released between configurations, not merely for the parent process
+  to exit. The pilot harness waits for used memory to fall below a threshold, escalates to a forced
+  kill, and re-checks; the idle preflight then polls rather than aborting on a slow teardown.
+- Record `kv_cache_tokens` **per cell**, from the engine instance that actually served it, and compute
+  any predicted KV wall from that figure rather than from a committed constant.
+- Treat a KV capacity materially below the configuration's reproducible value as evidence of a
+  contaminated launch and discard the cell.
+
+### H11 — `recomputed_tokens` cannot measure preemption recompute in this build — measured 2026-08-23
+
+D11 lists "recomputed-token count" as a required per-point observable, and the pilot readiness note
+in this document claimed `recomputed_tokens` "is what makes H8's preemption-by-recompute loop
+measurable rather than inferred". **Both are wrong.** The counter exists, emits, and is structurally
+incapable of reporting what D11 wants.
+
+`vllm/v1/metrics/stats.py`, `PromptTokenStats.update_from_output`:
+
+```python
+recomputed = 1 if (num_cached_tokens + 1 == prompt_len) else 0
+self.recomputed_tokens += recomputed
+```
+
+It increments by **at most one token per prefill**, and only in the single edge case where the whole
+prompt was a prefix-cache hit except the last token, which the scheduler forces the model to
+recompute so the forward pass has an input. It has nothing to do with preemption.
+
+Under the locked serving configuration prefix caching is disabled (H7), so `num_cached_tokens` is
+always 0, the condition is never satisfied, and `vllm:prompt_tokens_recomputed` is **always exactly
+zero**. Measured: BF16 at concurrency 18 recorded 7 preemptions per cell across two repetitions with
+`recomputed_tokens = 0` in both.
+
+**Rule.** Do not use `recomputed_tokens` as a pressure indicator. The KV-capacity pressure signal for
+this study is:
+
+```text
+vllm:num_preemptions_total     sharp and reproducible: 0 at C<=17, 7 at C=18, both reps
+vllm:kv_cache_usage_perc       max 0.962 at C=17 -> 0.985 at C=18
+throughput regression          peaks at C=16, falls at C=17 and beyond
+TPOT P95 inflation             32.6 ms at C=16 -> 39.8 at C=17 -> 41.3 at C=18
+```
+
+The *effect* of preemption-by-recompute remains measurable through throughput and latency; the
+recompute **volume** is not directly counted in this build. D11's per-point logging requirement must
+be amended accordingly rather than left naming a counter that cannot fire.
+
+This is the exact failure mode P5 exists to catch: a metric name present in the source is not
+evidence that a usable value arrives at runtime.
 
 ## Result identity
 
