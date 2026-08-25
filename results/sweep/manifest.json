@@ -1,0 +1,120 @@
+{
+  "artifact": "D11 serving sweep",
+  "sweep_config_hash": "df0f0f124d987a5c",
+  "spec": {
+    "schema_version": 3,
+    "decode_ladder": [
+      1,
+      4,
+      8,
+      12,
+      16,
+      24,
+      32,
+      48,
+      64,
+      96
+    ],
+    "prefill_ladder": [
+      1,
+      2,
+      4,
+      8
+    ],
+    "latin": [
+      [
+        "BF16_REFERENCE",
+        "FP8_PRIMARY",
+        "FP4_PRIMARY"
+      ],
+      [
+        "FP8_PRIMARY",
+        "FP4_PRIMARY",
+        "BF16_REFERENCE"
+      ],
+      [
+        "FP4_PRIMARY",
+        "BF16_REFERENCE",
+        "FP8_PRIMARY"
+      ]
+    ],
+    "decode_cell": {
+      "min_requests_factor": 4,
+      "window_floor_s": 120.0,
+      "warmup_wall_cap_s": 600.0,
+      "gate_timeout_s": 420.0,
+      "warmup_lifetimes": 2,
+      "min_periods": 4,
+      "margin": 1.5,
+      "hard_cap_s": 1800.0,
+      "abort_tpot_ms": 500.0
+    },
+    "prefill_cell": {
+      "min_requests_factor": 4,
+      "window_floor_s": 60.0,
+      "warmup_wall_cap_s": 300.0,
+      "gate_timeout_s": 300.0,
+      "warmup_lifetimes": 2,
+      "min_periods": 4,
+      "margin": 1.5,
+      "hard_cap_s": 900.0,
+      "abort_tpot_ms": null
+    },
+    "workloads": {
+      "DECODE_PRIMARY": {
+        "input_tokens": 512,
+        "output_tokens": 2048
+      },
+      "PREFILL_PROBE": {
+        "input_tokens": 8192,
+        "output_tokens": 32
+      }
+    },
+    "server_controls": {
+      "max_model_len": 32768,
+      "gpu_memory_utilization": 0.9,
+      "max_num_seqs": 256,
+      "kv_cache_dtype": "auto",
+      "enable_prefix_caching": false,
+      "seed": 0
+    },
+    "slo_tpot_ms": 50.0,
+    "kv_expected": {
+      "BF16_REFERENCE": 44688,
+      "FP8_PRIMARY": 97888,
+      "FP4_PRIMARY": 120944
+    },
+    "kv_tolerance": {
+      "BF16_REFERENCE": 0.01,
+      "FP8_PRIMARY": 0.01,
+      "FP4_PRIMARY": 0.05
+    },
+    "configs": {
+      "BF16_REFERENCE": {
+        "model": "/home/sathvik/.cache/huggingface/hub/models--NousResearch--Meta-Llama-3.1-8B-Instruct/snapshots/d10aef7999a2b5ba950ab3974312feeedbfe0b77",
+        "expected_kernel_pattern": null,
+        "forbidden_kernel_patterns": [
+          "CutlassFP8ScaledMMLinearKernel",
+          "NvFp4LinearBackend",
+          "Marlin"
+        ]
+      },
+      "FP8_PRIMARY": {
+        "model": "/home/sathvik/llm_quantization_threshold/checkpoints/llama31-8b-instruct-FP8_DYNAMIC",
+        "expected_kernel_pattern": "CutlassFP8ScaledMMLinearKernel",
+        "forbidden_kernel_patterns": [
+          "Marlin"
+        ]
+      },
+      "FP4_PRIMARY": {
+        "model": "/home/sathvik/llm_quantization_threshold/checkpoints/llama31-8b-instruct-NVFP4",
+        "expected_kernel_pattern": "FLASHINFER_CUTLASS",
+        "forbidden_kernel_patterns": [
+          "CT_EMULATIONS",
+          "emulation"
+        ]
+      }
+    }
+  },
+  "started_at": "2026-08-25T14:00:53-0400"
+}

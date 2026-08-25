@@ -1,0 +1,455 @@
+sweep_config_hash = df0f0f124d987a5c
+  launched BF16_REFERENCE rep1 kv_tokens=44688 start=24.03s log=decode_primary_BF16_REFERENCE_r1_1787627721.log
+[23:15:45] START SWEEP:BF16:DECODE_PRIMARY:C1:r1
+[23:23:12] DONE  SWEEP:BF16:DECODE_PRIMARY:C1:r1 status=OK outcome=measured tok/s=36.23 tpotP95=27.571346074580223 slo=True kvP95=0.05605300859598858 preempt=0.0 periods=4.72 wall=447.71s
+[23:23:12] START SWEEP:BF16:DECODE_PRIMARY:C4:r1
+[23:30:53] DONE  SWEEP:BF16:DECODE_PRIMARY:C4:r1 status=OK outcome=measured tok/s=142.05 tpotP95=28.064010677332334 slo=True kvP95=0.21418338108882523 preempt=0.0 periods=4.68 wall=460.73s
+[23:30:53] START SWEEP:BF16:DECODE_PRIMARY:C8:r1
+[23:39:01] DONE  SWEEP:BF16:DECODE_PRIMARY:C8:r1 status=OK outcome=measured tok/s=267.93 tpotP95=29.589442377478935 slo=True kvP95=0.43753581661891117 preempt=0.0 periods=4.53 wall=487.78s
+[23:39:03] START SWEEP:BF16:DECODE_PRIMARY:C12:r1
+[23:47:37] DONE  SWEEP:BF16:DECODE_PRIMARY:C12:r1 status=OK outcome=measured tok/s=381.77 tpotP95=31.273042235329417 slo=True kvP95=0.6498567335243552 preempt=0.0 periods=4.71 wall=513.81s
+[23:47:39] START SWEEP:BF16:DECODE_PRIMARY:C16:r1
+[23:56:35] DONE  SWEEP:BF16:DECODE_PRIMARY:C16:r1 status=OK outcome=measured tok/s=487.27 tpotP95=32.5991216370209 slo=True kvP95=0.8796561604584527 preempt=0.0 periods=4.69 wall=536.36s
+[23:56:37] START SWEEP:BF16:DECODE_PRIMARY:C24:r1
+[00:09:57] DONE  SWEEP:BF16:DECODE_PRIMARY:C24:r1 status=OK outcome=measured tok/s=518.73 tpotP95=55.517986756172775 slo=False kvP95=0.9951289398280803 preempt=49.0 periods=5.26 wall=799.84s
+  SLO violated at C=24; higher points skipped for this repetition
+  monotonicity probe at C=32 (violation was C=24)
+[00:09:59] START SWEEP:BF16:DECODE_PRIMARY:C32:r1
+[00:11:17] DONE  SWEEP:BF16:DECODE_PRIMARY:C32:r1 status=SERVER_DIED outcome=defect tok/s=None tpotP95=None slo=None kvP95=None preempt=None periods=None wall=77.64s
+[00:11:17] SKIPPED_PAST_SLO SWEEP:BF16:DECODE_PRIMARY:C48:r1 {'skipped_because_slo_violated_at_c': 24}
+[00:11:17] SKIPPED_PAST_SLO SWEEP:BF16:DECODE_PRIMARY:C64:r1 {'skipped_because_slo_violated_at_c': 24}
+[00:11:17] SKIPPED_PAST_SLO SWEEP:BF16:DECODE_PRIMARY:C96:r1 {'skipped_because_slo_violated_at_c': 24}
+  launched FP8_PRIMARY rep1 kv_tokens=97888 start=22.02s log=decode_primary_FP8_PRIMARY_r1_1787631117.log
+[00:12:19] START SWEEP:FP8:DECODE_PRIMARY:C1:r1
+[00:17:29] DONE  SWEEP:FP8:DECODE_PRIMARY:C1:r1 status=OK outcome=measured tok/s=66.05 tpotP95=15.1084707507456 slo=True kvP95=0.02291973189471965 preempt=0.0 periods=4.47 wall=309.46s
+[00:17:29] START SWEEP:FP8:DECODE_PRIMARY:C4:r1
+[00:22:27] DONE  SWEEP:FP8:DECODE_PRIMARY:C4:r1 status=OK outcome=measured tok/s=246.79 tpotP95=16.14279490313777 slo=True kvP95=0.09776034003596532 preempt=0.0 periods=4.15 wall=298.48s
+[00:22:27] START SWEEP:FP8:DECODE_PRIMARY:C8:r1
+[00:27:53] DONE  SWEEP:FP8:DECODE_PRIMARY:C8:r1 status=OK outcome=measured tok/s=450.17 tpotP95=17.637842031774483 slo=True kvP95=0.20107896027464445 preempt=0.0 periods=4.54 wall=325.98s
+[00:27:53] START SWEEP:FP8:DECODE_PRIMARY:C12:r1
+[00:33:49] DONE  SWEEP:FP8:DECODE_PRIMARY:C12:r1 status=OK outcome=measured tok/s=618.26 tpotP95=19.17793507061368 slo=True kvP95=0.2889651790093183 preempt=0.0 periods=4.65 wall=355.53s
+[00:33:49] START SWEEP:FP8:DECODE_PRIMARY:C16:r1
+[00:40:09] DONE  SWEEP:FP8:DECODE_PRIMARY:C16:r1 status=OK outcome=measured tok/s=772.14 tpotP95=20.49383543626031 slo=True kvP95=0.3936733692986758 preempt=0.0 periods=4.68 wall=379.57s
+[00:40:11] START SWEEP:FP8:DECODE_PRIMARY:C24:r1
+[00:46:38] DONE  SWEEP:FP8:DECODE_PRIMARY:C24:r1 status=OK outcome=measured tok/s=1002.41 tpotP95=23.504818207612757 slo=True kvP95=0.6048716691188492 preempt=0.0 periods=4.42 wall=387.62s
+[00:46:40] START SWEEP:FP8:DECODE_PRIMARY:C32:r1
+[00:53:57] DONE  SWEEP:FP8:DECODE_PRIMARY:C32:r1 status=OK outcome=measured tok/s=1187.24 tpotP95=26.417094924091124 slo=True kvP95=0.8024848782082721 preempt=0.0 periods=4.63 wall=436.21s
+[00:53:59] START SWEEP:FP8:DECODE_PRIMARY:C48:r1
+[01:04:19] DONE  SWEEP:FP8:DECODE_PRIMARY:C48:r1 status=OK outcome=measured tok/s=1368.85 tpotP95=40.011646297763036 slo=True kvP95=0.9953572012424391 preempt=66.0 periods=5.29 wall=620.56s
+[01:04:19] START SWEEP:FP8:DECODE_PRIMARY:C64:r1
+[01:16:15] DONE  SWEEP:FP8:DECODE_PRIMARY:C64:r1 status=OK outcome=measured tok/s=1410.3 tpotP95=56.03170416656946 slo=False kvP95=0.994507111329083 preempt=163.0 periods=4.79 wall=715.78s
+  SLO violated at C=64; higher points skipped for this repetition
+  monotonicity probe at C=96 (violation was C=64)
+[01:16:17] START SWEEP:FP8:DECODE_PRIMARY:C96:r1
+[01:35:54] DONE  SWEEP:FP8:DECODE_PRIMARY:C96:r1 status=OK outcome=measured tok/s=1348.91 tpotP95=83.44866899483094 slo=False kvP95=0.999476867745627 preempt=706.0 periods=4.97 wall=1176.88s
+  launched FP4_PRIMARY rep1 kv_tokens=120944 start=22.02s log=decode_primary_FP4_PRIMARY_r1_1787636196.log
+[01:36:58] START SWEEP:FP4:DECODE_PRIMARY:C1:r1
+[01:41:28] DONE  SWEEP:FP4:DECODE_PRIMARY:C1:r1 status=OK outcome=measured tok/s=87.89 tpotP95=11.368741792921044 slo=True kvP95=0.020435300344006348 preempt=0.0 periods=5.16 wall=270.87s
+[01:41:28] START SWEEP:FP4:DECODE_PRIMARY:C4:r1
+[01:45:59] DONE  SWEEP:FP4:DECODE_PRIMARY:C4:r1 status=OK outcome=measured tok/s=318.16 tpotP95=12.578571886778501 slo=True kvP95=0.08264091029372853 preempt=0.0 periods=4.67 wall=270.89s
+[01:45:59] START SWEEP:FP4:DECODE_PRIMARY:C8:r1
+[01:50:46] DONE  SWEEP:FP4:DECODE_PRIMARY:C8:r1 status=OK outcome=measured tok/s=567.23 tpotP95=13.983282674061662 slo=True kvP95=0.16586398518126486 preempt=0.0 periods=4.37 wall=286.92s
+[01:50:48] START SWEEP:FP4:DECODE_PRIMARY:C12:r1
+[01:56:06] DONE  SWEEP:FP4:DECODE_PRIMARY:C12:r1 status=OK outcome=measured tok/s=765.28 tpotP95=15.486947937120565 slo=True kvP95=0.2399047367028314 preempt=0.0 periods=4.58 wall=318.0s
+[01:56:06] START SWEEP:FP4:DECODE_PRIMARY:C16:r1
+[02:01:17] DONE  SWEEP:FP4:DECODE_PRIMARY:C16:r1 status=OK outcome=measured tok/s=940.78 tpotP95=16.767075347333545 slo=True kvP95=0.3321778248213813 preempt=0.0 periods=4.3 wall=310.47s
+[02:01:17] START SWEEP:FP4:DECODE_PRIMARY:C24:r1
+[02:07:24] DONE  SWEEP:FP4:DECODE_PRIMARY:C24:r1 status=OK outcome=measured tok/s=1191.4 tpotP95=19.789083391399785 slo=True kvP95=0.48356708123842285 preempt=0.0 periods=4.26 wall=366.59s
+[02:07:24] START SWEEP:FP4:DECODE_PRIMARY:C32:r1
+[02:13:38] DONE  SWEEP:FP4:DECODE_PRIMARY:C32:r1 status=OK outcome=measured tok/s=1378.5 tpotP95=22.731937974194107 slo=True kvP95=0.6556297962423921 preempt=0.0 periods=4.29 wall=374.58s
+[02:13:38] START SWEEP:FP4:DECODE_PRIMARY:C48:r1
+[02:21:39] DONE  SWEEP:FP4:DECODE_PRIMARY:C48:r1 status=OK outcome=measured tok/s=1650.15 tpotP95=28.752161495926238 slo=True kvP95=0.9887073299814766 preempt=5.0 periods=4.86 wall=480.29s
+[02:21:39] START SWEEP:FP4:DECODE_PRIMARY:C64:r1
+[02:32:16] DONE  SWEEP:FP4:DECODE_PRIMARY:C64:r1 status=OK outcome=measured tok/s=1731.14 tpotP95=44.439177051588985 slo=True kvP95=0.9981608891241068 preempt=112.0 periods=5.24 wall=637.65s
+[02:32:18] START SWEEP:FP4:DECODE_PRIMARY:C96:r1
+[02:48:16] DONE  SWEEP:FP4:DECODE_PRIMARY:C96:r1 status=OK outcome=measured tok/s=1738.7 tpotP95=70.51111969065866 slo=False kvP95=0.9981542736173591 preempt=440.0 periods=5.18 wall=956.9s
+  SLO violated at C=96; higher points skipped for this repetition
+  launched FP8_PRIMARY rep2 kv_tokens=97888 start=22.03s log=decode_primary_FP8_PRIMARY_r2_1787640537.log
+[02:49:19] START SWEEP:FP8:DECODE_PRIMARY:C1:r2
+[02:54:28] DONE  SWEEP:FP8:DECODE_PRIMARY:C1:r2 status=OK outcome=measured tok/s=66.1 tpotP95=15.096100033792059 slo=True kvP95=0.02291973189471965 preempt=0.0 periods=4.46 wall=308.94s
+[02:54:28] START SWEEP:FP8:DECODE_PRIMARY:C4:r2
+[02:59:26] DONE  SWEEP:FP8:DECODE_PRIMARY:C4:r2 status=OK outcome=measured tok/s=247.0 tpotP95=16.136595081734963 slo=True kvP95=0.09834886382213502 preempt=0.0 periods=4.14 wall=297.97s
+[02:59:28] START SWEEP:FP8:DECODE_PRIMARY:C8:r2
+[03:04:54] DONE  SWEEP:FP8:DECODE_PRIMARY:C8:r2 status=OK outcome=measured tok/s=449.95 tpotP95=17.63187799011628 slo=True kvP95=0.20136504822625467 preempt=0.0 periods=4.54 wall=325.98s
+[03:04:54] START SWEEP:FP8:DECODE_PRIMARY:C12:r2
+[03:10:49] DONE  SWEEP:FP8:DECODE_PRIMARY:C12:r2 status=OK outcome=measured tok/s=619.32 tpotP95=19.175854409924508 slo=True kvP95=0.29092692496321726 preempt=0.0 periods=4.64 wall=355.04s
+[03:10:49] START SWEEP:FP8:DECODE_PRIMARY:C16:r2
+[03:17:08] DONE  SWEEP:FP8:DECODE_PRIMARY:C16:r2 status=OK outcome=measured tok/s=771.93 tpotP95=20.483934249340827 slo=True kvP95=0.3936570214157266 preempt=0.0 periods=4.68 wall=379.61s
+[03:17:10] START SWEEP:FP8:DECODE_PRIMARY:C24:r2
+[03:23:38] DONE  SWEEP:FP8:DECODE_PRIMARY:C24:r2 status=OK outcome=measured tok/s=1000.74 tpotP95=23.53026773214147 slo=True kvP95=0.6042177538008828 preempt=0.0 periods=4.42 wall=388.1s
+[03:23:41] START SWEEP:FP8:DECODE_PRIMARY:C32:r2
+[03:30:57] DONE  SWEEP:FP8:DECODE_PRIMARY:C32:r2 status=OK outcome=measured tok/s=1187.33 tpotP95=26.422415739680588 slo=True kvP95=0.8030080104626451 preempt=0.0 periods=4.63 wall=436.19s
+[03:30:59] START SWEEP:FP8:DECODE_PRIMARY:C48:r2
+[03:41:19] DONE  SWEEP:FP8:DECODE_PRIMARY:C48:r2 status=OK outcome=measured tok/s=1369.49 tpotP95=39.954618537398375 slo=True kvP95=0.9972535556645414 preempt=66.0 periods=5.28 wall=620.03s
+[03:41:19] START SWEEP:FP8:DECODE_PRIMARY:C64:r2
+[03:53:14] DONE  SWEEP:FP8:DECODE_PRIMARY:C64:r2 status=OK outcome=measured tok/s=1410.71 tpotP95=56.04463419135393 slo=False kvP95=0.9976377309138467 preempt=163.0 periods=4.78 wall=715.29s
+  SLO violated at C=64; higher points skipped for this repetition
+[03:53:14] SKIPPED_PAST_SLO SWEEP:FP8:DECODE_PRIMARY:C96:r2 {'skipped_because_slo_violated_at_c': 64}
+  launched FP4_PRIMARY rep2 kv_tokens=120944 start=22.03s log=decode_primary_FP4_PRIMARY_r2_1787644436.log
+[03:54:18] START SWEEP:FP4:DECODE_PRIMARY:C1:r2
+[03:58:49] DONE  SWEEP:FP4:DECODE_PRIMARY:C1:r2 status=OK outcome=measured tok/s=87.87 tpotP95=11.37278541561096 slo=True kvP95=0.02049483990473668 preempt=0.0 periods=5.15 wall=270.86s
+[03:58:49] START SWEEP:FP4:DECODE_PRIMARY:C4:r2
+[04:03:19] DONE  SWEEP:FP4:DECODE_PRIMARY:C4:r2 status=OK outcome=measured tok/s=318.1 tpotP95=12.582085746350463 slo=True kvP95=0.08264091029372853 preempt=0.0 periods=4.67 wall=270.88s
+[04:03:19] START SWEEP:FP4:DECODE_PRIMARY:C8:r2
+[04:08:02] DONE  SWEEP:FP4:DECODE_PRIMARY:C8:r2 status=OK outcome=measured tok/s=577.0 tpotP95=13.742826861985897 slo=True kvP95=0.1604657316750463 preempt=0.0 periods=4.29 wall=282.42s
+[04:08:02] START SWEEP:FP4:DECODE_PRIMARY:C12:r2
+[04:13:20] DONE  SWEEP:FP4:DECODE_PRIMARY:C12:r2 status=OK outcome=measured tok/s=765.62 tpotP95=15.480305117286076 slo=True kvP95=0.2399047367028314 preempt=0.0 periods=4.59 wall=317.97s
+[04:13:20] START SWEEP:FP4:DECODE_PRIMARY:C16:r2
+[04:18:30] DONE  SWEEP:FP4:DECODE_PRIMARY:C16:r2 status=OK outcome=measured tok/s=941.37 tpotP95=16.76259704539757 slo=True kvP95=0.3178618682191056 preempt=0.0 periods=4.29 wall=309.96s
+[04:18:30] START SWEEP:FP4:DECODE_PRIMARY:C24:r2
+[04:24:37] DONE  SWEEP:FP4:DECODE_PRIMARY:C24:r2 status=OK outcome=measured tok/s=1190.92 tpotP95=19.79694718383089 slo=True kvP95=0.48552527123577666 preempt=0.0 periods=4.26 wall=366.58s
+[04:24:37] START SWEEP:FP4:DECODE_PRIMARY:C32:r2
+[04:30:52] DONE  SWEEP:FP4:DECODE_PRIMARY:C32:r2 status=OK outcome=measured tok/s=1376.1 tpotP95=22.763591670117496 slo=True kvP95=0.6520508070918233 preempt=0.0 periods=4.29 wall=375.08s
+[04:30:52] START SWEEP:FP4:DECODE_PRIMARY:C48:r2
+[04:38:52] DONE  SWEEP:FP4:DECODE_PRIMARY:C48:r2 status=OK outcome=measured tok/s=1650.48 tpotP95=28.740880788216558 slo=True kvP95=0.9845660227573433 preempt=5.0 periods=4.85 wall=479.78s
+[04:38:52] START SWEEP:FP4:DECODE_PRIMARY:C64:r2
+[04:49:29] DONE  SWEEP:FP4:DECODE_PRIMARY:C64:r2 status=OK outcome=measured tok/s=1731.3 tpotP95=44.421930829837414 slo=True kvP95=0.9975522625033078 preempt=112.0 periods=5.24 wall=637.6s
+[04:49:29] START SWEEP:FP4:DECODE_PRIMARY:C96:r2
+[05:05:26] DONE  SWEEP:FP4:DECODE_PRIMARY:C96:r2 status=OK outcome=measured tok/s=1739.26 tpotP95=70.50078060934305 slo=False kvP95=0.9981873511510981 preempt=439.0 periods=5.17 wall=956.35s
+  SLO violated at C=96; higher points skipped for this repetition
+  launched BF16_REFERENCE rep2 kv_tokens=44688 start=24.03s log=decode_primary_BF16_REFERENCE_r2_1787648767.log
+[05:06:31] START SWEEP:BF16:DECODE_PRIMARY:C1:r2
+[05:14:02] DONE  SWEEP:BF16:DECODE_PRIMARY:C1:r2 status=OK outcome=measured tok/s=36.17 tpotP95=27.616802467931606 slo=True kvP95=0.05417263610315187 preempt=0.0 periods=4.77 wall=450.7s
+[05:14:02] START SWEEP:BF16:DECODE_PRIMARY:C4:r2
+[05:21:42] DONE  SWEEP:BF16:DECODE_PRIMARY:C4:r2 status=OK outcome=measured tok/s=142.29 tpotP95=27.979371508489702 slo=True kvP95=0.2153474212034384 preempt=0.0 periods=4.68 wall=460.22s
+[05:21:44] START SWEEP:BF16:DECODE_PRIMARY:C8:r2
+[05:29:51] DONE  SWEEP:BF16:DECODE_PRIMARY:C8:r2 status=OK outcome=measured tok/s=268.22 tpotP95=29.67424492200888 slo=True kvP95=0.439541547277937 preempt=0.0 periods=4.53 wall=487.24s
+[05:29:53] START SWEEP:BF16:DECODE_PRIMARY:C12:r2
+[05:38:27] DONE  SWEEP:BF16:DECODE_PRIMARY:C12:r2 status=OK outcome=measured tok/s=381.65 tpotP95=31.261920921641444 slo=True kvP95=0.6509849570200573 preempt=0.0 periods=4.7 wall=513.8s
+[05:38:29] START SWEEP:BF16:DECODE_PRIMARY:C16:r2
+[05:47:26] DONE  SWEEP:BF16:DECODE_PRIMARY:C16:r2 status=OK outcome=measured tok/s=487.21 tpotP95=32.577571284946536 slo=True kvP95=0.8819842406876791 preempt=0.0 periods=4.69 wall=536.34s
+[05:47:28] START SWEEP:BF16:DECODE_PRIMARY:C24:r2
+[06:00:48] DONE  SWEEP:BF16:DECODE_PRIMARY:C24:r2 status=OK outcome=measured tok/s=518.24 tpotP95=55.542752082877286 slo=False kvP95=0.9929083094555874 preempt=49.0 periods=5.27 wall=800.35s
+  SLO violated at C=24; higher points skipped for this repetition
+[06:00:48] SKIPPED_PAST_SLO SWEEP:BF16:DECODE_PRIMARY:C32:r2 {'skipped_because_slo_violated_at_c': 24}
+[06:00:48] SKIPPED_PAST_SLO SWEEP:BF16:DECODE_PRIMARY:C48:r2 {'skipped_because_slo_violated_at_c': 24}
+[06:00:48] SKIPPED_PAST_SLO SWEEP:BF16:DECODE_PRIMARY:C64:r2 {'skipped_because_slo_violated_at_c': 24}
+[06:00:48] SKIPPED_PAST_SLO SWEEP:BF16:DECODE_PRIMARY:C96:r2 {'skipped_because_slo_violated_at_c': 24}
+  launched FP4_PRIMARY rep3 kv_tokens=120944 start=22.02s log=decode_primary_FP4_PRIMARY_r3_1787652089.log
+[06:01:51] START SWEEP:FP4:DECODE_PRIMARY:C1:r3
+[06:06:22] DONE  SWEEP:FP4:DECODE_PRIMARY:C1:r3 status=OK outcome=measured tok/s=87.91 tpotP95=11.368316771301274 slo=True kvP95=0.02049483990473668 preempt=0.0 periods=5.16 wall=270.88s
+[06:06:22] START SWEEP:FP4:DECODE_PRIMARY:C4:r3
+[06:10:53] DONE  SWEEP:FP4:DECODE_PRIMARY:C4:r3 status=OK outcome=measured tok/s=318.3 tpotP95=12.573826913624039 slo=True kvP95=0.07568139719502513 preempt=0.0 periods=4.67 wall=270.87s
+[06:10:53] START SWEEP:FP4:DECODE_PRIMARY:C8:r3
+[06:15:40] DONE  SWEEP:FP4:DECODE_PRIMARY:C8:r3 status=OK outcome=measured tok/s=567.17 tpotP95=13.985200762903636 slo=True kvP95=0.16586398518126486 preempt=0.0 periods=4.37 wall=286.91s
+[06:15:42] START SWEEP:FP4:DECODE_PRIMARY:C12:r3
+[06:21:00] DONE  SWEEP:FP4:DECODE_PRIMARY:C12:r3 status=OK outcome=measured tok/s=765.99 tpotP95=15.472544061239995 slo=True kvP95=0.2399047367028314 preempt=0.0 periods=4.59 wall=317.97s
+[06:21:00] START SWEEP:FP4:DECODE_PRIMARY:C16:r3
+[06:26:10] DONE  SWEEP:FP4:DECODE_PRIMARY:C16:r3 status=OK outcome=measured tok/s=941.78 tpotP95=16.751459077448537 slo=True kvP95=0.3219899444297433 preempt=0.0 periods=4.29 wall=309.93s
+[06:26:10] START SWEEP:FP4:DECODE_PRIMARY:C24:r3
+[06:32:17] DONE  SWEEP:FP4:DECODE_PRIMARY:C24:r3 status=OK outcome=measured tok/s=1191.19 tpotP95=19.796897680049376 slo=True kvP95=0.48552527123577666 preempt=0.0 periods=4.26 wall=366.55s
+[06:32:17] START SWEEP:FP4:DECODE_PRIMARY:C32:r3
+[06:38:32] DONE  SWEEP:FP4:DECODE_PRIMARY:C32:r3 status=OK outcome=measured tok/s=1377.8 tpotP95=22.745632357350775 slo=True kvP95=0.654227308811855 preempt=0.0 periods=4.29 wall=374.59s
+[06:38:34] START SWEEP:FP4:DECODE_PRIMARY:C48:r3
+[06:46:33] DONE  SWEEP:FP4:DECODE_PRIMARY:C48:r3 status=OK outcome=measured tok/s=1650.33 tpotP95=28.73338745995327 slo=True kvP95=0.9875033077533739 preempt=5.0 periods=4.85 wall=479.77s
+[06:46:33] START SWEEP:FP4:DECODE_PRIMARY:C64:r3
+[06:57:12] DONE  SWEEP:FP4:DECODE_PRIMARY:C64:r3 status=OK outcome=measured tok/s=1729.49 tpotP95=44.38462514777995 slo=True kvP95=0.9995104525006615 preempt=112.0 periods=5.24 wall=638.1s
+[06:57:12] START SWEEP:FP4:DECODE_PRIMARY:C96:r3
+[07:13:07] DONE  SWEEP:FP4:DECODE_PRIMARY:C96:r3 status=OK outcome=measured tok/s=1738.75 tpotP95=70.54707297115095 slo=False kvP95=0.9993979888859487 preempt=438.0 periods=5.16 wall=955.35s
+  SLO violated at C=96; higher points skipped for this repetition
+  launched BF16_REFERENCE rep3 kv_tokens=44688 start=24.02s log=decode_primary_BF16_REFERENCE_r3_1787656428.log
+[07:14:13] START SWEEP:BF16:DECODE_PRIMARY:C1:r3
+[07:21:43] DONE  SWEEP:BF16:DECODE_PRIMARY:C1:r3 status=OK outcome=measured tok/s=36.19 tpotP95=27.595162266523236 slo=True kvP95=0.054262177650429816 preempt=0.0 periods=4.76 wall=450.23s
+[07:21:45] START SWEEP:BF16:DECODE_PRIMARY:C4:r3
+[07:29:26] DONE  SWEEP:BF16:DECODE_PRIMARY:C4:r3 status=OK outcome=measured tok/s=142.12 tpotP95=28.034282272048504 slo=True kvP95=0.21418338108882523 preempt=0.0 periods=4.68 wall=460.7s
+[07:29:28] START SWEEP:BF16:DECODE_PRIMARY:C8:r3
+[07:37:35] DONE  SWEEP:BF16:DECODE_PRIMARY:C8:r3 status=OK outcome=measured tok/s=267.86 tpotP95=29.690687076684995 slo=True kvP95=0.43753581661891117 preempt=0.0 periods=4.53 wall=487.76s
+[07:37:37] START SWEEP:BF16:DECODE_PRIMARY:C12:r3
+[07:46:11] DONE  SWEEP:BF16:DECODE_PRIMARY:C12:r3 status=OK outcome=measured tok/s=381.84 tpotP95=31.262276588426605 slo=True kvP95=0.6498567335243552 preempt=0.0 periods=4.71 wall=513.8s
+[07:46:13] START SWEEP:BF16:DECODE_PRIMARY:C16:r3
+[07:55:10] DONE  SWEEP:BF16:DECODE_PRIMARY:C16:r3 status=OK outcome=measured tok/s=487.22 tpotP95=32.607250350203756 slo=True kvP95=0.8796561604584527 preempt=0.0 periods=4.69 wall=536.35s
+[07:55:12] START SWEEP:BF16:DECODE_PRIMARY:C24:r3
+[08:08:32] DONE  SWEEP:BF16:DECODE_PRIMARY:C24:r3 status=OK outcome=measured tok/s=517.91 tpotP95=55.53706894978689 slo=False kvP95=0.992406876790831 preempt=49.0 periods=5.27 wall=800.83s
+  SLO violated at C=24; higher points skipped for this repetition
+[08:08:32] SKIPPED_PAST_SLO SWEEP:BF16:DECODE_PRIMARY:C32:r3 {'skipped_because_slo_violated_at_c': 24}
+[08:08:32] SKIPPED_PAST_SLO SWEEP:BF16:DECODE_PRIMARY:C48:r3 {'skipped_because_slo_violated_at_c': 24}
+[08:08:33] SKIPPED_PAST_SLO SWEEP:BF16:DECODE_PRIMARY:C64:r3 {'skipped_because_slo_violated_at_c': 24}
+[08:08:33] SKIPPED_PAST_SLO SWEEP:BF16:DECODE_PRIMARY:C96:r3 {'skipped_because_slo_violated_at_c': 24}
+  launched FP8_PRIMARY rep3 kv_tokens=97888 start=22.02s log=decode_primary_FP8_PRIMARY_r3_1787659754.log
+[08:09:36] START SWEEP:FP8:DECODE_PRIMARY:C1:r3
+[08:14:46] DONE  SWEEP:FP8:DECODE_PRIMARY:C1:r3 status=OK outcome=measured tok/s=66.05 tpotP95=15.110598865083887 slo=True kvP95=0.02291973189471965 preempt=0.0 periods=4.47 wall=309.47s
+[08:14:46] START SWEEP:FP8:DECODE_PRIMARY:C4:r3
+[08:19:44] DONE  SWEEP:FP8:DECODE_PRIMARY:C4:r3 status=OK outcome=measured tok/s=246.54 tpotP95=16.149130589552776 slo=True kvP95=0.09795651463135523 preempt=0.0 periods=4.14 wall=298.44s
+[08:19:44] START SWEEP:FP8:DECODE_PRIMARY:C8:r3
+[08:25:10] DONE  SWEEP:FP8:DECODE_PRIMARY:C8:r3 status=OK outcome=measured tok/s=450.27 tpotP95=17.63569832354412 slo=True kvP95=0.20107896027464445 preempt=0.0 periods=4.54 wall=325.98s
+[08:25:10] START SWEEP:FP8:DECODE_PRIMARY:C12:r3
+[08:31:05] DONE  SWEEP:FP8:DECODE_PRIMARY:C12:r3 status=OK outcome=measured tok/s=619.64 tpotP95=19.175041426140606 slo=True kvP95=0.29092692496321726 preempt=0.0 periods=4.65 wall=355.04s
+[08:31:07] START SWEEP:FP8:DECODE_PRIMARY:C16:r3
+[08:37:27] DONE  SWEEP:FP8:DECODE_PRIMARY:C16:r3 status=OK outcome=measured tok/s=771.38 tpotP95=20.503999255622617 slo=True kvP95=0.39406571848945554 preempt=0.0 periods=4.68 wall=379.6s
+[08:37:27] START SWEEP:FP8:DECODE_PRIMARY:C24:r3
+[08:43:55] DONE  SWEEP:FP8:DECODE_PRIMARY:C24:r3 status=OK outcome=measured tok/s=1001.08 tpotP95=23.527760697702973 slo=True kvP95=0.6042177538008828 preempt=0.0 periods=4.43 wall=388.1s
+[08:43:57] START SWEEP:FP8:DECODE_PRIMARY:C32:r3
+[08:51:13] DONE  SWEEP:FP8:DECODE_PRIMARY:C32:r3 status=OK outcome=measured tok/s=1187.03 tpotP95=26.419717705421625 slo=True kvP95=0.8038254046101029 preempt=0.0 periods=4.63 wall=436.19s
+[08:51:13] START SWEEP:FP8:DECODE_PRIMARY:C48:r3
+[09:01:35] DONE  SWEEP:FP8:DECODE_PRIMARY:C48:r3 status=OK outcome=measured tok/s=1367.84 tpotP95=39.90696001724892 slo=True kvP95=0.9939185875429132 preempt=66.0 periods=5.29 wall=621.06s
+[09:01:37] START SWEEP:FP8:DECODE_PRIMARY:C64:r3
+[09:13:31] DONE  SWEEP:FP8:DECODE_PRIMARY:C64:r3 status=OK outcome=measured tok/s=1413.19 tpotP95=55.884318360616376 slo=False kvP95=0.9998365211705085 preempt=162.0 periods=4.78 wall=714.28s
+  SLO violated at C=64; higher points skipped for this repetition
+[09:13:31] SKIPPED_PAST_SLO SWEEP:FP8:DECODE_PRIMARY:C96:r3 {'skipped_because_slo_violated_at_c': 64}
+  launched BF16_REFERENCE rep1 kv_tokens=44688 start=24.03s log=prefill_probe_BF16_REFERENCE_r1_1787663652.log
+[09:14:36] START SWEEP:BF16:PREFILL_PROBE:C1:r1
+[09:17:47] DONE  SWEEP:BF16:PREFILL_PROBE:C1:r1 status=OK outcome=measured tok/s=13.82 tpotP95=28.99345920811738 slo=True kvP95=0.18400787965616047 preempt=0.0 periods=26.0 wall=190.63s
+[09:17:47] START SWEEP:BF16:PREFILL_PROBE:C2:r1
+[09:20:58] DONE  SWEEP:BF16:PREFILL_PROBE:C2:r1 status=OK outcome=measured tok/s=16.19 tpotP95=73.47383772834173 slo=False kvP95=0.36738896848137537 preempt=0.0 periods=15.22 wall=191.0s
+  SLO violated at C=2; higher points skipped for this repetition
+  monotonicity probe at C=4 (violation was C=2)
+[09:20:58] START SWEEP:BF16:PREFILL_PROBE:C4:r1
+[09:24:19] DONE  SWEEP:BF16:PREFILL_PROBE:C4:r1 status=OK outcome=measured tok/s=19.05 tpotP95=164.93433178665356 slo=False kvP95=0.7353151862464183 preempt=0.0 periods=8.95 wall=201.06s
+[09:24:19] SKIPPED_PAST_SLO SWEEP:BF16:PREFILL_PROBE:C8:r1 {'skipped_because_slo_violated_at_c': 2}
+  launched FP8_PRIMARY rep1 kv_tokens=97888 start=22.02s log=prefill_probe_FP8_PRIMARY_r1_1787664295.log
+[09:25:17] START SWEEP:FP8:PREFILL_PROBE:C1:r1
+[09:28:28] DONE  SWEEP:FP8:PREFILL_PROBE:C1:r1 status=OK outcome=measured tok/s=22.42 tpotP95=16.491823853744613 slo=True kvP95=0.08402811835867252 preempt=0.0 periods=42.19 wall=191.1s
+[09:28:30] START SWEEP:FP8:PREFILL_PROBE:C2:r1
+[09:31:51] DONE  SWEEP:FP8:PREFILL_PROBE:C2:r1 status=OK outcome=measured tok/s=26.62 tpotP95=45.91435173173405 slo=True kvP95=0.1624979565146314 preempt=0.0 periods=25.02 wall=200.94s
+[09:31:53] START SWEEP:FP8:PREFILL_PROBE:C4:r1
+[09:35:14] DONE  SWEEP:FP8:PREFILL_PROBE:C4:r1 status=OK outcome=measured tok/s=29.74 tpotP95=105.76260593201545 slo=False kvP95=0.26777832270720936 preempt=0.0 periods=13.98 wall=200.99s
+  SLO violated at C=4; higher points skipped for this repetition
+  monotonicity probe at C=8 (violation was C=4)
+[09:35:14] START SWEEP:FP8:PREFILL_PROBE:C8:r1
+[09:38:35] DONE  SWEEP:FP8:PREFILL_PROBE:C8:r1 status=OK outcome=measured tok/s=30.98 tpotP95=234.1669175909051 slo=False kvP95=0.670794507111329 preempt=0.0 periods=7.28 wall=201.03s
+  launched FP4_PRIMARY rep1 kv_tokens=120944 start=22.02s log=prefill_probe_FP4_PRIMARY_r1_1787665152.log
+[09:39:34] START SWEEP:FP4:PREFILL_PROBE:C1:r1
+[09:42:45] DONE  SWEEP:FP4:PREFILL_PROBE:C1:r1 status=OK outcome=measured tok/s=32.01 tpotP95=12.720967215230509 slo=True kvP95=0.06800740936755756 preempt=0.0 periods=60.19 wall=191.02s
+[09:42:47] START SWEEP:FP4:PREFILL_PROBE:C2:r1
+[09:45:58] DONE  SWEEP:FP4:PREFILL_PROBE:C2:r1 status=OK outcome=measured tok/s=38.33 tpotP95=32.774785044227514 slo=True kvP95=0.13601481873511512 preempt=0.0 periods=36.0 wall=190.88s
+[09:46:00] START SWEEP:FP4:PREFILL_PROBE:C4:r1
+[09:49:11] DONE  SWEEP:FP4:PREFILL_PROBE:C4:r1 status=OK outcome=measured tok/s=43.66 tpotP95=73.56823194591749 slo=False kvP95=0.2716327070653612 preempt=0.0 periods=20.51 wall=190.9s
+  SLO violated at C=4; higher points skipped for this repetition
+  monotonicity probe at C=8 (violation was C=4)
+[09:49:13] START SWEEP:FP4:PREFILL_PROBE:C8:r1
+[09:52:24] DONE  SWEEP:FP4:PREFILL_PROBE:C8:r1 status=OK outcome=measured tok/s=43.54 tpotP95=163.36969204562445 slo=False kvP95=0.5048954749933845 preempt=0.0 periods=10.23 wall=190.93s
+refine BF16_REFERENCE: bisecting [16,24]
+  launched BF16_REFERENCE rep1 kv_tokens=44688 start=24.03s log=refine_BF16_REFERENCE_r1_1787665980.log
+[09:53:24] START SWEEP_REFINE:BF16:DECODE_PRIMARY:C20:r1
+[10:05:12] DONE  SWEEP_REFINE:BF16:DECODE_PRIMARY:C20:r1 status=OK outcome=measured tok/s=472.89 tpotP95=45.287317400596876 slo=True kvP95=0.9742120343839542 preempt=15.0 periods=5.05 wall=708.16s
+[10:05:12] START SWEEP_REFINE:BF16:DECODE_PRIMARY:C18:r1
+[10:16:47] DONE  SWEEP_REFINE:BF16:DECODE_PRIMARY:C18:r1 status=OK outcome=measured tok/s=438.18 tpotP95=41.311528858784214 slo=True kvP95=0.9736747851002865 preempt=5.0 periods=5.04 wall=695.13s
+[10:16:47] START SWEEP_REFINE:BF16:DECODE_PRIMARY:C17:r1
+[10:27:42] DONE  SWEEP_REFINE:BF16:DECODE_PRIMARY:C17:r1 status=OK outcome=measured tok/s=424.06 tpotP95=39.765635936112204 slo=True kvP95=0.9309813753581662 preempt=0.0 periods=4.67 wall=654.55s
+refine BF16_REFERENCE: wall bracket [17,18]
+refine FP8_PRIMARY: bisecting [32,48]
+  launched FP8_PRIMARY rep1 kv_tokens=97888 start=22.02s log=refine_FP8_PRIMARY_r1_1787668098.log
+[10:28:40] START SWEEP_REFINE:FP8:DECODE_PRIMARY:C40:r1
+[10:37:17] DONE  SWEEP_REFINE:FP8:DECODE_PRIMARY:C40:r1 status=OK outcome=measured tok/s=1314.06 tpotP95=30.09112261118103 slo=True kvP95=0.9924064083701161 preempt=10.0 periods=4.91 wall=516.84s
+[10:37:17] START SWEEP_REFINE:FP8:DECODE_PRIMARY:C36:r1
+[10:45:14] DONE  SWEEP_REFINE:FP8:DECODE_PRIMARY:C36:r1 status=OK outcome=measured tok/s=1225.75 tpotP95=28.935263908395846 slo=True kvP95=0.8967712931175412 preempt=0.0 periods=4.75 wall=476.76s
+[10:45:14] START SWEEP_REFINE:FP8:DECODE_PRIMARY:C38:r1
+[10:53:17] DONE  SWEEP_REFINE:FP8:DECODE_PRIMARY:C38:r1 status=OK outcome=measured tok/s=1269.4 tpotP95=29.253650062708854 slo=True kvP95=0.8941638057871506 preempt=0.0 periods=4.44 wall=482.77s
+[10:53:17] START SWEEP_REFINE:FP8:DECODE_PRIMARY:C39:r1
+[11:01:36] DONE  SWEEP_REFINE:FP8:DECODE_PRIMARY:C39:r1 status=OK outcome=measured tok/s=1295.05 tpotP95=29.61174560160616 slo=True kvP95=0.9827284616642145 preempt=5.0 periods=4.67 wall=498.8s
+refine FP8_PRIMARY: wall bracket [38,39]
+refine FP4_PRIMARY: bisecting [32,48]
+  launched FP4_PRIMARY rep1 kv_tokens=120944 start=22.02s log=refine_FP4_PRIMARY_r1_1787670132.log
+[11:02:34] START SWEEP_REFINE:FP4:DECODE_PRIMARY:C40:r1
+[11:09:35] DONE  SWEEP_REFINE:FP4:DECODE_PRIMARY:C40:r1 status=OK outcome=measured tok/s=1524.71 tpotP95=25.586209736991233 slo=True kvP95=0.8131119343741731 preempt=0.0 periods=4.46 wall=420.65s
+[11:09:35] START SWEEP_REFINE:FP4:DECODE_PRIMARY:C44:r1
+[11:17:09] DONE  SWEEP_REFINE:FP4:DECODE_PRIMARY:C44:r1 status=OK outcome=measured tok/s=1566.65 tpotP95=27.545390353108377 slo=True kvP95=0.9052659433712622 preempt=0.0 periods=4.75 wall=454.24s
+[11:17:09] START SWEEP_REFINE:FP4:DECODE_PRIMARY:C46:r1
+[11:24:51] DONE  SWEEP_REFINE:FP4:DECODE_PRIMARY:C46:r1 status=OK outcome=measured tok/s=1602.31 tpotP95=27.99878255133715 slo=True kvP95=0.9238687483461233 preempt=0.0 periods=4.62 wall=462.25s
+[11:24:51] START SWEEP_REFINE:FP4:DECODE_PRIMARY:C47:r1
+[11:32:36] DONE  SWEEP_REFINE:FP4:DECODE_PRIMARY:C47:r1 status=OK outcome=measured tok/s=1628.15 tpotP95=28.171394006197872 slo=True kvP95=0.9721222545646996 preempt=0.0 periods=4.63 wall=464.75s
+refine FP4_PRIMARY: wall bracket [47,48]
+sweep phase complete
+[2026-08-25 11:33:06] FOLLOWUP: main sweep pid=916188 exited
+[2026-08-25 11:33:06] FOLLOWUP: GPU free (15 MiB); resuming unfinished cells
+sweep_config_hash = df0f0f124d987a5c
+  launched BF16_REFERENCE rep1 kv_tokens=44688 start=24.03s log=decode_primary_BF16_REFERENCE_r1_1787671993.log
+  monotonicity probe at C=32 (violation was C=24)
+[11:33:37] START SWEEP:BF16:DECODE_PRIMARY:C32:r1
+[11:48:44] DONE  SWEEP:BF16:DECODE_PRIMARY:C32:r1 status=OK outcome=measured tok/s=572.85 tpotP95=71.38270730768983 slo=False kvP95=0.994484240687679 preempt=121.0 periods=5.03 wall=906.07s
+skip FP8_PRIMARY rep1 DECODE_PRIMARY: all cells present
+skip FP4_PRIMARY rep1 DECODE_PRIMARY: all cells present
+skip FP8_PRIMARY rep2 DECODE_PRIMARY: all cells present
+skip FP4_PRIMARY rep2 DECODE_PRIMARY: all cells present
+skip BF16_REFERENCE rep2 DECODE_PRIMARY: all cells present
+skip FP4_PRIMARY rep3 DECODE_PRIMARY: all cells present
+skip BF16_REFERENCE rep3 DECODE_PRIMARY: all cells present
+skip FP8_PRIMARY rep3 DECODE_PRIMARY: all cells present
+skip BF16_REFERENCE rep1 PREFILL_PROBE: all cells present
+skip FP8_PRIMARY rep1 PREFILL_PROBE: all cells present
+skip FP4_PRIMARY rep1 PREFILL_PROBE: all cells present
+refine BF16_REFERENCE: bisecting [16,24]
+  launched BF16_REFERENCE rep1 kv_tokens=44688 start=24.03s log=refine_BF16_REFERENCE_r1_1787672960.log
+refine BF16_REFERENCE: wall bracket [17,18]
+refine FP8_PRIMARY: bisecting [32,48]
+  launched FP8_PRIMARY rep1 kv_tokens=97888 start=22.02s log=refine_FP8_PRIMARY_r1_1787672990.log
+refine FP8_PRIMARY: wall bracket [38,39]
+refine FP4_PRIMARY: bisecting [32,48]
+  launched FP4_PRIMARY rep1 kv_tokens=120944 start=22.02s log=refine_FP4_PRIMARY_r1_1787673017.log
+refine FP4_PRIMARY: wall bracket [47,48]
+refine-slo BF16_REFERENCE: bisecting SLO crossing in [20,24]
+  launched BF16_REFERENCE rep1 kv_tokens=44688 start=24.03s log=refine_slo_BF16_REFERENCE_r1_1787673040.log
+[11:51:04] START SWEEP_REFINE_SLO:BF16:DECODE_PRIMARY:C22:r1
+[12:04:08] DONE  SWEEP_REFINE_SLO:BF16:DECODE_PRIMARY:C22:r1 status=OK outcome=measured tok/s=498.73 tpotP95=50.74068920805816 slo=False kvP95=0.9921203438395415 preempt=33.0 periods=5.46 wall=783.81s
+[12:04:08] START SWEEP_REFINE_SLO:BF16:DECODE_PRIMARY:C21:r1
+[12:16:51] DONE  SWEEP_REFINE_SLO:BF16:DECODE_PRIMARY:C21:r1 status=OK outcome=measured tok/s=488.18 tpotP95=47.58732306033247 slo=True kvP95=0.9931948424068768 preempt=23.0 periods=5.36 wall=762.75s
+refine-slo BF16_REFERENCE: max concurrency within SLO = 21 (first breach at 22)
+refine-slo FP8_PRIMARY: bisecting SLO crossing in [48,64]
+  launched FP8_PRIMARY rep1 kv_tokens=97888 start=22.02s log=refine_slo_FP8_PRIMARY_r1_1787674647.log
+[12:17:49] START SWEEP_REFINE_SLO:FP8:DECODE_PRIMARY:C56:r1
+[12:28:56] DONE  SWEEP_REFINE_SLO:FP8:DECODE_PRIMARY:C56:r1 status=OK outcome=measured tok/s=1408.55 tpotP95=48.95763143948923 slo=True kvP95=0.99689390223966 preempt=118.0 periods=5.11 wall=667.13s
+[12:28:58] START SWEEP_REFINE_SLO:FP8:DECODE_PRIMARY:C60:r1
+[12:40:30] DONE  SWEEP_REFINE_SLO:FP8:DECODE_PRIMARY:C60:r1 status=OK outcome=measured tok/s=1411.01 tpotP95=52.6343934274582 slo=False kvP95=0.9977112963871179 preempt=136.0 periods=4.83 wall=691.71s
+[12:40:30] START SWEEP_REFINE_SLO:FP8:DECODE_PRIMARY:C58:r1
+[12:51:52] DONE  SWEEP_REFINE_SLO:FP8:DECODE_PRIMARY:C58:r1 status=OK outcome=measured tok/s=1403.96 tpotP95=50.77779104951455 slo=False kvP95=0.9977358182115416 preempt=117.0 periods=4.86 wall=682.17s
+[12:51:52] START SWEEP_REFINE_SLO:FP8:DECODE_PRIMARY:C57:r1
+[13:03:09] DONE  SWEEP_REFINE_SLO:FP8:DECODE_PRIMARY:C57:r1 status=OK outcome=measured tok/s=1401.23 tpotP95=49.66159518803576 slo=True kvP95=0.9969265980055583 preempt=116.0 periods=4.87 wall=677.15s
+refine-slo FP8_PRIMARY: max concurrency within SLO = 57 (first breach at 58)
+refine-slo FP4_PRIMARY: bisecting SLO crossing in [64,96]
+  launched FP4_PRIMARY rep1 kv_tokens=120944 start=22.02s log=refine_slo_FP4_PRIMARY_r1_1787677426.log
+[13:04:08] START SWEEP_REFINE_SLO:FP4:DECODE_PRIMARY:C80:r1
+[13:16:06] DONE  SWEEP_REFINE_SLO:FP4:DECODE_PRIMARY:C80:r1 status=OK outcome=measured tok/s=1736.88 tpotP95=56.727620965401265 slo=False kvP95=0.9983527388197936 preempt=214.0 periods=4.74 wall=718.33s
+[13:16:06] START SWEEP_REFINE_SLO:FP4:DECODE_PRIMARY:C72:r1
+[13:27:28] DONE  SWEEP_REFINE_SLO:FP4:DECODE_PRIMARY:C72:r1 status=OK outcome=measured tok/s=1739.5 tpotP95=51.532279680306516 slo=False kvP95=0.9965599364911352 preempt=158.0 periods=4.96 wall=681.71s
+[13:27:28] START SWEEP_REFINE_SLO:FP4:DECODE_PRIMARY:C68:r1
+[13:38:27] DONE  SWEEP_REFINE_SLO:FP4:DECODE_PRIMARY:C68:r1 status=OK outcome=measured tok/s=1745.67 tpotP95=47.81708144673802 slo=True kvP95=0.9982799682455676 preempt=139.0 periods=5.24 wall=658.71s
+[13:38:27] START SWEEP_REFINE_SLO:FP4:DECODE_PRIMARY:C70:r1
+[13:49:36] DONE  SWEEP_REFINE_SLO:FP4:DECODE_PRIMARY:C70:r1 status=OK outcome=measured tok/s=1745.46 tpotP95=49.56810558528143 slo=True kvP95=0.999206139190262 preempt=152.0 periods=5.09 wall=668.71s
+[13:49:36] START SWEEP_REFINE_SLO:FP4:DECODE_PRIMARY:C71:r1
+[14:00:52] DONE  SWEEP_REFINE_SLO:FP4:DECODE_PRIMARY:C71:r1 status=OK outcome=measured tok/s=1740.12 tpotP95=50.63806460762208 slo=False kvP95=0.9984122783805239 preempt=148.0 periods=4.96 wall=675.73s
+refine-slo FP4_PRIMARY: max concurrency within SLO = 70 (first breach at 71)
+sweep phase complete
+[2026-08-25 14:00:53] FOLLOWUP: resume pass exited rc=0
+sweep_config_hash = df0f0f124d987a5c
+refine-slo BF16_REFERENCE: crossing already bracketed [21,22]
+refine-slo FP8_PRIMARY: crossing already bracketed [57,58]
+refine-slo FP4_PRIMARY: crossing already bracketed [70,71]
+sweep phase complete
+[2026-08-25 14:00:56] FOLLOWUP: refine-slo exited rc=0
+124 cells in /home/sathvik/llm_quantization_threshold/results/sweep
+
+status                    outcome      n
+  OK                      measured     110
+  SKIPPED_PAST_SLO        infeasible   14
+
+DECODE_PRIMARY cells
+cfg     C rep            status     outcome    tok/s  tpotP95   slo  kvmax  pre   per   wall   kvtok
+BF16    1   1                OK    measured     36.2     27.6  True  0.057    0  4.72    448   44688
+BF16    4   1                OK    measured    142.1     28.1  True  0.225    0  4.68    461   44688
+BF16    8   1                OK    measured    267.9     29.6  True  0.444    0  4.53    488   44688
+BF16   12   1                OK    measured    381.8     31.3  True  0.675    0  4.71    514   44688
+BF16   16   1                OK    measured    487.3     32.6  True  0.913    0  4.69    536   44688
+BF16   17   1                OK    measured    424.1     39.8  True  0.974    0  4.67    655   44688
+BF16   18   1                OK    measured    438.2     41.3  True  0.999    5  5.04    695   44688
+BF16   20   1                OK    measured    472.9     45.3  True  0.995   15  5.05    708   44688
+BF16   21   1                OK    measured    488.2     47.6  True  0.996   23  5.36    763   44688
+BF16   22   1                OK    measured    498.7     50.7 False  0.999   33  5.46    784   44688
+BF16   24   1                OK    measured    518.7     55.5 False  0.998   49  5.26    800   44688
+BF16   32   1                OK    measured    572.9     71.4 False  0.999  121  5.03    906   44688
+BF16   48   1  SKIPPED_PAST_SLO  infeasible        -        -  None      -    -     -      -       -
+BF16   64   1  SKIPPED_PAST_SLO  infeasible        -        -  None      -    -     -      -       -
+BF16   96   1  SKIPPED_PAST_SLO  infeasible        -        -  None      -    -     -      -       -
+BF16    1   2                OK    measured     36.2     27.6  True  0.055    0  4.77    451   44688
+BF16    4   2                OK    measured    142.3     28.0  True  0.225    0  4.68    460   44688
+BF16    8   2                OK    measured    268.2     29.7  True  0.444    0  4.53    487   44688
+BF16   12   2                OK    measured    381.6     31.3  True  0.675    0  4.70    514   44688
+BF16   16   2                OK    measured    487.2     32.6  True  0.917    0  4.69    536   44688
+BF16   24   2                OK    measured    518.2     55.5 False  0.997   49  5.27    800   44688
+BF16   32   2  SKIPPED_PAST_SLO  infeasible        -        -  None      -    -     -      -       -
+BF16   48   2  SKIPPED_PAST_SLO  infeasible        -        -  None      -    -     -      -       -
+BF16   64   2  SKIPPED_PAST_SLO  infeasible        -        -  None      -    -     -      -       -
+BF16   96   2  SKIPPED_PAST_SLO  infeasible        -        -  None      -    -     -      -       -
+BF16    1   3                OK    measured     36.2     27.6  True  0.056    0  4.76    450   44688
+BF16    4   3                OK    measured    142.1     28.0  True  0.225    0  4.68    461   44688
+BF16    8   3                OK    measured    267.9     29.7  True  0.444    0  4.53    488   44688
+BF16   12   3                OK    measured    381.8     31.3  True  0.675    0  4.71    514   44688
+BF16   16   3                OK    measured    487.2     32.6  True  0.915    0  4.69    536   44688
+BF16   24   3                OK    measured    517.9     55.5 False  0.996   49  5.27    801   44688
+BF16   32   3  SKIPPED_PAST_SLO  infeasible        -        -  None      -    -     -      -       -
+BF16   48   3  SKIPPED_PAST_SLO  infeasible        -        -  None      -    -     -      -       -
+BF16   64   3  SKIPPED_PAST_SLO  infeasible        -        -  None      -    -     -      -       -
+BF16   96   3  SKIPPED_PAST_SLO  infeasible        -        -  None      -    -     -      -       -
+FP4     1   1                OK    measured     87.9     11.4  True  0.021    0  5.16    271  120944
+FP4     4   1                OK    measured    318.2     12.6  True  0.085    0  4.67    271  120944
+FP4     8   1                OK    measured    567.2     14.0  True  0.169    0  4.37    287  120944
+FP4    12   1                OK    measured    765.3     15.5  True  0.246    0  4.58    318  120944
+FP4    16   1                OK    measured    940.8     16.8  True  0.339    0  4.30    310  120944
+FP4    24   1                OK    measured   1191.4     19.8  True  0.487    0  4.26    367  120944
+FP4    32   1                OK    measured   1378.5     22.7  True  0.656    0  4.29    375  120944
+FP4    40   1                OK    measured   1524.7     25.6  True  0.841    0  4.46    421  120944
+FP4    44   1                OK    measured   1566.7     27.5  True  0.920    0  4.75    454  120944
+FP4    46   1                OK    measured   1602.3     28.0  True  0.958    0  4.62    462  120944
+FP4    47   1                OK    measured   1628.2     28.2  True  0.989    0  4.63    465  120944
+FP4    48   1                OK    measured   1650.2     28.8  True  0.994    5  4.86    480  120944
+FP4    64   1                OK    measured   1731.1     44.4  True  1.000  112  5.24    638  120944
+FP4    68   1                OK    measured   1745.7     47.8  True  0.999  139  5.24    659  120944
+FP4    70   1                OK    measured   1745.5     49.6  True  1.000  152  5.09    669  120944
+FP4    71   1                OK    measured   1740.1     50.6 False  0.999  148  4.96    676  120944
+FP4    72   1                OK    measured   1739.5     51.5 False  1.000  158  4.96    682  120944
+FP4    80   1                OK    measured   1736.9     56.7 False  0.999  214  4.74    718  120944
+FP4    96   1                OK    measured   1738.7     70.5 False  0.999  440  5.18    957  120944
+FP4     1   2                OK    measured     87.9     11.4  True  0.021    0  5.15    271  120944
+FP4     4   2                OK    measured    318.1     12.6  True  0.085    0  4.67    271  120944
+FP4     8   2                OK    measured    577.0     13.7  True  0.165    0  4.29    282  120944
+FP4    12   2                OK    measured    765.6     15.5  True  0.246    0  4.59    318  120944
+FP4    16   2                OK    measured    941.4     16.8  True  0.330    0  4.29    310  120944
+FP4    24   2                OK    measured   1190.9     19.8  True  0.489    0  4.26    367  120944
+FP4    32   2                OK    measured   1376.1     22.8  True  0.653    0  4.29    375  120944
+FP4    48   2                OK    measured   1650.5     28.7  True  0.994    5  4.85    480  120944
+FP4    64   2                OK    measured   1731.3     44.4  True  1.000  112  5.24    638  120944
+FP4    96   2                OK    measured   1739.3     70.5 False  1.000  439  5.17    956  120944
+FP4     1   3                OK    measured     87.9     11.4  True  0.021    0  5.16    271  120944
+FP4     4   3                OK    measured    318.3     12.6  True  0.082    0  4.67    271  120944
+FP4     8   3                OK    measured    567.2     14.0  True  0.169    0  4.37    287  120944
+FP4    12   3                OK    measured    766.0     15.5  True  0.246    0  4.59    318  120944
+FP4    16   3                OK    measured    941.8     16.8  True  0.330    0  4.29    310  120944
+FP4    24   3                OK    measured   1191.2     19.8  True  0.489    0  4.26    367  120944
+FP4    32   3                OK    measured   1377.8     22.7  True  0.656    0  4.29    375  120944
+FP4    48   3                OK    measured   1650.3     28.7  True  0.996    5  4.85    480  120944
+FP4    64   3                OK    measured   1729.5     44.4  True  1.000  112  5.24    638  120944
+FP4    96   3                OK    measured   1738.8     70.5 False  1.000  438  5.16    955  120944
+FP8     1   1                OK    measured     66.0     15.1  True  0.023    0  4.47    309   97888
+FP8     4   1                OK    measured    246.8     16.1  True  0.102    0  4.15    298   97888
+FP8     8   1                OK    measured    450.2     17.6  True  0.208    0  4.54    326   97888
+FP8    12   1                OK    measured    618.3     19.2  True  0.292    0  4.65    356   97888
+FP8    16   1                OK    measured    772.1     20.5  True  0.406    0  4.68    380   97888
+FP8    24   1                OK    measured   1002.4     23.5  True  0.621    0  4.42    388   97888
+FP8    32   1                OK    measured   1187.2     26.4  True  0.832    0  4.63    436   97888
+FP8    36   1                OK    measured   1225.8     28.9  True  0.906    0  4.75    477   97888
+FP8    38   1                OK    measured   1269.4     29.3  True  0.895    0  4.44    483   97888
+FP8    39   1                OK    measured   1295.0     29.6  True  0.996    5  4.67    499   97888
+FP8    40   1                OK    measured   1314.1     30.1  True  0.994   10  4.91    517   97888
+FP8    48   1                OK    measured   1368.8     40.0  True  0.999   66  5.29    621   97888
+FP8    56   1                OK    measured   1408.5     49.0  True  0.999  118  5.11    667   97888
+FP8    57   1                OK    measured   1401.2     49.7  True  1.000  116  4.87    677   97888
+FP8    58   1                OK    measured   1404.0     50.8 False  0.999  117  4.86    682   97888
+FP8    60   1                OK    measured   1411.0     52.6 False  1.000  136  4.83    692   97888
+FP8    64   1                OK    measured   1410.3     56.0 False  0.998  163  4.79    716   97888
+FP8    96   1                OK    measured   1348.9     83.4 False  1.000  706  4.97   1177   97888
+FP8     1   2                OK    measured     66.1     15.1  True  0.023    0  4.46    309   97888
+FP8     4   2                OK    measured    247.0     16.1  True  0.103    0  4.14    298   97888
+FP8     8   2                OK    measured    449.9     17.6  True  0.209    0  4.54    326   97888
+FP8    12   2                OK    measured    619.3     19.2  True  0.294    0  4.64    355   97888
+FP8    16   2                OK    measured    771.9     20.5  True  0.405    0  4.68    380   97888
+FP8    24   2                OK    measured   1000.7     23.5  True  0.620    0  4.42    388   97888
+FP8    32   2                OK    measured   1187.3     26.4  True  0.832    0  4.63    436   97888
+FP8    48   2                OK    measured   1369.5     40.0  True  1.000   66  5.28    620   97888
+FP8    64   2                OK    measured   1410.7     56.0 False  1.000  163  4.78    715   97888
+FP8    96   2  SKIPPED_PAST_SLO  infeasible        -        -  None      -    -     -      -       -
+FP8     1   3                OK    measured     66.0     15.1  True  0.023    0  4.47    309   97888
+FP8     4   3                OK    measured    246.5     16.1  True  0.103    0  4.14    298   97888
+FP8     8   3                OK    measured    450.3     17.6  True  0.208    0  4.54    326   97888
+FP8    12   3                OK    measured    619.6     19.2  True  0.294    0  4.65    355   97888
+FP8    16   3                OK    measured    771.4     20.5  True  0.408    0  4.68    380   97888
+FP8    24   3                OK    measured   1001.1     23.5  True  0.620    0  4.43    388   97888
+FP8    32   3                OK    measured   1187.0     26.4  True  0.833    0  4.63    436   97888
+FP8    48   3                OK    measured   1367.8     39.9  True  0.998   66  5.29    621   97888
+FP8    64   3                OK    measured   1413.2     55.9 False  1.000  162  4.78    714   97888
+FP8    96   3  SKIPPED_PAST_SLO  infeasible        -        -  None      -    -     -      -       -
+
+14 infeasible cells:
+  SWEEP:BF16:PREFILL_PROBE:C8:r1 SKIPPED_PAST_SLO (slo violated at C=2)
+  SWEEP:BF16:DECODE_PRIMARY:C32:r2 SKIPPED_PAST_SLO (slo violated at C=24)
+  SWEEP:BF16:DECODE_PRIMARY:C32:r3 SKIPPED_PAST_SLO (slo violated at C=24)
+  SWEEP:BF16:DECODE_PRIMARY:C48:r1 SKIPPED_PAST_SLO (slo violated at C=24)
+  SWEEP:BF16:DECODE_PRIMARY:C48:r2 SKIPPED_PAST_SLO (slo violated at C=24)
+  SWEEP:BF16:DECODE_PRIMARY:C48:r3 SKIPPED_PAST_SLO (slo violated at C=24)
+  SWEEP:BF16:DECODE_PRIMARY:C64:r1 SKIPPED_PAST_SLO (slo violated at C=24)
+  SWEEP:BF16:DECODE_PRIMARY:C64:r2 SKIPPED_PAST_SLO (slo violated at C=24)
+  SWEEP:BF16:DECODE_PRIMARY:C64:r3 SKIPPED_PAST_SLO (slo violated at C=24)
+  SWEEP:BF16:DECODE_PRIMARY:C96:r1 SKIPPED_PAST_SLO (slo violated at C=24)
+  SWEEP:BF16:DECODE_PRIMARY:C96:r2 SKIPPED_PAST_SLO (slo violated at C=24)
+  SWEEP:BF16:DECODE_PRIMARY:C96:r3 SKIPPED_PAST_SLO (slo violated at C=24)
+  SWEEP:FP8:DECODE_PRIMARY:C96:r2 SKIPPED_PAST_SLO (slo violated at C=64)
+  SWEEP:FP8:DECODE_PRIMARY:C96:r3 SKIPPED_PAST_SLO (slo violated at C=64)
+[2026-08-25 14:00:56] FOLLOWUP: ALL PHASES COMPLETE
