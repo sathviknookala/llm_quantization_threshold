@@ -236,13 +236,23 @@ Aggregate throughput at the SLO boundary is reported alongside it.
 ### Read the sweep by region
 
 ```text
-below the BF16 KV wall   throughput gap = bandwidth benefit  (fewer weight bytes read per step)
-above the BF16 KV wall   widening gap   = capacity benefit   (fewer weight bytes resident -> more KV)
+below the BF16 KV wall   throughput gap = total-memory-traffic ratio, weights being one term
+above the BF16 KV wall   widening gap   = capacity benefit  (fewer weight bytes resident -> more KV)
 ```
 
-Both halves are consequences of weight residency shrinking. The below-wall region carries a
-falsifiable prediction from D10: the throughput ratio there should equal the weight-size ratio. Test
-it explicitly rather than assuming it.
+**Corrected 2026-08-23 after pilot P1.** D10 predicted the below-wall ratio would equal the
+weight-size ratio (1.77x / 2.65x). It does not: measured 1.83x / 2.44x at concurrency 1, falling to
+1.62x / 2.00x at concurrency 12. Per-step traffic is `weights + KV + other`, and because KV precision
+is held at BF16 the KV term is common to all three rungs, so it dilutes the ratio and does so more as
+concurrency rises.
+
+Consequences for reporting:
+
+- the below-wall gap is **concurrency-dependent**; quote it with the concurrency attached, never as a
+  single speedup number;
+- it may not be described as a weight-residency or weight-bandwidth benefit — that attribution
+  requires dividing out the KV term and labelling the result as modelled;
+- the capacity half above the wall is unaffected by this correction.
 
 Because the sweep is bandwidth-bound throughout, it does **not** measure the arithmetic benefit of
 low precision. `PREFILL_PROBE` supplies a bounded observation of that; do not extrapolate it into the

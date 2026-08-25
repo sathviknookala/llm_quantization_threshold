@@ -85,15 +85,60 @@ stated plainly:
 
 ### The bandwidth half travels better than the compute framing suggested
 
-An earlier version of D11 argued that the compute half of the benefit generalizes to other hardware
-while the capacity half does not. Under a bandwidth-bound decode workload the below-wall benefit is
-bandwidth, not FLOPs, and that generalizes *more* strongly: every GPU must read weights, whereas FP4
-tensor-core support is specific to recent architectures.
+Under the locked decode-dominated workload the below-wall benefit is a **bandwidth** effect, not an
+arithmetic one. Every GPU must read weights; not every GPU has FP4 tensor cores. So the below-wall
+result generalizes more strongly than an arithmetic framing would imply, while the capacity half
+remains a function of this machine's 24 GiB ceiling.
 
-This is a limitation stated in the favourable direction, and it should not be overread. It says the
-below-wall *mechanism* is portable, not that the numbers are. The realized ratio still depends on the
-target card's achievable bandwidth and on whether that card's decode regime is also bandwidth-bound
-at the concurrency of interest.
+**Measured qualification of that claim (pilot P1, 2026-08-23).** The below-wall benefit is *not* a
+single number that travels — it is concurrency-dependent, and it is not predictable from weight size
+alone.
+
+- Per-step memory traffic is **weights + KV + other**, and only the weight term shrinks with
+  precision. KV precision is held at BF16 across the ladder, so that term is common to all three
+  rungs and pulls every ratio toward 1, increasingly so as concurrency rises. FP4's measured ratio
+  falls from 2.44 at concurrency 1 to 2.00 at concurrency 12. Any claim of the form "FP4 is N times
+  faster below the wall" is incomplete unless it names the concurrency.
+- The compression is stronger for the larger ratio, so **FP4's advantage erodes faster than FP8's**
+  as load rises. A deployment sizing on a batch-1 measurement will over-estimate FP4's benefit more
+  than it over-estimates FP8's.
+- FP4 additionally runs at a lower fraction of achievable memory bandwidth than FP8 (86% versus 97%
+  of a measured 620 GB/s read ceiling at batch 1), so roughly 7-8% of its expected benefit is lost to
+  execution efficiency rather than to memory traffic. This is a property of the NVFP4 path in this
+  backend and is not implied by the format.
+
+The portability claim therefore holds for the *mechanism* (fewer weight bytes read per step) but not
+for the *magnitude*. Transporting a specific speedup to another GPU requires knowing that machine's
+KV-to-weight traffic ratio at the intended concurrency, and its FP4 kernel efficiency.
+
+### The KV wall is set by peak occupancy, and capacity depends on the serving path and launch hygiene
+
+Two measured constraints on any capacity claim (pilot P2, hazards H9/H10):
+
+- The wall sits where *instantaneous* aggregate KV footprint exceeds capacity, i.e. at the crest of
+  the occupancy oscillation, not at mean occupancy. Predicting from mean occupancy overestimated
+  sustainable concurrency by eleven points.
+- KV capacity depends on the serving path and on the GPU being genuinely free at launch. The offline
+  `LLM` path and `vllm serve` report different capacities for the same configuration and flags (BF16
+  39,664 vs 44,688 tokens), and a launch begun before a previous engine released VRAM silently sized
+  a 10% smaller cache. Across nine clean serving launches BF16 and FP8 were exactly reproducible, so
+  this is a launch-hygiene hazard rather than inherent nondeterminism (H10). A wall concurrency must
+  still be reported with the capacity of the engine instance that produced it.
+
+### The study measures weight quantization under a fixed KV-cache policy
+
+KV precision is held at BF16 on every rung (D5), so nothing here measures the benefit of quantizing
+the KV cache. This is deliberate — it is what makes the measured capacity gain attributable to weight
+residency alone — but it bounds the claim in a way worth stating plainly.
+
+At this workload the KV term is not a small correction. At concurrency 12 a decode step reads roughly
+2.8 GB of KV against 6.07 GB of FP4 weights, so for the FP4 rung KV is already a third of per-step
+traffic, and by concurrency 24 it is comparable to the weights. A deployment that quantized KV as
+well would see a materially larger benefit than any number this study reports.
+
+**Therefore:** these results are the benefit of weight quantization *under a BF16 KV policy*, not the
+benefit of low-precision serving in general, and they understate what a fully quantized deployment
+achieves. `FP8_KV_VARIANT` is reserved in `QUANTIZATION_CONFIGS.md` and is the natural phase 2.
 
 ### The workload is synthetic in two controlled ways
 
