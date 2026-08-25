@@ -413,7 +413,7 @@ Criterion was rho <= 0.25; measured rho clears it by 39-122x. Per-cell CV is 0.0
 Three repetitions therefore resolve the FP8-vs-FP4 serving difference with very large margin.
 
 **Caveat that the number does not capture.** P3 estimates variance from ~2-6 minute windows. The
-sweep runs 6-8 hours, over which the card heats and clocks fall (H6) — the pilot already saw SM clock
+sweep ran 14.75 hours (2026-08-25), over which the card heats and clocks fall (H6) — the pilot saw SM clock
 move 1885 -> 1728 MHz between concurrency points under a pinned 145 W cap. Short-run spread is a
 floor on long-run spread, not an estimate of it, which is why counterbalanced run ordering remains a
 rule rather than something the variance figure lets us skip.
@@ -528,7 +528,7 @@ before anything was cleared. What follows replaces it.
 
 > P1 falsified D10's original proportional-scaling prediction. This does not invalidate the serving
 > sweep; it removes the assumption that weight compression ratio quantitatively predicts throughput
-> speedup. The full sweep will report observed below-wall throughput empirically and separately
+> speedup. The full sweep reports observed below-wall throughput empirically and separately
 > measure the movement and usefulness of the KV-capacity wall.
 
 The current criteria:
@@ -630,9 +630,34 @@ Not present:
 
 ### What the pilot will not tell you even if it passes
 
-P3 estimates variance from short runs. The sweep is 6-8 hours, over which the card heats and clocks
+P3 estimates variance from short runs. The sweep ran 14.75 hours, over which the card heats and clocks
 fall (H6). Short-run spread is a floor on long-run spread, not an estimate of it — which is why run
 ordering is counterbalanced by rule rather than trusted to the variance figure.
+
+## Sweep execution record — 2026-08-25
+
+The sweep ran to completion. 124 cells, 14.75 h GPU-exclusive, `results/sweep/`,
+`sweep_config_hash = df0f0f124d987a5c`. **Zero defect cells, zero invalid reasons, zero cells with an
+incomplete window.** Twelve engine launches for the locked ladder plus prefill, three for
+`SWEEP_REFINE` and three for `SWEEP_REFINE_SLO`.
+
+The execution-readiness blockers listed under "Exit criteria" were all discharged before the run, and
+the contract's own rules held up in practice:
+
+- the derived budget mattered — BF16 at C=32 returned a valid 5.04-period window at **908 s**, past
+  the flat 900 s cap this document used to specify;
+- the SLO-only skip predicate mattered — BF16 at C=18 and FP8 at C=48 both preempt heavily while
+  meeting the SLO, so a pressure-keyed skip would have truncated FP8 a full ladder step early;
+- H6 was tested rather than assumed and produced no drift signal (0.20% throughput between
+  repetitions 1 and 3);
+- H10 did not occur: per-launch `kv_cache_tokens` was identical for every launch of a configuration.
+
+**One rule was misapplied and cost a cell.** The 50 ms TPOT SLO is a decode criterion, but it also
+governed `PREFILL_PROBE`, whose shape emits 32 output tokens. It fired at C=2 for BF16, so C=8 was
+recorded `SKIPPED_PAST_SLO` rather than measured. BF16 at C=8 would need 65,792 KV tokens against
+44,688 and may be infeasible regardless, but the recorded reason is a rule applied outside its
+domain. **`PREFILL_PROBE` needs its own saturation criterion — TTFT-based — before it is re-run**, and
+until then its BF16 arm is bounded at C=4.
 
 ## GPU state and telemetry
 

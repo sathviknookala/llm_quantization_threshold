@@ -235,6 +235,25 @@ Aggregate throughput at the SLO boundary is reported alongside it.
 
 ### Read the sweep by region
 
+**Measured 2026-08-25.** The sweep produced the headline metric for all three configurations
+(`results/sweep/`, 124 cells, zero defects):
+
+```text
+                max concurrency within TPOT P95 <= 50 ms      tok/s at ceiling
+                ladder point   refined (n=1)   first breach
+BF16                      16              21             22              488.2
+FP8                       48              57             58             1401.2
+FP4                       64              70             71             1745.5
+```
+
+FP8 sustains 2.71x BF16's concurrency, FP4 3.33x BF16 and 1.23x FP8. The refined figures come from
+the `SWEEP_REFINE_SLO` bisection and are **repetition 1 only**; label them n=1. The ladder points
+bracketing them are n=3 with <=0.22% spread. KV-pressure walls, separately refined, are [17,18],
+[38,39] and [47,48] — each exactly what the peak-footprint arithmetic predicted.
+
+These are the serving axis only. **The marginal tradeoff and any deployment boundary require the
+quality axis, which is not measured**, so nothing here locates a knee.
+
 ```text
 below the BF16 KV wall   throughput gap = realized token-rate difference at that concurrency
 above the BF16 KV wall   widening gap   = capacity benefit  (fewer weight bytes resident -> more KV)

@@ -359,7 +359,8 @@ separate them. The supported claims are narrower:
 
 - quantized configurations show reproducible sub-wall throughput differences;
 - the weight-ratio prediction does not explain them quantitatively;
-- the full sweep will measure those realized differences;
+- the sweep measured those realized differences (2026-08-25) and they remain concurrency-dependent:
+  FP4-over-BF16 is 2.43x at C=1, 2.12x at C=8, 1.93x at C=16, median of 3 repetitions;
 - P2 independently confirmed the BF16 KV-capacity wall at [17, 18], which preserves the capacity-side
   motivation of the study on its own evidence.
 
@@ -478,6 +479,33 @@ follow, and they are the same ones stated under "Resolved 2026-08-24" below:
   one contributor among several, and the measurement does not isolate it. Report the realized
   difference; attribute nothing.
 
+### Sweep outcome 2026-08-25 — the decision is discharged
+
+124 cells, 14.75 h, zero defect cells. `results/sweep/`, `sweep_config_hash = df0f0f124d987a5c`.
+
+```text
+              max concurrency within TPOT P95 <= 50 ms        tok/s at that ceiling
+              ladder point    refined (n=1)   first breach
+BF16                    16               21             22                    488.2
+FP8                     48               57             58                   1401.2
+FP4                     64               70             71                   1745.5
+```
+
+FP8 sustains **2.71x** BF16's concurrency, FP4 **3.33x** BF16 and **1.23x** FP8. The locked ladder
+alone read 16 / 48 / 64, understating all three by 24-31%, so the `SWEEP_REFINE_SLO` bisection is
+what makes the headline usable. **Those refined figures are repetition 1 only (n=1)** and must carry
+that label; the n=3 ladder points bracketing them show <=0.22% spread.
+
+**The SLO ceiling is not the wall.** Each configuration serves past its wall before breaching
+latency — BF16 to 1.24x its wall, FP8 and FP4 to about 1.5x. Preemption and SLO violation are
+distinct events and reporting must not conflate them.
+
+**Repeatability and controls.** Median-of-3 spread <=0.22% on every cell but one (FP4@C8, 1.73%). The
+pre-registered H6 drift test found worst matched-cell drift of 0.20% throughput and 0.76% clock
+between repetitions 1 and 3, inside the pilot baseline, so **H6 is measured rather than assumed for
+this run**. `kv_cache_tokens` was identical across all launches per configuration, so H10
+contamination did not occur.
+
 **The wall is set by peak occupancy, not by a peak-to-mean band.** P2 measured the BF16 transition
 directly:
 
@@ -502,9 +530,15 @@ these must be recomputed per engine instance):
 
 ```text
 BF16   44,688 KV tokens / 2,560 = 17   measured bracket [17, 18]
-FP8    97,888 KV tokens / 2,560 = 38   not yet measured
-FP4    not yet measured under the serving path
+FP8    97,888 KV tokens / 2,560 = 38   measured bracket [38, 39]
+FP4   120,944 KV tokens / 2,560 = 47   measured bracket [47, 48]
 ```
+
+**Resolved by the sweep, 2026-08-25.** All three brackets come from the `SWEEP_REFINE` bisection
+(`results/sweep/cells.jsonl`). **The peak-footprint arithmetic predicted every wall exactly** — 17,
+38 and 47 against measured lower edges of 17, 38 and 47. The mean-occupancy basis would have
+predicted 29 / 63 / 78 and been wrong on all three, which closes the question D11 left open about
+which basis predicts the wall.
 
 **Degradation past the wall is milder than H8 predicted, at least at C=18.** BF16 at C=18 recorded 7
 preemptions per cell and throughput of 437 tok/s against 490 at C=16 — a regression, not a collapse.

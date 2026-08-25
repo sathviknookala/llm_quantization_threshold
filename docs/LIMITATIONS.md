@@ -82,11 +82,19 @@ stated plainly:
 - **No balanced/mixed shape is measured**, so nothing is known about how the boundary moves between
   the two regimes.
 - **The result is a concurrency-dependent boundary for one shape**, not a workload-dependent map.
+- **The headline ceilings are unreplicated.** The 21 / 57 / 70 max-in-SLO figures come from a
+  repetition-1 bisection (n=1). The n=3 ladder points bracketing them agree to <=0.22%, so the risk
+  is low, but these numbers have not been repeated and must be labelled n=1 wherever quoted.
+  Replicating the three bisections costs about nine cells.
+- **`PREFILL_PROBE`'s BF16 arm stops at C=4.** The 50 ms TPOT SLO is a decode criterion and should
+  not have governed a 32-output-token shape; it fired at C=2 for BF16, so C=8 was skipped. The point
+  may be KV-infeasible anyway (65,792 tokens needed against 44,688), but it is absent for a
+  misapplied rule rather than a measurement, and the probe needs a TTFT-based criterion before re-run.
 - **The KV walls are resolved to different precisions.** BF16's was bracketed to [17, 18] by a
-  dedicated pilot search. The sweep's locked ladder brackets FP8 and FP4 only to [32, 48] — the same
-  interval for both — so a `SWEEP_REFINE` bisection phase resolves them afterwards. Any reported wall
-  must name the phase that produced it, and a wall carrying only the ladder bracket may not be
-  compared numerically against one carrying a bisected bracket.
+  dedicated pilot search. The sweep's locked ladder bracketed FP8 and FP4 only to [32, 48] — the same
+  interval for both — and the `SWEEP_REFINE` bisection resolved them to [38, 39] and [47, 48]
+  (2026-08-25). Any reported wall must still name the phase that produced it: a ladder bracket may not
+  be compared numerically against a bisected one.
 - **Counterbalancing balances position, not carryover.** The three-repetition Latin square is cyclic,
   so FP8 follows BF16 in two of three repetitions and FP4 in none. Balancing carryover across three
   treatments needs six sequences. A thermal preflight gate and a pre-registered drift test stand in

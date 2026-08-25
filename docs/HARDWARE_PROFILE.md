@@ -229,6 +229,15 @@ predicted 2.65x, falling to 2.00x by concurrency 12. Its magnitude is an output 
 and the study does not attribute it to a single mechanism. The arithmetic path is observed only by
 `PREFILL_PROBE`.
 
+### 3b. The power cap is continuously active — measured 2026-08-25
+
+The sweep records `clocks_throttle_reasons.sw_power_cap` per cell. It reads **1.0 for entire timed
+windows** on every configuration: the card is power-limited for the whole measurement, not
+intermittently. `hw_slowdown` and `sw_thermal_slowdown` stayed at 0.0. So SM clock is set by the
+operating point under a 145 W ceiling rather than by thermal headroom, which is why matched cells run
+hours apart agree to within 0.76% on clock (H6 drift test, `results/sweep/`). Every serving number in
+this project is measured under that ceiling.
+
 ### 4. Hardware capability is not equivalent to backend capability
 
 A low-precision format enters the locked study only after the chosen inference stack is verified to expose an appropriate path on this GPU. Do not infer practical support solely from the GPU architecture.

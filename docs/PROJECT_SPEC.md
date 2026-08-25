@@ -275,7 +275,10 @@ to a mechanism the measurement cannot isolate:
    BF16 wall at [17, 18].
 
 The magnitude of the serving benefit is an experimental output of this sweep, not an inference from
-checkpoint size. At these batch sizes the primary workload does not isolate the arithmetic/tensor-core
+checkpoint size. **Measured 2026-08-25:** max concurrency within the 50 ms TPOT P95
+SLO is 21 / 57 / 70 for BF16 / FP8 / FP4 (refined, n=1), i.e. FP8 at 2.71x and FP4 at 3.33x BF16,
+with KV-pressure walls at [17,18], [38,39] and [47,48]. See `docs/EVALUATION_RIG.md` and
+`results/sweep/`. At these batch sizes the primary workload does not isolate the arithmetic/tensor-core
 benefit of low precision; `PREFILL_PROBE` supplies a bounded observation of that instead.
 
 ---
