@@ -1,0 +1,51 @@
+{
+  "gate_status": "CLEAN",
+  "failed_checks": [],
+  "checks": {
+    "all_configs_loaded": true,
+    "dispatch_reconfirmed": true,
+    "full_vocab_all_passes": true,
+    "distributions_finite": true,
+    "distributions_normalized": true,
+    "bf16_self_kl_near_zero": true,
+    "fp8_kl_finite_nonnegative": true,
+    "fp4_kl_finite_nonnegative": true,
+    "fp8_not_pathological": true,
+    "fp4_not_pathological": true,
+    "fp8_top1_agreement_ok": true,
+    "fp4_top1_agreement_ok": true
+  },
+  "pairs": {
+    "BF16||BF16_selfcheck": {
+      "median_nats": 0.0,
+      "mean_nats": 0.0,
+      "max_nats": 0.0,
+      "min_nats": 0.0,
+      "p90_nats": 0.0,
+      "all_finite": true,
+      "all_nonnegative": true,
+      "top1_agreement_vs_bf16": 1.0
+    },
+    "BF16||FP8": {
+      "median_nats": 0.0050798976271073295,
+      "mean_nats": 0.012069606205565866,
+      "max_nats": 0.09304121095736917,
+      "min_nats": 7.321226828010621e-06,
+      "p90_nats": 0.017414725490952323,
+      "all_finite": true,
+      "all_nonnegative": true,
+      "top1_agreement_vs_bf16": 0.9375
+    },
+    "BF16||FP4": {
+      "median_nats": 0.045515032555777823,
+      "mean_nats": 0.15083350780876836,
+      "max_nats": 1.3918661701924888,
+      "min_nats": 0.00019164992258028027,
+      "p90_nats": 0.17200435664477254,
+      "all_finite": true,
+      "all_nonnegative": true,
+      "top1_agreement_vs_bf16": 0.8125
+    }
+  }
+}
+WROTE /home/sathvik/llm_quantization_threshold/results/pilot/correctness_gate.json
