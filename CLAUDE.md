@@ -109,152 +109,117 @@ A valid result may favor BF16, FP8, FP4, different choices for different workloa
 
 ## Current focus
 
-**The workload and concurrency contract is locked. Phase 1 is a memory-focused study.** Model
-qualification is complete, the precision ladder is locked, and D10/D11 are now resolved: one primary
-decode-dominated workload swept across concurrency, with an explicit latency SLO as the saturation
-criterion. **No final benchmark collection has started, and no harness code exists** — the next steps
-are the corpus gate (D16), then the harness, then the pilot.
-
-Current conclusions:
-
-1. The core experimental dimension is the quantization/deployment configuration.
-2. BF16 is the common high-precision reference; it is not the maximum precision supported by the GPU.
-3. BF16 fit is the binding constraint, and at 8B it is genuinely tight: 14.99 GiB of weights leaves
-   4.84 GiB of KV cache. This is the regime where quantization buys capacity, not just speed.
-4. The ladder is locked: BF16 -> FP8 -> NVFP4, all three natively executed on SM120.
-5. KV-cache precision is held at BF16 across the whole ladder, so measured capacity gains are
-   attributable to weight residency alone. FP8 KV cache is the natural phase 2, not a phase-1 gap.
-6. Hardware is fixed experimental context/control, not an independent variable.
-7. The driver (575.64.03 / CUDA 12.9) caps the serving stack at vLLM 0.19.1. This costs nothing the
-   ladder needs — SM120 CUTLASS FP8 and FP4 are both present in that build.
-8. **Both halves of the benefit come from weight residency shrinking.** Under the locked workload the
-   sweep is memory-bandwidth-bound throughout, so the split is bandwidth vs capacity, not compute vs
-   capacity. This supersedes the earlier compute-vs-capacity framing in D11.
-
-Locked workload and sweep (D10, D11):
+**The pilot has run. The sweep is NOT cleared.** P2, P3, P5 pass, P4 is valid, and the correctness
+gate is clean — but **P1 FAILED**. D10's weight-size-ratio prediction is falsified; the corrected
+interpretation is recorded in D10/D11 as of 2026-08-24. What still gates the sweep is that the
+replacement model was fitted post hoc and has not been validated.
+Artifacts: `results/pilot/`, verdict in `results/pilot/PILOT_DECISION.md`.
 
 ```text
-DECODE_PRIMARY    512 in / 2048 out    concurrency 1,4,8,12,16,24,32,48,64,96   3 repetitions
-PREFILL_PROBE    8192 in /   32 out    concurrency 1,2,4,8                       no repetitions
-SLO               TPOT P95 <= 50 ms    defines saturation and the headline capacity metric
+P1  memory-bandwidth-bound assumption   FAIL    FP4 ratio outside +/-20% and drifts -17.8%
+P2  BF16 KV wall                        PASS    bracket [17, 18], inside the 15-25 band
+P3  repetition count                    PASS    rho 0.0020 / 0.0064  -> 3 repetitions locked
+P4  achievable HBM bandwidth            VALID   620.1 GB/s read, 92.3% of 672.0 GB/s spec
+P5  harness validation                  PASS    23 invariants, 43 cells
+    correctness gate                    CLEAN   32 real C4 contexts, dispatch reconfirmed
 ```
 
-KV wall per configuration under `DECODE_PRIMARY` (2,560-token peak footprint, 128 KiB KV/token):
+**The one blocking result — interpretation now resolved (D10/D11, 2026-08-24).** D10 assumed the
+below-wall throughput gain would roughly equal the weight-size ratio (1.77x, 2.65x). Measured over
+3 repetitions with per-cell CV 0.01-0.15%:
 
 ```text
-              weights     KV cache    KV tokens   KV wall (peak / mean)   kernel
-BF16          14.99 GiB    4.84 GiB      39,664         15  /  25         default BF16 GEMM
-FP8            8.49 GiB   11.31 GiB      92,608         36  /  60         CutlassFP8ScaledMMLinearKernel
-FP4 (NVFP4)    5.65 GiB   14.57 GiB     119,360         46  /  77         SM120 CUTLASS FP4 (flashinfer)
+  C     BF16      FP8      FP4    R_FP8    dev    R_FP4     dev
+  1    36.06    66.01    87.88    1.831  +3.7%    2.437   -8.1%
+  8   268.31   449.99   566.99    1.677  -5.0%    2.113  -20.3%
+ 12   381.30   618.08   763.77    1.621  -8.2%    2.003  -24.5%
 ```
 
-**Next — planned order.** The pilot is defined in `EXPERIMENTAL_CONTRACT.md` with five jobs (P1-P5)
-and exit criteria; it validates the contract's free parameters and produces no results.
+**Corrected interpretation, now recorded in D10/D11.** Throughput follows *total* per-step memory
+traffic, not weight traffic:
 
 ```text
-0. resolve D16 (prompt corpus) + close the pilot's open items   <- current step
-1. build the serving harness, then run pilot P1-P5 + KL correctness gate
-2. serving sweep                                            overnight, GPU-exclusive
-3. quality run                                              KL first; PPL/tasks need D14/D15
+bytes/step = weights + KV + other      only the weight term shrinks with precision
 ```
 
-**The pilot is fully specified but has no code behind it.** `scripts/` holds a 60-line
-single-request smoke. Readiness was checked on 2026-08-23 and is recorded in
-`EXPERIMENTAL_CONTRACT.md`: checkpoints are on disk, the GPU is idle, `vllm bench serve` ships with
-the flags the contract needs, and every counter D11 requires already exists in `vllm/v1/metrics/`.
-What is missing is the harness itself, the corpus (D16), and pass/fail criteria for four of the five
-pilot jobs.
+KV precision is held at BF16 across the ladder (D5), so the KV term is common to all three rungs,
+dilutes every ratio toward 1, and does so more as concurrency rises — which is why both ratios
+decline and FP4 (smallest weight term) degrades fastest. Measured residual after weights and KV, at
+the 620.1 GB/s read ceiling: BF16 ~0.74 GB/step, FP8 ~0.10 GB, FP4 ~0.87 GB (9-11% of its step).
+FP8 is thus almost fully explained by weights + KV; FP4 is not, and reaches only 86% of measured read
+bandwidth at C=1 against FP8's 97%.
 
-The correctness gate sits *before* the sweep, not after: timing a corrupted checkpoint wastes the
-most expensive resource in the project. The quality harness can be **written** while the sweep runs;
-only its execution serializes on the GPU. Inside the quality arm the BF16 continuations and reference
-distributions must be produced first, then each quantized configuration streams against them.
+The sub-wall region **is** still memory-bound (zero preemption, clean scaling, stable TPOT). What
+failed is the weight-bytes-only prediction, not the bandwidth-bound premise.
 
-Phase 1 deliverable is the quality-loss vs sustainable-concurrency curve for this one model.
+**Reporting rule now locked (D11):** report the below-wall gap as the raw measured quantity, always
+with its concurrency attached, and never call it a weight-residency or weight-bandwidth benefit.
+
+```text
+0. D10/D11 interpretation corrected                        DONE 2026-08-24
+1. validate the 3-term model on points it was not fitted on  <- current step
+2. serving sweep                          overnight, GPU-exclusive, 3 reps locked
+3. quality run                            KL first; PPL/tasks need D14/D15
+```
 
 ## Last session
 
-**Session 3 — resolved D10 and D11; narrowed phase 1 to a memory-focused lens.**
+**Session 4 — built and ran the serving pilot; P1 failed and the sweep is not cleared.**
 
-- Adopted a memory-focused lens and locked one primary workload, 512 in / 2048 out, replacing the
-  prefill-heavy / balanced / decode-heavy trio. `BALANCED` dropped; a cheap `PREFILL_PROBE` kept so
-  the arithmetic benefit is observed in bounded form rather than not at all.
-- Established that decode arithmetic intensity is approximately batch size, so the whole sweep stays
-  bandwidth-bound and the KV walls (15 / 36 / 46) sit clear of compute saturation by construction.
-- Reframed the D11 decomposition from compute-vs-capacity to **bandwidth-vs-capacity**, which also
-  strengthens the portability argument: every GPU reads weights, not every GPU has FP4 tensor cores.
-- Derived from the coarse smoke artifacts that all three configurations decode at ~620-660 GB/s, so
-  the batch-1 speedup may be fully explained by weight bytes. Recorded as a falsifiable pilot
-  prediction, explicitly not as a result.
-- Locked the concurrency points, an explicit TPOT P95 <= 50 ms SLO as the saturation criterion, a
-  cell-abort rule, steady-state warmup rules, and run-order counterbalancing.
-- Added hazards H7 (prefix caching can silently delete the workload) and H8 (occupancy grows 5x, so
-  the KV wall is a band and preemption-by-recompute makes degradation superlinear).
-- Extended the quality rig to teacher-forced KL at ten strided positions across the 2,048-token
-  generation, since measuring quality at position 1 of a 2,048-position workload was the central gap.
-- Then measured the first formulation of that rig infeasible and replaced it. Full-vocab
-  `prompt_logprobs` over 2,560 positions returns 328M `Logprob` objects (~16 GB host RAM per request)
-  and disables prefix-cache reads. Ten truncated-prefix passes over the already-proven D13 path cost
-  ~64 MB and keep caching. Recorded in D13 so it is not reintroduced.
-- Defined the pilot formally (P1-P5 plus a KL correctness gate) and added the sub-wall bandwidth-bound
-  check: P1 now runs at concurrency 1, 8 and 12, because D11's whole decomposition rests on the sweep
-  being bandwidth-bound and nothing had measured that.
-- Opened D14 (perplexity corpus and token budget) and D15 (downstream task set), converting the last
-  unowned `TBD`s in the quality rig into tracked gates.
-- Checked pilot readiness against the installed stack rather than the docs. Good news: all four D11
-  counters (`num_preempted_reqs`, `recomputed_tokens`, `kv_cache_usage`, `num_waiting_reqs`) already
-  exist in `vllm/v1/metrics/`, which was P5's largest unknown. `vllm bench serve` supplies the request
-  driver but not the warmup gate, steady-state entry, or cell abort.
-- Recorded eight open items inside the pilot specification — four jobs have no pass/fail criterion,
-  P4's obvious measurement method is circular with P1, `PREFILL_PROBE` plumbing is unchecked, and SLO
-  feasibility is only tested incidentally.
-- Opened D16 (prompt corpus), which blocks the pilot. Ultrachat is excluded by calibration leakage
-  since it calibrated the FP4 rung.
+- Resolved **D16** (was blocking): C4 `en` validation shard 0, 512 prompts of exactly 512 tokens plus
+  64 of exactly 8192, each from a distinct document, prefix-disjointness enforced by hash over the
+  first 64 content tokens, ultrachat excluded. Emitted as token IDs so tokenization cannot drift.
+- Built `scripts/pilot/`: corpus prep, HBM microbenchmark, server control, a contract-enforcing
+  request driver, orchestrator with resume, correctness gate, analyzer with pre-registered criteria.
+- **P4**: 620.1 / 564.7 / 545.8 GB/s (read / triad / copy), CV ~0.1%, 21.3x L2 working set. Recorded
+  in `HARDWARE_PROFILE.md`, which no longer says "NOT YET RECORDED".
+- **Correctness gate CLEAN** on 32 real held-out contexts; BF16 self-KL exactly 0 under batch-order
+  reversal; dispatch reconfirmed on all three rungs.
+- **P2 PASS**: wall at [17, 18], reproducible on both sides. Peak-footprint basis predicted 17 and is
+  the better predictor; the mean-occupancy basis (29) overstates it.
+- **P3 PASS**: rho = 0.0020 / 0.0064 against a 0.25 criterion. 3 repetitions locked.
+- **P1 FAIL**: see Current focus. Reported against the pre-registered criteria rather than adjusted.
+- Found **H9**: the workload is *periodic*, not flat — phase-aligned slots make throughput oscillate
+  +/-11% with period `out_tokens * C / throughput` (predicted 39.8 s vs 40 s observed). A flatness
+  gate cannot fire; steady state must be defined as stationarity over >= 1 period, and windows must
+  span whole periods. Six cells were discarded and re-run under the corrected gate.
+- Found **H10**: the serving path allocates more KV than the offline path (BF16 44,688 vs 39,664),
+  and a launch begun before a previous engine released VRAM silently sized a 10%-smaller cache.
+- Four harness bugs caught before they could corrupt results: Prometheus `_total` suffix nulling all
+  four D11 counters; a window-only pressure test that would have inverted P2 on an aborted cell;
+  empty-text tokens dropping from the ITL series; and a token-count invariant that compared
+  incommensurable time spans and, in one revision, passed vacuously on a missing field.
 
 ## Known issues / unresolved premises
 
-- **Checkpoint provenance has one open deviation.** Weights are SHA256-identical to official, but
-  `tokenizer_config.json` carries a shorter `chat_template` (348 chars vs the official multi-KB
-  template). Within-model comparability is unaffected; absolute instruct-task scores would not be
-  comparable to published Llama numbers. Re-pin to `meta-llama/Llama-3.1-8B-Instruct` @ `0e9e39f2`
-  when the license is approved.
-- **Qualification serving numbers are not benchmark numbers.** They are single-request, single-run,
-  no warmup, no repetition. The BF16 short-workload figure (2.7 tok/s) is warmup contamination.
-- **The ~620-660 GB/s bandwidth finding is derived, not measured.** It comes from a two-point prefill
-  subtraction over coarse smoke artifacts and assumes decode cost is equal at 2k and 16k context. It
-  is a pilot prediction and must not be quoted as a result.
-- **Memory bandwidth is not recorded in `HARDWARE_PROFILE.md`.** Under a memory-focused lens it is the
-  governing hardware constant, and neither the spec figure nor an achieved measurement exists yet.
-- **Qualification KL values are a feasibility demo, not a quality result.** 16 highly repetitive
-  synthetic contexts. They must not be cited as measured degradation.
-- **Repetition count is provisional at 3.** Pilot variance has not been measured; raise it if
-  run-to-run spread is large relative to the FP8-to-FP4 gap.
-- **The teacher-forced KL rig measures divergence given BF16's trajectory**, not free-running drift of
-  each configuration's own generation. Whether divergence compounds through the sampling loop is
-  untested.
-- **The sweep is assumed memory-bandwidth-bound throughout, and that is not yet measured.** D11's
-  bandwidth-vs-capacity decomposition depends on it. Pilot job P1 tests it at concurrency 1, 8 and 12;
-  if the ratio decays before the BF16 wall at 15, the decomposition must be reopened.
-- **The quality arm has two open gates.** D14 (perplexity corpus and token budget) and D15 (downstream
-  task set) are unresolved, and chat-formatted tasks stay blocked by the `chat_template` deviation.
-- **The pilot cannot run yet.** No harness code exists, the prompt corpus is unnamed (D16), and four
-  of the five pilot jobs have no pass/fail criterion. All eight open items are listed under `Pilot`
-  in `EXPERIMENTAL_CONTRACT.md`.
-- **P4's bandwidth measurement must be independent of P1.** Deriving bandwidth from decode throughput
-  and then using it to validate a bandwidth-derived throughput prediction would be circular.
-- **The 50 ms TPOT SLO is unverified above batch 1.** It was chosen from a batch-1 estimate of ~25 ms.
-  If BF16 breaches it by concurrency 8-12, its max-concurrency-at-SLO collapses and the headline
-  comparison distorts.
-- **Calibration sensitivity is untested, and applies only to FP4.** FP8 needs no calibration, so the
-  calibration-robustness study is FP4-only. The single FP4 draw used 128 ultrachat samples, seed 0.
-- **FP4's first load pays a ~61 s flashinfer JIT build.** Cached now, but it must never leak into a
-  serving metric.
-- **Idle PCIe state is not benchmark state.** Negotiated link generation still unverified under load.
-- **The GPU is power-limited at 145 W** and clocks fall under load, so throughput is measured under a
-  power ceiling rather than at fixed clocks.
-- **Phase 1 measures one workload shape.** The arithmetic benefit of low precision is not measured by
-  the sweep, and prefill-dominated deployments are out of scope. See `LIMITATIONS.md`.
-- **No quality or serving outcome is predetermined.** The ladder being natively executable says
-  nothing about whether FP4's degradation is worth its gain.
+- **P1 failed; D10/D11 corrected 2026-08-24.** The below-wall gap is the ratio of *total* per-step
+  memory traffic (weights + KV + other), not a weight-residency reading, and it is
+  concurrency-dependent. D11 now says so and fixes the reporting rule. The docs are consistent; the
+  open item is validation of the replacement model, below.
+- **The KV-traffic model is fitted, not validated.** It reproduces R_FP4(12) to 0.3%, but it was
+  constructed after seeing the data and uses a mean resident context read off the KV gauge. It needs
+  an independent test before it becomes the sweep's prediction.
+- **FP4's low-batch bandwidth shortfall is unexplained.** 86% of measured read bandwidth at C=1
+  against FP8's 97% is consistent with per-GEMM overhead but has not been attributed.
+- **Throughput inversion near the wall is confounded with clock throttling.** SM clock fell
+  1872 -> 1728 MHz at C=17 under a pinned 145 W cap, so ~7.7 of the 13% throughput drop is clock, not
+  capacity. Identify the wall by preemption and KV saturation, never by throughput shape.
+- **The measured wall is 4 percentage points of KV from the clean side.** C=17 sits at 96.2% KV max
+  with zero preemption; C=18 at 98.5% with preemption. The bracket is tight and depends on the KV
+  capacity of the specific engine launch (H10).
+- **Pilot variance is a floor, not an estimate.** P3's rho comes from minutes-long windows; the sweep
+  is 6-8 hours with thermal drift.
+- **Checkpoint provenance still has one open deviation** (`chat_template`, 348 chars vs official).
+  Weights are SHA256-identical. Re-pin to `meta-llama/Llama-3.1-8B-Instruct` @ `0e9e39f2` when the
+  license lands.
+- **Qualification serving and KL numbers remain non-citable** — single-request, no warmup, and 16
+  repetitive synthetic contexts respectively.
+- **Pilot numbers are diagnostic and may not be cited as results.**
+- **The quality arm has two open gates**, D14 (perplexity corpus) and D15 (task set), and
+  chat-formatted tasks stay blocked by the `chat_template` deviation.
+- **Calibration sensitivity is untested and FP4-only.** One draw, 128 ultrachat samples, seed 0.
+- **`PREFILL_PROBE` is plumbing-checked only.** One C=1 cell per configuration; the 1/2/4/8 sweep has
+  not run.
+- **No quality or serving outcome is predetermined.**
 
 At the end of a session, overwrite `Current focus`, `Last session`, and `Known issues / unresolved premises` in place. Git history is the changelog; this file should remain a current-state hub.
