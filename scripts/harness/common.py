@@ -153,8 +153,15 @@ def software_identity():
                                  capture_output=True, text=True).stdout.strip()
     rec["git_head"] = subprocess.run("git -C %s rev-parse HEAD" % REPO, shell=True,
                                      capture_output=True, text=True).stdout.strip()
-    rec["git_dirty"] = bool(subprocess.run("git -C %s status --porcelain" % REPO, shell=True,
-                                           capture_output=True, text=True).stdout.strip())
+    # provenance asks whether the code that ran matches HEAD, so dirty means tracked-file
+    # modifications; untracked scratch files are counted separately rather than conflated
+    rec["git_dirty"] = bool(subprocess.run(
+        "git -C %s status --porcelain --untracked-files=no" % REPO, shell=True,
+        capture_output=True, text=True).stdout.strip())
+    rec["git_untracked_files"] = len([
+        l for l in subprocess.run("git -C %s status --porcelain" % REPO, shell=True,
+                                  capture_output=True, text=True).stdout.splitlines()
+        if l.startswith("??")])
     return rec
 
 
