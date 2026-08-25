@@ -11,8 +11,8 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from pilot import common, driver  # noqa: E402
-from pilot.server import VllmServer  # noqa: E402
+from harness import common, driver, orchestration as orch  # noqa: E402
+from harness.server import VllmServer  # noqa: E402
 
 CELLS = os.path.join(common.PILOT_DIR, "cells.jsonl")
 LOGS = os.path.join(common.PILOT_DIR, "server_logs")
@@ -33,92 +33,33 @@ P2_CELL = dict(min_requests_factor=2, window_floor_s=120.0, warmup_wall_cap_s=30
 
 
 def load_prompts(workload):
-    n = common.WORKLOADS[workload]["input_tokens"]
-    stem = os.path.join(common.CORPUS_DIR, f"{workload.lower()}_{n}tok")
-    body = json.load(open(stem + ".json"))
-    manifest = json.load(open(stem + "_manifest.json"))
-    for p in body["prompts"]:
-        if p["n_tokens"] != n:
-            raise SystemExit(f"ABORT: corpus prompt {p['index']} has {p['n_tokens']} tokens, want {n}")
-    return body["prompts"], manifest
+    return orch.load_prompts(workload)
 
 
 def done_keys():
-    keys = set()
-    if not os.path.exists(CELLS):
-        return keys
-    for line in open(CELLS):
-        try:
-            r = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        keys.add((r["job"], r["configuration_id"], r["workload"], r["concurrency"], r["repetition"]))
-    return keys
+    return orch.done_keys(CELLS)
 
 
 def append_cell(rec):
-    os.makedirs(os.path.dirname(CELLS), exist_ok=True)
-    with open(CELLS, "a") as fh:
-        fh.write(json.dumps(rec, default=str) + "\n")
+    return orch.append_cell(CELLS, rec)
 
 
 def identity(job, config_id, srv, manifest, env):
-    return {
-        "job": job,
-        "configuration_id": config_id,
-        "quantization": common.CONFIGS[config_id]["short"],
-        "model_path": common.CONFIGS[config_id]["model"],
-        "weight_bytes_gb": common.CONFIGS[config_id]["weight_bytes_gb"],
-        "serving_backend": "vLLM " + env["software"].get("vllm", "?"),
-        "gpu": env["gpu"],
-        "software": env["software"],
-        "server_controls": common.SERVER_CONTROLS,
-        "kv_cache_tokens": srv.startup.get("kv_cache_tokens"),
-        "dispatch_verdict": srv.startup.get("dispatch_verdict"),
-        "enable_prefix_caching_logged": srv.startup.get("enable_prefix_caching_logged"),
-        "engine_start_seconds": srv.startup.get("engine_start_seconds"),
-        "server_log": srv.startup.get("log_path"),
-        "corpus_version": manifest["corpus_version"],
-        "prompt_set_hash": manifest["prompt_set_hash"],
-        "slo_tpot_ms": common.SLO_TPOT_MS,
-    }
+    return orch.identity(job, config_id, srv, manifest, env)
 
 
 def run_one(job, srv, config_id, prompts, manifest, env, workload, C, rep, cell_kwargs):
-    cc = driver.CellConfig(workload=workload, concurrency=C, repetition=rep, **cell_kwargs)
-    tag = f"{job}:{common.CONFIGS[config_id]['short']}:{workload}:C{C}:r{rep}"
-    print(f"[{time.strftime('%H:%M:%S')}] START {tag}", flush=True)
-    t0 = time.time()
-    res = driver.run_cell(srv, prompts, cc, tag)
-    rec = identity(job, config_id, srv, manifest, env)
-    rec.update(res)
-    rec["started_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(t0))
-    rec["finished_at"] = common.now_iso()
-    append_cell(rec)
-    print(f"[{time.strftime('%H:%M:%S')}] DONE  {tag} status={res['status']} "
-          f"tok/s={res['output_tokens_per_s']} tpotP95={res['tpot_ms_p95']} "
-          f"kvP95={res['kv_cache_usage_p95']} preempt={res['num_preemptions_delta']} "
-          f"recomp={res['recomputed_tokens_delta']} pfxhits={res['prefix_cache_hits_delta']}",
-          flush=True)
-    return rec
+    return orch.run_one(CELLS, job, srv, config_id, prompts, manifest, env, workload, C, rep,
+                        cell_kwargs)
 
 
 def env_identity():
-    return {"gpu": common.gpu_identity(), "software": common.software_identity()}
+    return orch.env_identity()
 
 
 def preflight(wait_s=240):
-    """Wait for a genuinely idle GPU rather than aborting on a slow teardown."""
-    t0 = time.time()
-    while time.time() - t0 < wait_s:
-        if common.gpu_is_idle():
-            return
-        time.sleep(5.0)
-    t = common.gpu_telemetry()
-    raise SystemExit(
-        f"ABORT: GPU still busy after {wait_s}s "
-        f"(mem={t.get('memory.used')} MiB, util={t.get('utilization.gpu')}%); "
-        "timed runs require an otherwise-idle GPU")
+    # the pilot ran without a thermal gate; keep it reproducible rather than retro-fitting one
+    return orch.preflight(wait_s, require_cool=False)
 
 
 def job_p1_p3(reps, env, skip):

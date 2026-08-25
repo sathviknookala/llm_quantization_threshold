@@ -30,9 +30,9 @@ Consequences for the final claim:
 
 - Do not present the concurrency/capacity multiplier as a property of FP8 or FP4. It is a property of
   this model at this precision *on a 24 GiB GPU*.
-- Report the bandwidth benefit and the capacity benefit separately, as `HARDWARE_PROFILE.md`
-  implication 3 requires. Under the locked decode workload the below-wall half is bandwidth, not
-  compute, and it travels better than the capacity half (see below).
+- Report the below-wall throughput benefit and the capacity benefit separately, as
+  `HARDWARE_PROFILE.md` implication 3 requires. The study does not establish which of the two travels
+  better (see below).
 - A knee located mainly by capacity gains is the most hardware-specific result this project can
   produce, and should be labelled as such.
 
@@ -82,30 +82,50 @@ stated plainly:
 - **No balanced/mixed shape is measured**, so nothing is known about how the boundary moves between
   the two regimes.
 - **The result is a concurrency-dependent boundary for one shape**, not a workload-dependent map.
+- **The KV walls are resolved to different precisions.** BF16's was bracketed to [17, 18] by a
+  dedicated pilot search. The sweep's locked ladder brackets FP8 and FP4 only to [32, 48] — the same
+  interval for both — so a `SWEEP_REFINE` bisection phase resolves them afterwards. Any reported wall
+  must name the phase that produced it, and a wall carrying only the ladder bracket may not be
+  compared numerically against one carrying a bisected bracket.
+- **Counterbalancing balances position, not carryover.** The three-repetition Latin square is cyclic,
+  so FP8 follows BF16 in two of three repetitions and FP4 in none. Balancing carryover across three
+  treatments needs six sequences. A thermal preflight gate and a pre-registered drift test stand in
+  for what the design cannot balance; the residual is reported, not assumed away.
+- **"Concurrent users" is not what is measured.** The driver is closed-loop with a fixed number of
+  in-flight requests, `ignore_eos`, and homogeneous 512/2048 prompts — no arrival process, no
+  variability. The headline quantity is **maximum in-flight requests within the SLO**. Phrasing it as
+  concurrent users overstates it.
+- **`meets_slo` is survivor-biased.** It is computed only over requests that both start and finish
+  inside the timed window, so starved and still-in-flight requests contribute nothing. At high
+  concurrency it can read true on a cell where much of the offered load is not being served. Queue
+  depth and `window_completed_requests` are recorded alongside it and must be read with it.
 
-### The bandwidth half travels better than the compute framing suggested
+### The below-wall benefit is not attributed, and its portability is unknown
 
-Under the locked decode-dominated workload the below-wall benefit is a **bandwidth** effect, not an
-arithmetic one. Every GPU must read weights; not every GPU has FP4 tensor cores. So the below-wall
-result generalizes more strongly than an arithmetic framing would imply, while the capacity half
-remains a function of this machine's 24 GiB ceiling.
+**Withdrawn 2026-08-24.** This section previously argued that the below-wall benefit is a *bandwidth*
+effect rather than an arithmetic one, and therefore travels well because every GPU must read weights
+while not every GPU has FP4 tensor cores. **That argument is withdrawn.** Pilot P1 showed the gap is
+not predictable from weight size, and nothing in the study isolates which of weight traffic, common
+KV traffic, kernel efficiency, or scheduling produces it. An unattributed effect cannot be argued to
+port on the strength of one of its candidate causes.
 
-**Measured qualification of that claim (pilot P1, 2026-08-23).** The below-wall benefit is *not* a
-single number that travels — it is concurrency-dependent, and it is not predictable from weight size
-alone.
+What can be said: the capacity half remains a function of this machine's 24 GiB ceiling, and how far
+the below-wall throughput half generalizes is an open question this study does not answer.
 
-- Per-step memory traffic is **weights + KV + other**, and only the weight term shrinks with
-  precision. KV precision is held at BF16 across the ladder, so that term is common to all three
-  rungs and pulls every ratio toward 1, increasingly so as concurrency rises. FP4's measured ratio
-  falls from 2.44 at concurrency 1 to 2.00 at concurrency 12. Any claim of the form "FP4 is N times
-  faster below the wall" is incomplete unless it names the concurrency.
-- The compression is stronger for the larger ratio, so **FP4's advantage erodes faster than FP8's**
-  as load rises. A deployment sizing on a batch-1 measurement will over-estimate FP4's benefit more
-  than it over-estimates FP8's.
-- FP4 additionally runs at a lower fraction of achievable memory bandwidth than FP8 (86% versus 97%
-  of a measured 620 GB/s read ceiling at batch 1), so roughly 7-8% of its expected benefit is lost to
-  execution efficiency rather than to memory traffic. This is a property of the NVFP4 path in this
-  backend and is not implied by the format.
+**Measured qualification (pilot P1, 2026-08-23).** The below-wall benefit is *not* a single number
+that travels — it is concurrency-dependent, and it is not predictable from weight size alone.
+
+- FP4's measured ratio falls from 2.44 at concurrency 1 to 2.00 at concurrency 12 against a
+  weight-size prediction of 2.65. Any claim of the form "FP4 is N times faster below the wall" is
+  incomplete unless it names the concurrency. D10 records a post-hoc traffic model as a candidate
+  explanation; it is fitted, not validated, and no conclusion rests on it.
+- **FP4's advantage erodes faster than FP8's** as load rises: FP8 drifted 11.5% between concurrency 1
+  and 12, FP4 17.8%. A deployment sizing on a batch-1 measurement will over-estimate FP4's benefit
+  more than it over-estimates FP8's.
+- FP4 additionally sustains a lower fraction of achievable memory bandwidth than FP8 (86% versus 97%
+  of a measured 620 GB/s read ceiling at batch 1). The shortfall is unexplained and unattributed; it
+  is consistent with per-GEMM overhead in the NVFP4 path of this backend, but that has not been
+  demonstrated and is not implied by the format.
 
 The portability claim therefore holds for the *mechanism* (fewer weight bytes read per step) but not
 for the *magnitude*. Transporting a specific speedup to another GPU requires knowing that machine's

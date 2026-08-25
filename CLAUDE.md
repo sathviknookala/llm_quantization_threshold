@@ -20,6 +20,13 @@ This file is the always-loaded hub. Keep detailed methodology and measured state
 - **`docs/EVALUATION_RIG.md`** — quality metrics, serving metrics, uncertainty treatment, and marginal tradeoff calculations. *Read before implementing or changing evaluation code.*
 - **`docs/LIMITATIONS.md`** — claims the study cannot make and known threats to validity. *Read before interpreting final results or writing conclusions.*
 
+**Code layout.** `scripts/harness/` is the shared measurement harness — `common.py` (identity,
+telemetry, statistics), `driver.py` (one timed cell), `server.py` (vLLM lifecycle),
+`orchestration.py` (cell identity, resume, launch preflight). `run_pilot.py` and `run_sweep.py` are
+runners over it; `analyze.py` turns pilot cells into the pilot verdict; `selftest.py` exercises the
+cell state machine against a stub engine with no GPU. Renamed from `scripts/pilot/` on 2026-08-24 —
+the harness outlives the pilot.
+
 ## Research contract
 
 The unit under study is a **complete deployment configuration**, not a precision label in isolation. A configuration includes, where applicable:
@@ -109,58 +116,60 @@ A valid result may favor BF16, FP8, FP4, different choices for different workloa
 
 ## Current focus
 
-**The pilot has run. The sweep is NOT cleared.** P2, P3, P5 pass, P4 is valid, and the correctness
-gate is clean — but **P1 FAILED**. D10's weight-size-ratio prediction is falsified; the corrected
-interpretation is recorded in D10/D11 as of 2026-08-24. What still gates the sweep is that the
-replacement model was fitted post hoc and has not been validated.
-Artifacts: `results/pilot/`, verdict in `results/pilot/PILOT_DECISION.md`.
+**The pilot's science gate is CLEARED. The sweep is blocked on engineering, not on physics.**
+P2, P3, P5 pass, P4 is valid, the correctness gate is clean — and **P1 FAILED and stays FAIL**.
+
+**Amended 2026-08-24: P1 does not gate the sweep and is not rerun.** Its pre-registered tolerances
+were not relaxed and it is not rewritten as a PASS. P1 tested a *predictive shortcut* — that the
+below-wall throughput ratio could be read off the weight-size ratio — and reproducibly falsified it.
+Losing a shortcut is a reason to run the measurement, not to postpone it. No replacement predictive
+model is required, and the post-hoc three-term traffic model in D10 must **not** be promoted into a
+pre-sweep gate. Verdict in `results/pilot/PILOT_DECISION.md`, criterion in `EXPERIMENTAL_CONTRACT.md`
+"Exit criteria".
 
 ```text
-P1  memory-bandwidth-bound assumption   FAIL    FP4 ratio outside +/-20% and drifts -17.8%
-P2  BF16 KV wall                        PASS    bracket [17, 18], inside the 15-25 band
-P3  repetition count                    PASS    rho 0.0020 / 0.0064  -> 3 repetitions locked
-P4  achievable HBM bandwidth            VALID   620.1 GB/s read, 92.3% of 672.0 GB/s spec
-P5  harness validation                  PASS    23 invariants, 43 cells
-    correctness gate                    CLEAN   32 real C4 contexts, dispatch reconfirmed
+P1  weight-size-ratio prediction       FAIL    informative falsification, recorded, does not gate
+P2  BF16 KV wall                       PASS    bracket [17, 18], inside the 15-25 band
+P3  repetition count                   PASS    rho 0.0020 / 0.0064  -> 3 repetitions locked
+P4  achievable HBM bandwidth           VALID   620.1 GB/s read, 92.3% of 672.0 GB/s spec
+P5  harness validation                 PASS    23 invariants, 46 cells
+    correctness gate                   CLEAN   32 real C4 contexts, dispatch reconfirmed
 ```
 
-**The one blocking result — interpretation now resolved (D10/D11, 2026-08-24).** D10 assumed the
-below-wall throughput gain would roughly equal the weight-size ratio (1.77x, 2.65x). Measured over
-3 repetitions with per-cell CV 0.01-0.15%:
+**The interpretation the project now holds.** Quantization has two distinct resource effects, and
+only the first follows from checkpoint size:
 
 ```text
-  C     BF16      FP8      FP4    R_FP8    dev    R_FP4     dev
-  1    36.06    66.01    87.88    1.831  +3.7%    2.437   -8.1%
-  8   268.31   449.99   566.99    1.677  -5.0%    2.113  -20.3%
- 12   381.30   618.08   763.77    1.621  -8.2%    2.003  -24.5%
+smaller weight residency  ->  more VRAM free for KV  ->  greater KV capacity   (P2 confirmed: wall [17,18])
+smaller weight traffic    ->  *potential* throughput benefit, magnitude unknown
 ```
 
-**Corrected interpretation, now recorded in D10/D11.** Throughput follows *total* per-step memory
-traffic, not weight traffic:
+Decode also moves KV and other traffic and is subject to kernel efficiency, compute and scheduling
+effects, so **compression ratio does not imply proportional throughput gain**. The magnitude of the
+actual serving benefit is an **experimental output of the sweep**, not an inference from checkpoint
+size.
+
+**What may not be claimed.** The below-wall gap has *not* been uniquely attributed to HBM bandwidth,
+to KV dilution, or to kernel efficiency — this measurement cannot separate them. Supported: the
+sub-wall differences are reproducible; the weight-ratio prediction does not explain them
+quantitatively; the sweep will measure the realized differences; P2 independently confirmed the
+capacity-side motivation. Report the below-wall gap as the raw measured quantity, always with its
+concurrency attached, and never as a bandwidth or weight-residency benefit.
 
 ```text
-bytes/step = weights + KV + other      only the weight term shrinks with precision
+0. D10/D11 corrected; P1 exit criterion amended               DONE 2026-08-24
+1. build the D11 sweep orchestrator                            <- current step
+2. implement SKIPPED_PAST_SLO
+3. reconcile the cell wall cap with the 4-period window, and make
+   CELL_TIMEOUT classification agree with the contract
+4. serving sweep                       overnight, GPU-exclusive, 3 reps locked
+5. quality run                         KL first; PPL/tasks need D14/D15
 ```
 
-KV precision is held at BF16 across the ladder (D5), so the KV term is common to all three rungs,
-dilutes every ratio toward 1, and does so more as concurrency rises — which is why both ratios
-decline and FP4 (smallest weight term) degrades fastest. Measured residual after weights and KV, at
-the 620.1 GB/s read ceiling: BF16 ~0.74 GB/step, FP8 ~0.10 GB, FP4 ~0.87 GB (9-11% of its step).
-FP8 is thus almost fully explained by weights + KV; FP4 is not, and reaches only 86% of measured read
-bandwidth at C=1 against FP8's 97%.
-
-The sub-wall region **is** still memory-bound (zero preemption, clean scaling, stable TPOT). What
-failed is the weight-bytes-only prediction, not the bandwidth-bound premise.
-
-**Reporting rule now locked (D11):** report the below-wall gap as the raw measured quantity, always
-with its concurrency attached, and never call it a weight-residency or weight-bandwidth benefit.
-
-```text
-0. D10/D11 interpretation corrected                        DONE 2026-08-24
-1. validate the 3-term model on points it was not fitted on  <- current step
-2. serving sweep                          overnight, GPU-exclusive, 3 reps locked
-3. quality run                            KL first; PPL/tasks need D14/D15
-```
+Steps 1-3 are the whole remaining blocker list. After them the sweep is cleared with no further
+P1 experiment. The sweep must retain: the H9 stationarity gate and whole-period windows, H10
+per-launch KV-capacity recording with idle-GPU preflight/teardown, counterbalanced order, the frozen
+corpus, 3 repetitions with per-repetition engine restart.
 
 ## Last session
 
@@ -192,13 +201,15 @@ with its concurrency attached, and never call it a weight-residency or weight-ba
 
 ## Known issues / unresolved premises
 
-- **P1 failed; D10/D11 corrected 2026-08-24.** The below-wall gap is the ratio of *total* per-step
-  memory traffic (weights + KV + other), not a weight-residency reading, and it is
-  concurrency-dependent. D11 now says so and fixes the reporting rule. The docs are consistent; the
-  open item is validation of the replacement model, below.
-- **The KV-traffic model is fitted, not validated.** It reproduces R_FP4(12) to 0.3%, but it was
-  constructed after seeing the data and uses a mean resident context read off the KV gauge. It needs
-  an independent test before it becomes the sweep's prediction.
+- **The below-wall gap is unattributed, and that is now a settled position rather than an open gate.**
+  It is reproducible and concurrency-dependent. What produces it — weight traffic, common KV traffic,
+  kernel efficiency, scheduling — is not separated by this measurement and the study does not claim
+  to separate it. Report it as the realized difference at a stated concurrency.
+- **The three-term KV-traffic model is post-hoc and stays that way.** It reproduces R_FP4(12) to 0.3%
+  because it was fitted on that point. It is documented in D10 as a candidate explanation, is **not**
+  a sweep gate, and validating it is not required. If anyone wants to test it later, the pilot
+  already holds unfitted points (BF16 at C=15/16, FP8 and FP4 at C=24) and the test costs no GPU
+  time — a follow-up, not a dependency.
 - **FP4's low-batch bandwidth shortfall is unexplained.** 86% of measured read bandwidth at C=1
   against FP8's 97% is consistent with per-GEMM overhead but has not been attributed.
 - **Throughput inversion near the wall is confounded with clock throttling.** SM clock fell
@@ -215,6 +226,8 @@ with its concurrency attached, and never call it a weight-residency or weight-ba
 - **Qualification serving and KL numbers remain non-citable** — single-request, no warmup, and 16
   repetitive synthetic contexts respectively.
 - **Pilot numbers are diagnostic and may not be cited as results.**
+- **Three engineering blockers stand between here and the sweep** — orchestrator, `SKIPPED_PAST_SLO`,
+  and the wall-cap/window reconciliation. None is a physics question; see `Current focus`.
 - **The quality arm has two open gates**, D14 (perplexity corpus) and D15 (task set), and
   chat-formatted tasks stay blocked by the `chat_template` deviation.
 - **Calibration sensitivity is untested and FP4-only.** One draw, 128 ultrachat samples, seed 0.

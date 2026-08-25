@@ -236,25 +236,27 @@ Aggregate throughput at the SLO boundary is reported alongside it.
 ### Read the sweep by region
 
 ```text
-below the BF16 KV wall   throughput gap = total-memory-traffic ratio, weights being one term
+below the BF16 KV wall   throughput gap = realized token-rate difference at that concurrency
 above the BF16 KV wall   widening gap   = capacity benefit  (fewer weight bytes resident -> more KV)
 ```
 
-**Corrected 2026-08-23 after pilot P1.** D10 predicted the below-wall ratio would equal the
-weight-size ratio (1.77x / 2.65x). It does not: measured 1.83x / 2.44x at concurrency 1, falling to
-1.62x / 2.00x at concurrency 12. Per-step traffic is `weights + KV + other`, and because KV precision
-is held at BF16 the KV term is common to all three rungs, so it dilutes the ratio and does so more as
-concurrency rises.
+**Corrected 2026-08-23 after pilot P1, amended 2026-08-24.** D10 predicted the below-wall ratio would
+equal the weight-size ratio (1.77x / 2.65x). It does not: measured 1.83x / 2.44x at concurrency 1,
+falling to 1.62x / 2.00x at concurrency 12. The prediction is falsified and the compression ratio is
+no longer treated as a predictor of speedup. No replacement predictor is adopted; the sweep measures
+the realized difference instead.
 
 Consequences for reporting:
 
 - the below-wall gap is **concurrency-dependent**; quote it with the concurrency attached, never as a
   single speedup number;
-- it may not be described as a weight-residency or weight-bandwidth benefit — that attribution
-  requires dividing out the KV term and labelling the result as modelled;
-- the capacity half above the wall is unaffected by this correction.
+- it may not be described as a weight-residency, weight-bandwidth, or bandwidth benefit. The study
+  does not isolate what produces it. Any mechanistic split must be labelled modelled, not measured;
+- it may not be derived from or sanity-checked against the compression ratio;
+- the capacity half above the wall is unaffected by this correction, and P2 confirmed its mechanism
+  directly.
 
-Because the sweep is bandwidth-bound throughout, it does **not** measure the arithmetic benefit of
+At these batch sizes the primary workload does **not** isolate the arithmetic benefit of
 low precision. `PREFILL_PROBE` supplies a bounded observation of that; do not extrapolate it into the
 tradeoff curve.
 

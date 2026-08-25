@@ -263,15 +263,20 @@ DECODE_PRIMARY:  1, 4, 8, 12, 16, 24, 32, 48, 64, 96
 Dense through 12-48, where all three configurations' KV walls sit. Saturation is defined by an
 explicit SLO (`TPOT P95 <= 50 ms`), not by inspecting a throughput curve.
 
-The concurrency sweep carries the whole decomposition, because under a bandwidth-bound decode
-workload both halves of quantization's benefit come from weight residency shrinking:
+The concurrency sweep carries the whole comparison. **Corrected 2026-08-24 after pilot P1** — the
+sweep separates two effects by *where KV binds*, which is observable, and does not attribute either
+to a mechanism the measurement cannot isolate:
 
-1. **bandwidth** — fewer weight bytes read per decode step; visible below the KV wall;
-2. **capacity** — fewer weight bytes resident, leaving more KV for concurrent sequences; visible as
-   the widening gap above the KV wall.
+1. **throughput** — the realized token-rate difference below the KV wall, where no configuration is
+   capacity-limited. It is measured, concurrency-dependent, and **not** predictable from the weight
+   compression ratio (P1 falsified that prediction; see D10);
+2. **capacity** — fewer weight bytes resident leaves more VRAM for KV, raising feasible concurrency;
+   visible as the widening gap above the KV wall, and confirmed directly by P2's location of the
+   BF16 wall at [17, 18].
 
-Because the sweep stays bandwidth-bound throughout, it does not measure the arithmetic/tensor-core
-benefit of low precision. `PREFILL_PROBE` supplies a bounded observation of that instead.
+The magnitude of the serving benefit is an experimental output of this sweep, not an inference from
+checkpoint size. At these batch sizes the primary workload does not isolate the arithmetic/tensor-core
+benefit of low precision; `PREFILL_PROBE` supplies a bounded observation of that instead.
 
 ---
 

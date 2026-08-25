@@ -13,7 +13,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from pilot import common  # noqa: E402
+from harness import common  # noqa: E402
 
 # Deliberately loose "obviously broken" trip-wires, calibrated ~2 orders of magnitude above the
 # qualification feasibility values (results/qualification/kl_feasibility.json). Not quality bounds.

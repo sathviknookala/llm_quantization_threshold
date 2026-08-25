@@ -13,7 +13,7 @@ import random
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from pilot import common  # noqa: E402
+from harness import common  # noqa: E402
 
 C4_REPO = "allenai/c4"
 C4_FILE = "en/c4-validation.00000-of-00008.json.gz"

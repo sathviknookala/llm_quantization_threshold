@@ -17,3 +17,7 @@ results/pilot/corpus/*.json
 !results/pilot/corpus/*_manifest.json
 results/pilot/gate_logits/
 results/pilot/server_logs/
+
+# Sweep engine logs: large, per-launch, and the cell records carry the launch identity
+# (kv_cache_tokens, dispatch_verdict) that actually matters for reproduction.
+results/sweep/server_logs/

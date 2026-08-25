@@ -11,15 +11,35 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from pilot import common  # noqa: E402
+from harness import common  # noqa: E402
 
 CELLS = os.path.join(common.PILOT_DIR, "cells.jsonl")
+
+# Not machine-checkable from cells.jsonl, so they are declared rather than computed. The pilot's
+# science gate and the sweep's execution readiness are separate questions and are reported as such.
+SWEEP_EXECUTION_BLOCKERS = [
+    "D11 sweep orchestrator does not exist (scripts/pilot/run_pilot.py covers P1/P2/P3/P5 only)",
+    "SKIPPED_PAST_SLO is unimplemented; driver.py has only the 10x-SLO abort",
+    "cell wall cap vs the 4-period window is unreconciled, and CELL_TIMEOUT is classified "
+    "invalid where the contract calls a wall-cap overrun a result",
+]
+
+SWEEP_EXECUTION_INVARIANTS = [
+    "H9 periodic-stationarity gate and whole-period windows",
+    "H10 per-launch KV-capacity recording and idle-GPU preflight/teardown",
+    "counterbalanced configuration order",
+    "frozen corpus and prompt-set hash",
+    "3 repetitions with a per-repetition engine restart",
+]
 
 CRITERIA = {
     "p1_ordering": "BF16 < FP8 < FP4 output tok/s at every sub-wall concurrency (1, 8, 12)",
     "p1_ratio_tolerance_rel": 0.20,
     "p1_ratio_stability_rel": 0.15,
     "p1_subwall_clean": "no sustained BF16 KV preemption/recompute at C=1,8,12",
+    # Amended 2026-08-24: P1's tolerances are unchanged and its verdict still stands as measured;
+    # what changed is that the verdict no longer gates the sweep. See EXPERIMENTAL_CONTRACT.md.
+    "p1_exit_role": ("informative falsification - recorded, not a clearance gate"),
     "p2_expected_band": [15, 25],
     "p3_rho_max": 0.25,
     "p3_escalation": [3, 5, 7],
@@ -217,7 +237,7 @@ def analyse_p2(recs):
     for r in rows:
         per_c.setdefault(r["concurrency"], []).append(r)
 
-    from pilot.run_pilot import pressured as is_pressured
+    from harness.run_pilot import pressured as is_pressured
 
     def press(rs):
         return any(is_pressured(x) for x in rs)
@@ -512,14 +532,22 @@ def main():
         "files": sorted(f for f in os.listdir(a.out_dir) if os.path.isfile(os.path.join(a.out_dir, f))),
         "generated_at": common.now_iso(),
     }
-    cleared = (p1["verdict"] == "PASS" and p2["verdict"] == "PASS" and p3["verdict"] == "PASS"
+    # P1 is deliberately absent: amended 2026-08-24, its falsification is recorded but does not gate.
+    cleared = (p2["verdict"] == "PASS" and p3["verdict"] == "PASS"
                and p5["verdict"] == "PASS" and manifest["verdicts"]["P4"] == "VALID"
                and manifest["verdicts"]["correctness_gate"] == "CLEAN")
-    manifest["cleared_for_full_serving_sweep"] = cleared
+    manifest["p1_gates_the_sweep"] = False
+    manifest["pilot_science_gate_cleared"] = cleared
+    # Deliberately conjunctive: a true science gate must not read as permission to launch while
+    # engineering blockers stand.
+    manifest["cleared_for_full_serving_sweep"] = cleared and not SWEEP_EXECUTION_BLOCKERS
+    manifest["sweep_execution_blocked_by"] = SWEEP_EXECUTION_BLOCKERS
+    manifest["sweep_execution_invariants"] = SWEEP_EXECUTION_INVARIANTS
     common.write_json(os.path.join(a.out_dir, "manifest.json"), manifest)
     write_decision(a.out_dir, p1, p2, p3, p4, p5, gate, manifest)
     print(json.dumps(manifest["verdicts"], indent=2))
-    print("cleared_for_full_serving_sweep:", cleared)
+    print("pilot_science_gate_cleared:", cleared)
+    print("sweep_execution_blocked_by:", len(SWEEP_EXECUTION_BLOCKERS), "item(s)")
 
 
 def _r(v, nd=2):
@@ -539,7 +567,9 @@ def write_decision(out_dir, p1, p2, p3, p4, p5, gate, manifest):
       f"`{manifest['corpus']['prompt_set_hash'][:16]}...`.")
     A("")
 
-    A(f"## P1 - memory-bandwidth-bound assumption: **{p1['verdict']}**")
+    A(f"## P1 - weight-size-ratio prediction below the wall: **{p1['verdict']}**")
+    A("")
+    A("Informative falsification. Recorded as measured; does not gate the sweep (amended 2026-08-24).")
     A("")
     A("| C | BF16 tok/s | FP8 tok/s | FP4 tok/s | R_FP8 | R_FP4 | expected | BF16 KV pressure |")
     A("|---|---|---|---|---|---|---|---|")
@@ -667,26 +697,46 @@ def write_decision(out_dir, p1, p2, p3, p4, p5, gate, manifest):
 
     A("## Clearance")
     A("")
-    if manifest["cleared_for_full_serving_sweep"]:
-        A("**CLEARED for the full serving sweep.** P1, P2, P3 and P5 pass, the P4 measurement is")
-        A("valid, and the correctness gate is clean.")
+    A("Amended 2026-08-24. **P1 does not gate the sweep.** Its verdict above is unchanged and its")
+    A("tolerances were not relaxed - P1 falsified D10's original proportional-scaling prediction,")
+    A("and that falsification is the informative result. What it removes is the *assumption* that")
+    A("weight compression ratio quantitatively predicts throughput speedup; it does not remove the")
+    A("reason to run the sweep, which is to measure the realized benefit rather than infer it. No")
+    A("P1 rerun and no replacement predictive model are required. See EXPERIMENTAL_CONTRACT.md")
+    A("'Exit criteria'.")
+    A("")
+    if manifest["pilot_science_gate_cleared"]:
+        A("**Pilot science gate: CLEARED.** P2, P3 and P5 pass, the P4 measurement is valid, and")
+        A("the correctness gate is clean.")
     else:
-        A("**NOT CLEARED for the full serving sweep.**")
+        A("**Pilot science gate: NOT CLEARED.**")
         A("")
         for job, v in manifest["verdicts"].items():
-            if v not in ("PASS", "VALID", "CLEAN"):
+            if job != "P1" and v not in ("PASS", "VALID", "CLEAN"):
                 A(f"- {job} = {v}")
         A("")
-        if p1["verdict"] == "FAIL" or p2["verdict"] == "FAIL":
-            A("P1 or P2 failing means the physical assumptions behind D11 are not supported by the")
-            A("pilot. The decision to reopen is D11's, not the harness's - the evidence is reported")
-            A("as measured and the interpretation is not adjusted to fit it.")
+        if p2["verdict"] == "FAIL":
+            A("P2 failing means D11's concurrency ladder does not bracket the measured wall. The")
+            A("decision to reopen is D11's, not the harness's - the evidence is reported as")
+            A("measured and the interpretation is not adjusted to fit it.")
+    A("")
+    A("### Sweep execution readiness")
+    A("")
+    if manifest["sweep_execution_blocked_by"]:
+        A("The pilot's science gate is not the whole clearance. **Do not start the GPU sweep** "
+          "until these are resolved:")
+        A("")
+        for b in manifest["sweep_execution_blocked_by"]:
+            A(f"- {b}")
+        A("")
+    A("The sweep must retain, unchanged:")
+    A("")
+    for inv in manifest["sweep_execution_invariants"]:
+        A(f"- {inv}")
     A("")
     A("## Decisions that must be reopened")
     A("")
     reopen = []
-    if p1["verdict"] == "FAIL":
-        reopen.append("D11 bandwidth-vs-capacity decomposition, and D10's weight-size-ratio prediction")
     if p2["verdict"] == "FAIL":
         reopen.append("D11 concurrency ladder - the locked points do not bracket the measured wall")
     if p3["verdict"] == "FAIL":
@@ -694,7 +744,12 @@ def write_decision(out_dir, p1, p2, p3, p4, p5, gate, manifest):
     if p5["invariants"]["slo_visibility"]["bf16_within_slo_at_c8_c12"] is False:
         reopen.append("the 50 ms TPOT P95 SLO - BF16 breaches it below the KV wall")
     if not reopen:
-        A("- none")
+        A("- none outstanding")
+        if p1["verdict"] == "FAIL":
+            A("")
+            A("D10's proportional-scaling prediction and D11's below-wall reading were reopened on")
+            A("P1's evidence and resolved 2026-08-24. The three-term traffic model recorded in D10")
+            A("is post-hoc and is documented as a candidate explanation, not as a sweep gate.")
     for r in reopen:
         A(f"- {r}")
     A("")

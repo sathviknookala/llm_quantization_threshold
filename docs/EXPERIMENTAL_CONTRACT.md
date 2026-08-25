@@ -129,6 +129,31 @@ Scope:          concurrency 1, 2, 4, 8. No repetition structure. Not part of the
 
 These are part of the workload, not harness details. Any one of them can invalidate a sweep silently.
 
+**Prompt reuse across concurrency waves — amended 2026-08-24.** The corpus is 512 prompts and the
+driver draws round-robin, so a cell that issues more than 512 requests wraps. At C=96 a cell issues
+roughly 900. The rule is therefore: **distinct within a concurrency wave; reuse across waves is
+permitted and must be recorded** (`prompt_wraps`, `prompt_indices_unique`). No two simultaneous
+requests share a prompt while C <= 512, which is the property that matters for KV, and prefix caching
+is off. The corpus is deliberately **not** regenerated — that would change `prompt_set_hash` and
+break the provenance chain back to D16.
+
+**Pre-registered cell parameters for the sweep.** Fixed before the run, hashed into
+`sweep_config_hash`, and serialized into every cell record:
+
+```text
+margin                    1.5      budget headroom over the close conjunction
+min_periods               4        whole periods per timed window
+min_requests_factor       4        completed requests per unit concurrency
+window_floor_s            120      (DECODE_PRIMARY) / 60 (PREFILL_PROBE)
+warmup_lifetimes          2        sequence lifetimes discarded before the gate
+gate_timeout_s            420      floor; raised to 3x period at high concurrency
+hard_cap_s                1800     (DECODE_PRIMARY) / 900 (PREFILL_PROBE)
+abort_tpot_ms             500      10x the SLO. P2 disabled this to observe the pressured
+                                   regime; the sweep keeps it, because the skip rule already
+                                   stops the ladder and this is only a pathological-cell guard
+nonstationary_ratio       1.25     period growth that marks a cell as having left steady state
+```
+
 - **Prefix caching disabled.** Launch with automatic prefix caching off and log the hit rate anyway.
   See hazard H7.
 - **Prompt corpus.** Fixed held-out corpus, tokenized and chunked to exactly 512 (or 8192) tokens,
@@ -155,6 +180,31 @@ PREFILL_PROBE:   1, 2, 4, 8
 Ten points for the primary workload, dense through 12-48 where all three KV walls sit.
 3 configurations x 10 points x 3 repetitions = 90 timed cells.
 
+### Wall-refinement pass — additive, D11's locked points unchanged
+
+**Added 2026-08-24.** The locked ladder cannot resolve the FP8 and FP4 walls from each other: both
+fall inside the single 32-48 gap.
+
+```text
+configuration   wall        ladder bracket   width
+BF16            17          [16, 24]         8
+FP8             ~38         [32, 48]         16
+FP4             ~47         [32, 48]         16
+```
+
+The grid spacing where all three ceilings live is 1.5x; the FP8-to-FP4 KV separation is 1.24x. A 1.5x
+grid cannot resolve a 1.24x difference, so the sweep alone can return the same bracket for both — a
+null on the marginal capacity benefit of the FP8-to-FP4 step that would be indistinguishable from a
+real null, on the exact question the study exists to answer. It also contradicts D10's own rationale
+for the narrow workload, which traded shape variety to buy resolution near the walls.
+
+**The locked ten points are run unchanged.** After them, a separate phase bisects each
+configuration's `[last_clean, first_pressured]` bracket using the pilot's preemption-based
+`pressured()` predicate, repetition 1 only, roughly four cells per configuration. It carries its own
+job label (`SWEEP_REFINE`) so the pre-registered D11 set stays clean and the refinement is visibly
+additive rather than a retroactive re-spacing. Refinement points lie below the SLO-violation point,
+so they do not interact with the skip rule.
+
 ### Saturation criterion
 
 Saturation is defined by an explicit SLO, not by inspection of a throughput curve:
@@ -167,32 +217,134 @@ The headline capacity metric per configuration is **maximum concurrency sustaine
 
 ### Cell-abort rule
 
-Predeclared so the decision is never made ad hoc mid-run:
+**Revised 2026-08-24.** The previous rule read: "A cell is aborted and recorded as `SLO_VIOLATED` if
+TPOT P95 exceeds 10x the SLO (500 ms) or if the cell exceeds its wall-clock cap of 15 minutes." That
+conflated two different events under one status, and the harness disagreed with it anyway — it
+emitted `CELL_TIMEOUT`, which is marked invalid, i.e. missing data rather than a result.
 
-- A cell is aborted and recorded as `SLO_VIOLATED` if TPOT P95 exceeds **10x the SLO** (500 ms) or if
-  the cell exceeds its wall-clock cap of **15 minutes**.
-- Once a configuration violates the SLO at concurrency C, higher concurrency points for that
-  configuration are skipped and recorded as `SKIPPED_PAST_SLO`.
+**Budgets are derived from the measured period, not flat.** A flat cap is anti-correlated with what
+it should protect: past a KV wall throughput falls, the period lengthens, and the cell needs *more*
+wall clock precisely when it is producing the capacity result. Per phase:
+
+```text
+warmup budget    max(warmup_wall_cap_s, warmup_lifetimes * period * margin)
+gate budget      max(gate_timeout_s, 3 * period)
+measure budget   margin * max(window_floor_s, min_periods * period,
+                              (min_requests_factor + 1) * period)
+hard ceiling     hard_cap_s   absolute anti-hang backstop, 30 min for DECODE_PRIMARY
+```
+
+The measure budget must dominate the **whole** close conjunction, not one term of it. Sizing it on
+`min_periods` alone starves any short-period workload: `PREFILL_PROBE` has a 1-2 s period against a
+60 s window floor, so a `min_periods`-only budget would expire every probe cell. The
+`min_requests_factor + 1` term is measured, not decorative — `in_window_records` excludes the first
+period, so the request-count floor needs about one extra period, and the pilot's cells recorded 4.24
+to 5.16 periods in window against `min_periods = 4`.
+
+**Classification at expiry, in order.** The discriminator is *not* SLO state alone: a configuration
+that is genuinely too slow and a budget that is too small both present as missing the SLO, so an
+SLO-only test fires the defect branch only in the benign case.
+
+| condition | status | `outcome_class` |
+|---|---|---|
+| TPOT P95 > 10x SLO during measure | `SLO_VIOLATED` | measured |
+| at expiry, TPOT P95 above the SLO | `SLO_VIOLATED` | measured |
+| at expiry, within SLO but period grew > 1.25x | `NONSTATIONARY` | infeasible |
+| at expiry, within SLO at a stable period | `CELL_TIMEOUT` | defect |
+| gate never fired | `STEADY_STATE_NOT_REACHED` | infeasible |
+| hard ceiling with no tokens streaming | `CELL_HUNG` | defect |
+| engine died / harness exception | `SERVER_DIED` / `HARNESS_ERROR` | defect |
+
+`CELL_TIMEOUT` is therefore a genuine defect signal rather than a catch-all, and should be
+unreachable in a correctly budgeted run.
+
+**`outcome_class` exists because `valid_result` was overloaded.** `valid_result` answers "is there a
+timing measurement that passed the invariants". `outcome_class` answers "what does this cell tell the
+study": `measured`, `infeasible`, or `defect`. The headline max-concurrency-at-SLO metric reads
+`measured` union `infeasible`; a `defect` is never evidence about the hardware. Any status not
+explicitly mapped defaults to `defect`, never `infeasible` — a harness failure must not be able to
+masquerade as a capacity finding.
+
+**The skip predicate is an SLO-only allowlist.** Once a configuration violates the SLO at concurrency
+C, higher points for that configuration **in that repetition** are skipped and recorded as
+`SKIPPED_PAST_SLO`:
+
+```text
+violated  <=>  status == SLO_VIOLATED  or  (status == OK and meets_slo is False)
+```
+
+Nothing else truncates a ladder. `STEADY_STATE_NOT_REACHED`, `INVALID`, `CELL_TIMEOUT`, `CELL_HUNG`,
+`SERVER_DIED` and `HARNESS_ERROR` abort the **cell**, never the **ladder** — otherwise a harness
+event silently deletes the remaining points and the deletion is then reported as the configuration's
+serving ceiling.
+
+Two guards on the boundary, because per-repetition skipping makes the boundary point ragged and the
+surviving repetitions are the ones that did *not* violate:
+
+- repetition 1 runs exactly one point **past** the first violation, so monotonicity is tested rather
+  than assumed. BF16's pilot throughput is already non-monotonic (490 -> 425 -> 437 at C=16/17/18,
+  with C=17 confounded by a 1872 -> 1728 MHz clock drop), so one unlucky cell must not be able to
+  truncate a ladder permanently;
+- a ladder point counts toward the headline metric only if it violated in **at least 2 of 3**
+  repetitions, and the analyzer must print n per point and refuse to emit a median where n < 3.
+
+Do not conflate pressure with SLO violation. Pilot BF16 at C=18 shows 4 preemptions at 98.5% KV and
+still meets the SLO at 41.3 ms; keying the skip on preemption would truncate that ladder eight
+concurrency points early.
 
 Aborted and skipped cells are results and must be written to the artifact, not omitted. Do not stop a
 sweep merely because one configuration "looks fast enough."
 
 ### Per-point logging requirements
 
-Without these the bandwidth region and the capacity region cannot be distinguished after the fact:
+Without these the two regions cannot be distinguished after the fact:
 
 - whether the configuration was KV-limited at that point;
 - preemption count;
-- recomputed-token count;
-- queue depth and time-in-queue;
+- queue **depth** (`num_waiting_reqs`). **Time-in-queue is not recorded** — the driver has no
+  per-request queue-time observable in this build. Recorded here as a known gap rather than left
+  as an unmet requirement;
 - KV-block utilisation;
-- prefix-cache hit rate (expected zero; a non-zero value invalidates the cell).
+- prefix-cache hit rate (expected zero; a non-zero value invalidates the cell);
+- per-launch KV capacity in tokens, checked against the configuration's reproducible value before
+  any cell runs (H10);
+- SM-clock throttle reasons (`sw_power_cap`, `hw_slowdown`, `sw_thermal_slowdown`), without which a
+  power-cap event cannot be separated from a thermal one after the fact;
+- the full `CellConfig` used, serialized into the record. The pilot ran with `wall_cap_s` of 1200
+  and 1500 against a documented 15 minutes and nobody noticed, because not one config field was
+  ever written to the artifact;
+- prompt-corpus wrap count. The corpus holds 512 prompts; above roughly C=48 a cell issues more
+  requests than that and wraps.
+
+**`recomputed_tokens` is deliberately absent.** D11 originally required it. H11 established that the
+counter is structurally incapable of reporting preemption recompute in this build and is always zero
+once prefix caching is disabled. It is still recorded, but it is not a requirement and no analysis
+may rest on it.
 
 ### Run ordering
 
 Configurations must be **counterbalanced or randomized across repetitions**, not run in a fixed
 BF16 -> FP8 -> FP4 order. Over a multi-hour sweep the card heats and clocks fall (H6), so a fixed
 order systematically favours whichever configuration always runs first on a cool card.
+
+**What the Latin square does and does not balance — recorded 2026-08-24.** `LATIN` is a cyclic
+square: each configuration occupies each ordinal position exactly once, so *position* is balanced.
+*Carryover* is not. FP8 follows BF16 in 2 of 3 repetitions and FP4 in 0 of 3. Balancing carryover for
+three treatments requires six sequences (a Williams design); with three repetitions it is not
+achievable, and the skip rule makes it worse because BF16 skips the most cells and therefore forms
+the shortest block. This is stated rather than implied to be handled.
+
+**Two mitigations, and a test rather than an assumption.**
+
+- Preflight waits for an idle **and thermally comparable** GPU before every launch, not just idle
+  memory. That removes most of the ordering confound directly, which counterbalancing alone cannot.
+- H6 is **tested, not assumed**. Across the pilot's 43 decode cells the card sat at 83-86 C and
+  exactly 145.0 W in every single cell, and SM clock tracked the operating point rather than elapsed
+  time: matched `(configuration, C)` cells run hours apart agree to within 1.07% on clock and 0.33%
+  on throughput. That is the baseline a real drift signal must exceed. The sweep pre-registers the
+  comparison of matched cells between repetition 1 and repetition 3, and reports the residual of
+  within-cell throughput regressed on wall-clock offset and block position. Counterbalancing without
+  a residual diagnostic is a ritual.
 
 ## Warmup
 
@@ -227,9 +379,19 @@ than the regime.
   instantaneous 10 s windows swung 588 / 575 / 685 tok/s.
 - **Timed windows must span whole periods.** At least 4 sequence lifetimes, with
   `periods_in_window` recorded per cell, so the sawtooth averages out instead of biasing the mean.
+  This guarantee is **not** traded away for a predictable budget: the period count stays exact and
+  token-derived (see "Repetitions and duration"), and the *budget* is sized from the period frozen at
+  gate-fire. Pilot oscillation amplitude reaches 0.357 relative, so a window covering 2.8 periods
+  instead of 4 would carry roughly 10% residual bias — the same order as the FP8-to-FP4 gap the sweep
+  exists to measure, and biased in the flattering direction on exactly the degraded cells.
 - **Warmup is repeated after every change of concurrency**, not only after engine start. Changing
   concurrency changes the steady-state occupancy, so the previous steady state does not carry over.
 - **Cache state:** prefix caching disabled; flashinfer JIT artifacts warm before timing.
+- **Warmup truncation is recorded, not invalidating.** Warmup truncates where throughput has
+  collapsed, i.e. on the past-the-wall capacity cells. Promoting it to an invalidity reason would
+  destroy exactly the measurements the budget revision exists to save, so it is a first-class
+  recorded field feeding `outcome_class`. The period-derived warmup budget stops it firing
+  spuriously at high concurrency in the first place.
 
 Warmup must be sufficient to exclude both one-time initialization and the occupancy transient from
 steady-state serving results.
@@ -259,10 +421,23 @@ rule rather than something the variance figure lets us skip.
 - **Repetitions:** 3 independent runs per cell, each with its own warmup and its own engine-process
   restart between repetitions of the same configuration. Repetitions are counterbalanced against
   configuration order (see "Run ordering").
-- **Timed window:** `max(120 s, 4 x concurrency completed requests)`, capped by the 15-minute
-  cell-abort limit. The request-count floor matters at low concurrency, where a single BF16 request
-  takes roughly 51 s; the duration floor matters at high concurrency, where requests complete fast
-  enough that a count-based window would be too short to be a regime measurement.
+- **Timed window — single definition, revised 2026-08-24.** This document previously carried two
+  incompatible rules: `max(120 s, 4 x concurrency completed requests)` here, and "at least 4 sequence
+  lifetimes" under Warmup. The window closes when **all three** hold:
+
+  ```text
+  elapsed  >= window_floor_s
+  periods  >= min_periods          periods = tokens_in_window / (out_tokens * concurrency)
+  done     >= min_requests_factor * concurrency
+  ```
+
+  The period count is **token-derived and exact**, not a rate estimate. Using a live throughput
+  estimate made the requirement a moving target that receded as throughput fell, so a degrading cell
+  could never satisfy it. Verified against all 46 pilot cells: the token formula reproduces the
+  recorded `periods_in_window` to within 2.2%, with no cell disagreeing by more than 3%. The
+  request-count floor matters at low concurrency, where a single BF16 request takes roughly 51 s; the
+  duration floor matters at high concurrency, where requests complete fast enough that a count-based
+  window would be too short to be a regime measurement.
 - **Aggregation:** report the median across repetitions with the full spread; the run-level sample
   size is 3, not the number of requests inside a run. Do not treat thousands of requests inside one
   process as thousands of independent hardware experiments.
@@ -291,16 +466,24 @@ of the experiment. Nothing it measures is a result, and no pilot number may be q
 that in the bandwidth-bound region the throughput ratio between configurations equals the weight-size
 ratio (BF16:FP8:FP4 = 16.10 : 9.12 : 6.07 GB, so 1.77x and 2.65x over BF16). Measured at concurrency
 1, 8 and 12, three repetitions: 1.83x / 2.44x falling to 1.62x / 2.00x. The prediction is falsified —
-per-step traffic is `weights + KV + other` and the KV term is common across the ladder, so the ratio
-is concurrency-dependent and below the weight-size ratio. The region is still memory-bound. See D10
-for the corrected interpretation and `results/pilot/PILOT_DECISION.md` for the evidence.
+the measured ratio is concurrency-dependent and, for FP4, well below the weight-size ratio. The
+sub-wall region showed no preemption, no recompute and stable TPOT throughout. D10 records a
+post-hoc `weights + KV + other` traffic model as a candidate explanation; it is not established, and
+nothing downstream depends on it. See D10 and `results/pilot/PILOT_DECISION.md` for the evidence.
 
-Running it at several sub-wall points is the substance of the check, not a refinement of it. The
-entire bandwidth-vs-capacity decomposition in D11 assumes the sweep is memory-bandwidth-bound
-throughout, and that assumption is currently supported by an arithmetic-intensity argument with no
-measurement behind it. If the ratio holds at concurrency 1 but decays by 12, the card is entering
-compute saturation before the BF16 KV wall at 15, the below-wall region stops being a clean bandwidth
-reading, and D11's decomposition needs revisiting before the sweep runs.
+Running it at several sub-wall points was the substance of the check, and the several points are
+what produced the finding: the ratio held to +3.7% / -8.1% at concurrency 1 and decayed to -8.2% /
+-24.5% by concurrency 12. A single-point P1 would have read as a near-miss instead of a falsification.
+
+**What P1 established, and what it did not.** It established that the ratio is concurrency-dependent
+and that weight compression does not quantitatively predict throughput speedup. It did *not*
+establish a replacement attribution: the below-wall gap has not been uniquely attributed to HBM
+bandwidth, to KV dilution, or to kernel efficiency, and the pilot cannot separate them. The sub-wall
+region does remain free of the failure mode the check was watching for — zero preemption, zero
+recompute, clean scaling, stable TPOT at every sub-wall point — so the region is not entering
+capacity limitation before the BF16 wall, which is the property D11's ladder depends on.
+
+**Amended 2026-08-24: this verdict does not gate the sweep.** See "Exit criteria" below.
 
 **P2 — Confirm the BF16 KV wall.** It should appear between concurrency 15 (peak footprint basis) and
 25 (mean occupancy basis). Confirm by observing preemption onset and KV-block saturation, not by
@@ -335,9 +518,63 @@ qualification evidence predates any harness code.
 
 ### Exit criteria
 
-The sweep may start when P1-P5 pass and the correctness gate is clean. P1 or P2 failing is not a
-reason to proceed with an adjusted interpretation — both feed decisions (D10's prediction, D11's
-bracketing) that would have to be reopened first.
+**Amended 2026-08-24. P1 is an informative falsification, not a required PASS.**
+
+The original clause read: "The sweep may start when P1-P5 pass and the correctness gate is clean.
+P1 or P2 failing is not a reason to proceed with an adjusted interpretation — both feed decisions
+(D10's prediction, D11's bracketing) that would have to be reopened first." That clause was
+discharged, not waived: P1 failed, D10 and D11 were reopened, and the interpretation was corrected
+before anything was cleared. What follows replaces it.
+
+> P1 falsified D10's original proportional-scaling prediction. This does not invalidate the serving
+> sweep; it removes the assumption that weight compression ratio quantitatively predicts throughput
+> speedup. The full sweep will report observed below-wall throughput empirically and separately
+> measure the movement and usefulness of the KV-capacity wall.
+
+The current criteria:
+
+```text
+P1   informative     verdict recorded as measured; does not gate
+P2   must PASS       the ladder must bracket the measured wall, or the points are wrong
+P3   must PASS       repetition count must resolve the FP8-FP4 gap
+P4   must be VALID   the bandwidth ceiling must be measured independently
+P5   must PASS       the harness must be measuring what it claims to measure
+gate must be CLEAN   no timing a corrupted checkpoint or an unintended execution path
+```
+
+**P1 is not rerun and no replacement gate takes its place.** Specifically, the post-hoc three-term
+traffic model in D10 must **not** be promoted into a pre-sweep predictive gate. It was fitted after
+seeing P1's data and is documented as a candidate explanation and a possible follow-up, nothing more.
+Requiring it to be validated first would reinstate exactly the error P1 exposed — predicting the
+serving benefit instead of measuring it.
+
+**Why a falsification clears rather than blocks.** P1 tested a *predictive shortcut*: that the
+below-wall throughput ratio could be read off the weight-size ratio. Losing the shortcut is a reason
+to run the sweep, not a reason to postpone it, because the sweep is the measurement the shortcut was
+standing in for. What would have blocked the sweep is P2 failing — that would mean the concurrency
+points do not bracket the phenomenon and the sweep would measure the wrong region. P2 passed.
+
+**P1's result is preserved exactly.** Its pre-registered tolerances are unchanged, its verdict stays
+FAIL, and it is not rewritten as a PASS. See `results/pilot/PILOT_DECISION.md` and D10.
+
+### Execution readiness — separate from the exit criteria above
+
+The pilot's science gate is not the whole clearance. These are engineering and contract defects
+found after the pilot, and the sweep does not start until they are resolved:
+
+1. the D11 sweep orchestrator does not exist — `scripts/pilot/run_pilot.py` covers P1/P2/P3/P5 only;
+2. `SKIPPED_PAST_SLO` is unimplemented; `driver.py` carries only the 10x-SLO abort;
+3. the cell wall cap and the four-period window are unreconciled at the top of the ladder, and
+   `CELL_TIMEOUT` is classified invalid where this document calls a wall-cap overrun a result
+   (see "Cell-abort rule" and the note under it);
+4. documentation that still makes unsupported causal claims about the below-wall gap must be
+   corrected.
+
+The sweep must retain, unchanged: the H9 periodic-stationarity gate and whole-period windows; H10
+per-launch KV-capacity recording with idle-GPU preflight and teardown; counterbalanced configuration
+order; the frozen corpus and prompt-set hash; 3 repetitions with a per-repetition engine restart.
+
+Once those are resolved the serving sweep is cleared, with no further P1 experiment.
 
 ### Readiness — checked 2026-08-23
 

@@ -7,6 +7,7 @@
     "p1_ratio_tolerance_rel": 0.2,
     "p1_ratio_stability_rel": 0.15,
     "p1_subwall_clean": "no sustained BF16 KV preemption/recompute at C=1,8,12",
+    "p1_exit_role": "informative falsification - recorded, not a clearance gate",
     "p2_expected_band": [
       15,
       25
@@ -22,12 +23,13 @@
       "FP4_PRIMARY": 2.652
     }
   },
-  "cells_recorded": 43,
+  "cells_recorded": 46,
   "jobs": [
     "P1",
     "P2",
     "P3",
-    "P5"
+    "P5",
+    "P5V"
   ],
   "configurations": [
     "BF16_REFERENCE",
@@ -97,6 +99,20 @@
     "p5_harness_validation.json",
     "run.log"
   ],
-  "generated_at": "2026-08-23T22:53:36-0400",
-  "cleared_for_full_serving_sweep": false
+  "generated_at": "2026-08-24T22:21:55-0400",
+  "p1_gates_the_sweep": false,
+  "pilot_science_gate_cleared": true,
+  "cleared_for_full_serving_sweep": false,
+  "sweep_execution_blocked_by": [
+    "D11 sweep orchestrator does not exist (scripts/pilot/run_pilot.py covers P1/P2/P3/P5 only)",
+    "SKIPPED_PAST_SLO is unimplemented; driver.py has only the 10x-SLO abort",
+    "cell wall cap vs the 4-period window is unreconciled, and CELL_TIMEOUT is classified invalid where the contract calls a wall-cap overrun a result"
+  ],
+  "sweep_execution_invariants": [
+    "H9 periodic-stationarity gate and whole-period windows",
+    "H10 per-launch KV-capacity recording and idle-GPU preflight/teardown",
+    "counterbalanced configuration order",
+    "frozen corpus and prompt-set hash",
+    "3 repetitions with a per-repetition engine restart"
+  ]
 }

@@ -3,10 +3,12 @@
 Pilot measurements are **diagnostic**. Nothing in this file is an experiment result and no
 number here may be cited as measured degradation or measured serving benefit.
 
-Generated 2026-08-23T22:53:36-0400 - 43 cells.
+Generated 2026-08-24T22:21:55-0400 - 46 cells.
 Corpus `c4-en-validation-shard0-v1`, prompt-set hash `2681c604332813f2...`.
 
-## P1 - memory-bandwidth-bound assumption: **FAIL**
+## P1 - weight-size-ratio prediction below the wall: **FAIL**
+
+Informative falsification. Recorded as measured; does not gate the sweep (amended 2026-08-24).
 
 | C | BF16 tok/s | FP8 tok/s | FP4 tok/s | R_FP8 | R_FP4 | expected | BF16 KV pressure |
 |---|---|---|---|---|---|---|---|
@@ -46,6 +48,8 @@ Corpus `c4-en-validation-shard0-v1`, prompt-set hash `2681c604332813f2...`.
 - PASS - not_limited_materially_below_15
 - PASS - not_unconstrained_above_25
 - PASS - transition_reproducible
+
+**The throughput knee precedes preemption by one concurrency point.** Output throughput peaks at C=16 (489.61 tok/s) and regresses at C=17 (425.65 tok/s, -13.1%) with TPOT P95 rising 32.59 -> 39.82 ms — while preemption is still exactly zero and no requests are queued. A pressure test keyed only on preemption counters therefore detects this wall one point late. Both indicators are reported; the bracket above uses the pre-registered preemption/recompute definition.
 
 ## P3 - repetition count: **PASS**
 
@@ -146,15 +150,38 @@ SLO visibility (TPOT P95 <= 50.0 ms): BF16 within SLO at C=8 and C=12 = **True**
 
 ## Clearance
 
-**NOT CLEARED for the full serving sweep.**
+Amended 2026-08-24. **P1 does not gate the sweep.** Its verdict above is unchanged and its
+tolerances were not relaxed - P1 falsified D10's original proportional-scaling prediction,
+and that falsification is the informative result. What it removes is the *assumption* that
+weight compression ratio quantitatively predicts throughput speedup; it does not remove the
+reason to run the sweep, which is to measure the realized benefit rather than infer it. No
+P1 rerun and no replacement predictive model are required. See EXPERIMENTAL_CONTRACT.md
+'Exit criteria'.
 
-- P1 = FAIL
+**Pilot science gate: CLEARED.** P2, P3 and P5 pass, the P4 measurement is valid, and
+the correctness gate is clean.
 
-P1 or P2 failing means the physical assumptions behind D11 are not supported by the
-pilot. The decision to reopen is D11's, not the harness's - the evidence is reported
-as measured and the interpretation is not adjusted to fit it.
+### Sweep execution readiness
+
+The pilot's science gate is not the whole clearance. **Do not start the GPU sweep** until these are resolved:
+
+- D11 sweep orchestrator does not exist (scripts/pilot/run_pilot.py covers P1/P2/P3/P5 only)
+- SKIPPED_PAST_SLO is unimplemented; driver.py has only the 10x-SLO abort
+- cell wall cap vs the 4-period window is unreconciled, and CELL_TIMEOUT is classified invalid where the contract calls a wall-cap overrun a result
+
+The sweep must retain, unchanged:
+
+- H9 periodic-stationarity gate and whole-period windows
+- H10 per-launch KV-capacity recording and idle-GPU preflight/teardown
+- counterbalanced configuration order
+- frozen corpus and prompt-set hash
+- 3 repetitions with a per-repetition engine restart
 
 ## Decisions that must be reopened
 
-- D11 bandwidth-vs-capacity decomposition, and D10's weight-size-ratio prediction
+- none outstanding
+
+D10's proportional-scaling prediction and D11's below-wall reading were reopened on
+P1's evidence and resolved 2026-08-24. The three-term traffic model recorded in D10
+is post-hoc and is documented as a candidate explanation, not as a sweep gate.
 

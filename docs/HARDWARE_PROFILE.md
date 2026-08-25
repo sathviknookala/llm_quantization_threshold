@@ -217,13 +217,17 @@ Lower model-resident memory can leave more VRAM for KV cache and therefore incre
 The serving side of the project should therefore treat at least these as separate outcomes:
 
 ```text
-bandwidth benefit   fewer weight bytes read per decode step -> faster per-token
-capacity benefit    fewer weight bytes resident -> more KV  -> more concurrent sequences
+capacity effect     fewer weight bytes resident -> more KV  -> more concurrent sequences
+throughput effect   fewer weight bytes to move per decode step -> potential faster per-token
 ```
 
-Both are consequences of weight residency shrinking. Under the locked decode-dominated workload
-(D10) the sweep is memory-bandwidth-bound throughout, so the below-wall half is bandwidth rather
-than arithmetic; the arithmetic path is observed only by `PREFILL_PROBE`.
+**Corrected 2026-08-24 after pilot P1.** The capacity effect follows from checkpoint size and was
+confirmed directly (BF16 KV wall at [17, 18]). The throughput effect is only a potential: decode also
+moves KV and other traffic and is subject to kernel efficiency and scheduling, so the compression
+ratio does not predict the speedup — the pilot measured 2.44x for FP4 at concurrency 1 against a
+predicted 2.65x, falling to 2.00x by concurrency 12. Its magnitude is an output of the serving sweep,
+and the study does not attribute it to a single mechanism. The arithmetic path is observed only by
+`PREFILL_PROBE`.
 
 ### 4. Hardware capability is not equivalent to backend capability
 

@@ -192,15 +192,19 @@ PREFILL_PROBE    8192 input /   32 output tokens    concurrency 1-8, no repetiti
 
 ### The lens: this is a memory-focused study
 
-Both halves of the measured benefit are consequences of one thing — weight residency shrinking — and
-the workload is chosen so that a single sweep separates them:
+The workload is chosen so that a single sweep separates two effects by *where KV binds* — an
+observable, not an attribution:
 
 ```text
-below the KV wall   fewer weight BYTES READ per decode step    -> bandwidth benefit
-above the KV wall   fewer weight BYTES RESIDENT -> more KV      -> capacity benefit
+below the KV wall   nobody is capacity-limited  -> realized throughput difference, measured
+above the KV wall   fewer weight BYTES RESIDENT -> more KV -> capacity benefit
 ```
 
-This supersedes the earlier compute-vs-capacity framing. See D11.
+**Corrected 2026-08-24.** This previously read "fewer weight bytes read per decode step -> bandwidth
+benefit", asserting that both halves are consequences of weight residency shrinking. Pilot P1
+falsified the predictive form of that claim and the study does not isolate what produces the
+sub-wall difference, so the below-wall row states what is measured and attributes nothing. The
+capacity row stands and was confirmed by P2. See D11.
 
 ### Why 512 / 2048
 
@@ -255,10 +259,32 @@ FP4 lands outside a +/-20% tolerance at C=8 and C=12, and **both** ratios declin
 FP8 by 11.5% and FP4 by 17.8% between C=1 and C=12. A weight-size ratio is a single constant and
 cannot reproduce a concurrency-dependent gap.
 
-### The correct interpretation: throughput follows *total* memory traffic, not weight traffic
+### What replaces it: measure the benefit, do not predict it
 
-Decode is memory-bound, which the pilot confirms. But the bytes a decode step must move are not only
-the weights:
+**The primary consequence of P1 is subtractive.** The project no longer assumes that compression
+ratio predicts serving speedup. Quantization has two distinct resource effects, and only the first
+is a capacity statement that follows directly from checkpoint size:
+
+```text
+reduced weight residency  ->  more VRAM free for KV  ->  higher feasible concurrency, outward wall
+reduced weight traffic    ->  less weight-attributable traffic per decode step
+                          ->  *potential* sub-wall throughput benefit, magnitude unknown
+```
+
+Total decode behaviour also contains KV traffic, other memory traffic, kernel efficiency, compute
+effects and scheduling effects. So `compression ratio` does **not** imply proportional throughput
+gain, and the magnitude of the realized serving benefit is an **experimental output of the sweep**,
+not something inferred beforehand. The sweep reports the observed below-wall throughput empirically
+and separately measures the movement and usefulness of the KV wall.
+
+### Post-hoc candidate explanation — documented, not adopted
+
+**This model was fitted after seeing P1's data and is not a project premise.** It is recorded because
+it is the most plausible account on hand and a reasonable follow-up if the question is ever pursued
+directly. Nothing downstream depends on it, and it is explicitly **not** a pre-sweep gate — see
+"Status" at the end of this section.
+
+The bytes a decode step must move are not only the weights:
 
 ```text
 bytes per decode step  =  weights  +  KV read  +  other
@@ -286,9 +312,10 @@ measurement: 44,688 / 97,888 / 120,944 tokens at 131,072 bytes each. KV traffic 
 ratio harder, which is why FP4 degrades faster than FP8, and it grows with concurrency, which is why
 both ratios decline.
 
-**The measured decomposition.** Dividing per-step bytes by the independently measured 620.1 GB/s read
-ceiling (P4) and subtracting the weight and KV terms leaves a residual that is roughly constant per
-configuration and does not scale with concurrency:
+**The arithmetic.** Dividing per-step bytes by the independently measured 620.1 GB/s read ceiling
+(P4) and subtracting the weight and KV terms leaves a residual that is roughly constant per
+configuration and does not scale with concurrency. Only the 620.1 GB/s figure is a measurement here;
+the decomposition around it is not:
 
 ```text
 cfg    C    tok/s   step bytes        W        KV     other   other%
@@ -313,14 +340,28 @@ of measured read bandwidth at batch 1 against FP8's 97%, so a large part of FP4'
 execution efficiency in the SM120 CUTLASS FP4 path rather than bytes moved. The two are not separated
 by this measurement.
 
-**What is *not* overturned.** The sub-wall region is memory-bound as assumed: zero preemption, zero
-recompute, clean scaling, stable TPOT at every sub-wall point. What failed is the claim that *weight*
-bytes alone set the ratio.
+**What is *not* overturned.** The sub-wall region showed zero preemption, zero recompute, clean
+scaling and stable TPOT at every sub-wall point — it is not capacity-limited below the wall, which is
+the property D11's ladder actually depends on. What failed is the claim that *weight* bytes alone set
+the ratio.
 
-**Status of the replacement.** The three-term model was constructed after seeing the data and its
-`other` term is fitted per configuration. It reproduces R_FP4(12) to 0.3%, but it is not yet a
-validated prediction and must not be treated as one until it is tested against points it was not
-fitted on.
+**Status — post-hoc, not a gate. Settled 2026-08-24.** The three-term model was constructed after
+seeing the data and its `other` term is fitted per configuration. It reproduces R_FP4(12) to 0.3%,
+which is unsurprising for a model fitted on that point. It is therefore **not** a validated
+prediction, it is **not** promoted into a pre-sweep gate, and validating it is **not** required to
+run the primary experiment. Should anyone wish to test it later, the pilot already holds points it
+was not fitted on (BF16 at C=15/16, FP8 and FP4 at C=24) and the test costs no GPU time — but that is
+a follow-up, not a dependency.
+
+**What may and may not be claimed about the below-wall gap.** The gap has *not* been uniquely
+attributed to HBM bandwidth, nor to KV dilution, nor to kernel efficiency; this measurement cannot
+separate them. The supported claims are narrower:
+
+- quantized configurations show reproducible sub-wall throughput differences;
+- the weight-ratio prediction does not explain them quantitatively;
+- the full sweep will measure those realized differences;
+- P2 independently confirmed the BF16 KV-capacity wall at [17, 18], which preserves the capacity-side
+  motivation of the study on its own evidence.
 
 ### Why the study narrows to one workload
 
@@ -335,9 +376,9 @@ prefill contribution to confound the reading.
 
 ### Why the prefill probe is kept
 
-At these batch sizes decode is pure bandwidth, so the primary workload never observes low precision's
-**arithmetic** benefit at all. Without the probe, `LIMITATIONS.md` would have to say the study does
-not measure the compute benefit of quantization in any form. The probe is ~20 minutes of GPU time and
+At these batch sizes the primary workload does not isolate low precision's **arithmetic** benefit at
+all. Without the probe, `LIMITATIONS.md` would have to say the study does not measure the compute
+benefit of quantization in any form. The probe is ~20 minutes of GPU time and
 lets the project state a bounded observation instead of nothing.
 
 It is explicitly **not** a sweep arm: no repetition structure, no saturation search, and its numbers
@@ -401,34 +442,41 @@ footprint). 3 configurations x 10 points x 3 repetitions = 90 timed cells.
 
 `PREFILL_PROBE` uses `1, 2, 4, 8` with no repetition structure.
 
+**Ladder resolution — recorded 2026-08-24, points unchanged.** These ten points do not resolve the
+FP8 wall (~38) from the FP4 wall (~47): both sit in the single 32-48 gap, so the sweep alone returns
+`[32, 48]` for each. The grid spacing there is 1.5x against a 1.24x KV separation. The locked points
+are **not** re-spaced — that would rewrite a pre-registered set after seeing pilot data. Instead a
+separate `SWEEP_REFINE` phase bisects each bracket afterwards (`EXPERIMENTAL_CONTRACT.md`,
+"Wall-refinement pass"). Reported walls must state which phase produced them.
+
 **Why a sweep rather than one concurrency level:** quantization changes both the bytes read per
 decode step and the KV capacity available. At a single point those two effects are indistinguishable.
 
-### Pilot outcome — the decomposition holds, its arithmetic does not (2026-08-23)
+### Pilot outcome — the ladder holds, the predictive shortcut does not (2026-08-23)
 
 P1 and P2 tested this decision. **P1 FAILED, P2 PASSED.** Diagnostic pilot numbers, not results;
 artifacts under `results/pilot/`.
 
-**The below-wall region is bandwidth-bound, as assumed.** Throughput scales with concurrency, TPOT
-P95 stays within 27.7-31.3 ms for BF16 across C=1-12, and no configuration preempts below the wall.
-The bandwidth-vs-capacity framing survives.
+**The below-wall region is not capacity-limited, as assumed.** Throughput scales with concurrency,
+TPOT P95 stays within 27.7-31.3 ms for BF16 across C=1-12, and no configuration preempts below the
+wall. That is what the two-region reading of the sweep needs, and it survives.
 
-**But the below-wall gap is not the weight-size ratio.** Per-step traffic is `weights + KV + other`,
-and KV is held at BF16 for every rung (D5), so the common KV term compresses the ratio as concurrency
-rises. FP4's ratio falls from 2.437 at C=1 to 2.003 at C=12 — a 17.8% drift that breaches P1's
-stability criterion, and deviations of -20.3% and -24.5% from the predicted 2.652 that breach its
-tolerance. FP8 stays inside both. Full evidence and the corrected model are in D10.
+**But the below-wall gap is not the weight-size ratio.** FP4's ratio falls from 2.437 at C=1 to 2.003
+at C=12 — a 17.8% drift that breaches P1's stability criterion, and deviations of -20.3% and -24.5%
+from the predicted 2.652 that breach its tolerance. FP8 stays inside both. Full evidence in D10.
 
-**Consequence for reading the sweep.** The below-wall gap is still a pure *bandwidth* reading — no
-configuration is KV-limited there — but it is a reading of **total** per-step traffic, not of weight
-traffic, and it is **concurrency-dependent**. Two rules follow, and they are the same ones stated
-under "Resolved 2026-08-24" below:
+**Consequence for reading the sweep — amended 2026-08-24.** The below-wall gap is measured where no
+configuration is KV-limited, so it is not a capacity reading. It is **not**, on this evidence,
+uniquely a bandwidth reading either: weight traffic, common KV traffic, kernel efficiency and
+scheduling all sit inside it and the pilot cannot separate them. It is **concurrency-dependent** and
+it is reported as what it is — the realized throughput difference at a stated concurrency. Two rules
+follow, and they are the same ones stated under "Resolved 2026-08-24" below:
 
 - the sub-wall region cannot be summarised by one ratio per configuration; report it as a curve, and
   attach the concurrency to any single-number claim;
-- do not call it "the bandwidth benefit alone" if that is read as the benefit of smaller weights. The
-  weight term is one of three, and for FP4 it accounts for only about two-thirds of the step at
-  concurrency 12.
+- do not call it "the bandwidth benefit" or "the weight-residency benefit". Reduced weight traffic is
+  one contributor among several, and the measurement does not isolate it. Report the realized
+  difference; attribute nothing.
 
 **The wall is set by peak occupancy, not by a peak-to-mean band.** P2 measured the BF16 transition
 directly:
@@ -465,10 +513,12 @@ wall. Note also that the wall's first symptom is **throughput regression at C=17
 *zero* preemptions, so a pressure test keyed only on preemption counters detects the wall one
 concurrency point late.
 
-### Pilot outcome 2026-08-23 — the decomposition needs a correction before the sweep
+### Pilot outcome 2026-08-23 — the ladder is confirmed, the below-wall prediction is withdrawn
 
-**Status of this decision: the concurrency ladder is confirmed; the below-wall interpretation is
-not.** Pilot P1 FAILED and P2 PASSED (`results/pilot/PILOT_DECISION.md`).
+**Status of this decision: the concurrency ladder is confirmed; the below-wall *prediction* is
+withdrawn and replaced by measurement.** Pilot P1 FAILED and P2 PASSED
+(`results/pilot/PILOT_DECISION.md`). **Amended 2026-08-24: P1's failure does not gate the sweep and
+is not rerun** — see `EXPERIMENTAL_CONTRACT.md` "Exit criteria".
 
 - **P2 PASS.** The BF16 KV wall was located at **C in [17, 18]**, reproducibly: C=17 clean twice
   (0 preemptions across 32 telemetry samples), C=18 pressured twice (4 preemptions in 4 separate
@@ -477,70 +527,76 @@ not.** Pilot P1 FAILED and P2 PASSED (`results/pilot/PILOT_DECISION.md`).
   capacity of this engine (44,688 tokens) the peak-footprint basis gives 17 and the mean-occupancy
   basis 29; the measured wall sits at the peak-footprint edge, so **peak footprint is the better
   predictor for this workload** and the mean-occupancy column overstates the wall.
-- **P1 FAIL.** The below-wall throughput ratio is not the weight-size ratio (see D10). Because a
-  decode step reads weights *plus* a KV term that is identical across the ladder, the below-wall gap
-  understates the weight-residency advantage and shrinks as concurrency rises.
+- **P1 FAIL.** The below-wall throughput ratio is not the weight-size ratio, and it shrinks as
+  concurrency rises (see D10). The consequence is that the sweep **measures** the below-wall benefit
+  rather than predicting it from checkpoint size. No replacement predictor is required first.
 
 **Resolved 2026-08-24 — how the below-wall gap is reported.** The sentence "below the BF16 wall the
 throughput gap is the bandwidth benefit alone" was wrong as written and has been corrected above. The
 decision is to **report the below-wall gap as the raw, deployment-relevant measured quantity**, at
-each concurrency, without attributing it to weight residency alone. The modelled KV term is *not*
-divided out of the headline number, because the number a deployment actually experiences includes it.
+each concurrency, without attributing it to any single mechanism. Nothing is divided out of the
+headline number, because the number a deployment actually experiences includes all of it.
 
-Two reporting obligations follow:
+Three reporting obligations follow:
 
 - **Always name the concurrency.** The below-wall gap is not a constant. FP4 measured 2.44x at
   concurrency 1 and 2.00x at concurrency 12. "FP4 is 2.4x faster" is only true at batch 1.
-- **Never label it a weight-residency or weight-bandwidth benefit.** It is the ratio of total per-step
-  memory traffic, of which weights are one term of three (D10). Where an attribution to weight
-  residency is genuinely wanted, compute it separately with the KV term divided out and label it as a
-  modelled quantity, not a measurement.
+- **Never label it a weight-residency or weight-bandwidth benefit,** and do not label it a bandwidth
+  benefit either. It is the realized throughput difference; the study does not resolve what produces
+  it. Any mechanistic attribution must be computed separately and labelled a modelled quantity, not a
+  measurement.
+- **Never derive it from the compression ratio.** The magnitude of the serving benefit is an output
+  of the sweep, not an inference from checkpoint size. That is the whole content of P1.
 
-**Unaffected.** The sweep is memory-bound throughout the sub-wall region as assumed — no preemption,
-no recompute, clean scaling. Hardware bandwidth is now measured independently at 620 GB/s read
-(P4), so the below-wall region can be checked against a real ceiling rather than a self-referential
-one.
+**Unaffected.** The sub-wall region is free of capacity limitation — no preemption, no recompute,
+clean scaling — which is the premise the two-region reading needs. Hardware bandwidth is now measured
+independently at 620 GB/s read (P4), so sub-wall throughput can be stated against a real ceiling
+rather than a self-referential one.
 
-### The sweep decomposes bandwidth benefit from capacity benefit
+### The sweep separates a capacity effect from a throughput effect — amended 2026-08-24
 
-A quantization step delivers two things at once, and under this workload both are consequences of
-weight residency shrinking:
+A quantization step has two distinct resource consequences. Only the first follows directly from
+checkpoint size:
 
 ```text
-bandwidth benefit   fewer weight bytes read per decode step -> faster per-token
-capacity benefit    fewer weight bytes resident -> more KV  -> more concurrent sequences
+quantization -> smaller weight residency -> more VRAM free for KV -> greater KV capacity
+             -> smaller weight traffic   -> potential throughput benefit, magnitude unknown
 ```
 
-Both are real and a deployment gets both, so the **headline result is the combined benefit**. But
-they do not generalize equally, and the separation is already present in the shape of a single sweep:
+The capacity leg is an arithmetic consequence of a smaller checkpoint on a fixed 24 GiB card, and P2
+confirmed the mechanism directly by locating the BF16 wall at [17, 18]. The throughput leg is only a
+*potential*: total decode behaviour also contains KV traffic, other memory traffic, kernel efficiency,
+compute effects and scheduling effects, so `compression ratio` does **not** imply proportional
+throughput gain. **The magnitude of the actual serving benefit is an experimental output of the
+sweep, not something inferred from the compression ratio.** That is what P1 settled.
 
-- **Below the BF16 wall** every configuration holds every sequence. KV binds for no one, so the
-  throughput gap is a **pure bandwidth reading** — but of *total* per-step memory traffic, not of
-  weight traffic. Corrected 2026-08-23 after pilot P1: the gap is
-  `(W_BF16 + KV(C) + O) / (W_quant + KV(C) + O)`, and because KV precision is held at BF16 the KV
-  term is common to all three rungs and dilutes the ratio as concurrency rises. The below-wall gap is
-  therefore **concurrency-dependent and smaller than the weight-size ratio**, not a constant. See
-  D10.
+Both are real and a deployment gets both, so the **headline result is the combined benefit**. The two
+regions of a single sweep separate them by *where KV binds*, which is an observable, not an
+attribution:
+
+- **Below the BF16 wall** every configuration holds every sequence and KV binds for no one, so the
+  throughput gap is not a capacity effect. It is the **realized throughput difference at that
+  concurrency** — reproducible, concurrency-dependent, and smaller than the weight-size ratio. It is
+  reported as measured and is not attributed to a mechanism. See D10.
 - **Above the BF16 wall** BF16 begins queuing and preempting while FP8/FP4 keep batching. The gap
-  *widens*, and that widening is the **capacity contribution**.
+  *widens*, and that widening is the **capacity contribution**, whose mechanism P2 did confirm.
 
-**Consequence for how the sweep is reported.** The below-wall gap remains the right
-deployment-relevant quantity and is reported as measured. What it may **not** be called is "the
-weight-residency benefit" or "the bandwidth benefit attributable to smaller weights" — it is the
-benefit net of common KV traffic and per-configuration execution overhead. Any attribution to weight
-residency alone requires dividing out the KV term explicitly and saying so.
+**Consequence for how the sweep is reported.** The below-wall gap is the right deployment-relevant
+quantity and is reported as measured, always with its concurrency attached. What it may **not** be
+called is "the weight-residency benefit", "the bandwidth benefit", or anything else that names a
+cause the measurement did not isolate.
 
 **Correction to the earlier framing.** This decision previously described the split as *compute*
-versus capacity, and argued that the compute half travels to other hardware while the capacity half
-is a function of this machine's 24 GiB ceiling. Under a bandwidth-bound decode workload the
-below-wall benefit is bandwidth, not FLOPs — and that **strengthens** the portability argument rather
-than weakening it. Every GPU must read weights; not every GPU has FP4 tensor cores. The below-wall
-result generalizes more strongly than the compute framing claimed. The capacity half remains
-machine-specific (`LIMITATIONS.md`).
+versus capacity, then as *bandwidth* versus capacity. Neither is supported. The sub-wall gap has not
+been attributed to bandwidth, to arithmetic, or to anything else, so the portability argument that
+rested on it — "every GPU must read weights, so the sub-wall result travels" — is **withdrawn as a
+claim** and left as an open question. The capacity half remains machine-specific
+(`LIMITATIONS.md`), and how far the throughput half generalizes is simply not something this study
+establishes.
 
-The corollary is a real narrowing, recorded honestly: because the sweep is bandwidth-bound
-throughout, it does **not** measure low precision's arithmetic/tensor-core benefit. That is what
-`PREFILL_PROBE` exists to observe, in bounded form.
+The corollary is a real narrowing, recorded honestly: at these batch sizes the primary workload does
+not isolate low precision's arithmetic/tensor-core benefit. That is what `PREFILL_PROBE` exists to
+observe, in bounded form.
 
 ### The saturation criterion is an SLO, and it is mandatory
 

@@ -10,6 +10,8 @@ import time
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 PILOT_DIR = os.path.join(REPO, "results", "pilot")
+SWEEP_DIR = os.path.join(REPO, "results", "sweep")
+# the sweep reuses the pilot's frozen corpus unmoved, so prompt_set_hash provenance is intact
 CORPUS_DIR = os.path.join(PILOT_DIR, "corpus")
 
 BF16_SNAPSHOT = os.path.expanduser(
@@ -69,12 +71,18 @@ WORKLOADS = {
 SLO_TPOT_MS = 50.0
 SLO_ABORT_MULTIPLE = 10.0
 CELL_WALL_CAP_S = 900.0
+# Absolute per-cell ceiling. The measure budget is derived from the measured period, so without
+# this a 4x-oversubscribed cell has no bound at all.
+CELL_HARD_CAP_S = 1800.0
 TELEMETRY_PERIOD_S = 10.0
 
 SMI_FIELDS = [
     "memory.used", "memory.total", "utilization.gpu", "utilization.memory",
     "power.draw", "clocks.sm", "clocks.mem", "temperature.gpu",
     "pcie.link.gen.current", "pcie.link.width.current",
+    "clocks_throttle_reasons.sw_power_cap",
+    "clocks_throttle_reasons.hw_slowdown",
+    "clocks_throttle_reasons.sw_thermal_slowdown",
 ]
 
 
@@ -89,7 +97,8 @@ def gpu_telemetry():
             try:
                 rec[k] = float(v)
             except ValueError:
-                rec[k] = None
+                # throttle reasons report Active/Not Active, not a number
+                rec[k] = {"active": 1.0, "not active": 0.0}.get(v.strip().lower())
         return rec
     except Exception as exc:
         return {"error": str(exc)}
@@ -101,6 +110,15 @@ def gpu_identity():
     out = subprocess.run(q, shell=True, capture_output=True, text=True, timeout=15)
     keys = ["name", "uuid", "driver_version", "memory_total_mib", "power_limit_w"]
     return dict(zip(keys, [v.strip() for v in out.stdout.strip().split(",")]))
+
+
+PREFLIGHT_MAX_TEMP_C = 55.0
+
+
+def gpu_is_cool(max_temp_c=PREFLIGHT_MAX_TEMP_C):
+    """Idle memory is not the same as a comparable thermal state between launches."""
+    t = gpu_telemetry().get("temperature.gpu")
+    return t is not None and t <= max_temp_c
 
 
 def gpu_is_idle(max_mem_mib=512, max_util_pct=5):

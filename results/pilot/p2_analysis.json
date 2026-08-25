@@ -152,6 +152,15 @@
     17,
     18
   ],
+  "throughput_peak": {
+    "peak_C": 16,
+    "peak_tok_s": 489.61,
+    "next_C": 17,
+    "next_tok_s": 425.65,
+    "regression_pct": -13.1,
+    "tpot_from": 32.59,
+    "tpot_to": 39.82
+  },
   "reproducibility": {
     "17": [
       "clean",

@@ -10,7 +10,7 @@ import time
 import requests
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from pilot import common  # noqa: E402
+from harness import common  # noqa: E402
 
 KV_RE = re.compile(r"GPU KV cache size:\s*([\d,]+)\s*tokens")
 MAXCONC_RE = re.compile(r"Maximum concurrency for\s*([\d,]+)\s*tokens per request:\s*([\d.]+)x")
@@ -30,6 +30,25 @@ CHILD_ENV["PATH"] = ("/home/sathvik/miniconda3/envs/qnt/bin:/home/sathvik/cuda-1
                      + CHILD_ENV.get("PATH", ""))
 CHILD_ENV["CUDA_HOME"] = "/home/sathvik/cuda-12.9"
 CHILD_ENV["VLLM_LOGGING_LEVEL"] = "INFO"
+
+
+def gpu_holder_pids():
+    out = subprocess.run(
+        "nvidia-smi --query-compute-apps=pid --format=csv,noheader",
+        shell=True, capture_output=True, text=True, timeout=15).stdout
+    return [int(x) for x in out.split() if x.strip().isdigit()]
+
+
+def kill_gpu_holders():
+    """Precise teardown: only the processes the driver reports as holding device memory."""
+    pids = gpu_holder_pids()
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGKILL)
+            print(f"  killed stray GPU holder pid={pid}", flush=True)
+        except OSError:
+            pass
+    return pids
 
 
 def wait_for_gpu_release(timeout=300, threshold_mib=512, poll=3.0):
@@ -68,7 +87,7 @@ class VllmServer:
 
     def start(self, timeout=900):
         os.makedirs(os.path.dirname(self.log_path) or ".", exist_ok=True)
-        self.log_fh = open(self.log_path, "w")
+        self.log_fh = open(self.log_path, "a")
         t0 = time.time()
         self.proc = subprocess.Popen(self.command(), stdout=self.log_fh,
                                      stderr=subprocess.STDOUT, env=CHILD_ENV,
@@ -126,7 +145,7 @@ class VllmServer:
     def alive(self):
         return self.proc is not None and self.proc.poll() is None
 
-    def wait_drained(self, timeout=180):
+    def wait_drained(self, timeout=600):
         t0 = time.time()
         while time.time() - t0 < timeout:
             try:
@@ -158,5 +177,7 @@ class VllmServer:
         # vLLM v1 runs EngineCore in its own process; the parent can exit before VRAM is released,
         # and the next configuration profiles memory at startup, so wait for an actually-free GPU
         if not wait_for_gpu_release(release_timeout):
-            subprocess.run("pkill -9 -f 'vllm serve'", shell=True)
+            # `pkill -f 'vllm serve'` never matched: v1 renames the child to VLLM::EngineCore, so
+            # the old fallback was dead code. Ask the driver which PIDs actually hold the GPU.
+            kill_gpu_holders()
             wait_for_gpu_release(120)
