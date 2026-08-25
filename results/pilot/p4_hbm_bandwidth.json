@@ -1,0 +1,100 @@
+{
+  "job": "P4",
+  "purpose": "independent achievable HBM bandwidth; NOT derived from decode throughput",
+  "measurement_method": "hand-written CUDA float4 streaming kernels, CUDA-event timed",
+  "gpu": {
+    "name": "NVIDIA RTX PRO 4000 Blackwell",
+    "uuid": "GPU-fdc11a18-6edb-7e2f-82b2-6bd0b9ed714d",
+    "driver_version": "575.64.03",
+    "memory_total_mib": "24467",
+    "power_limit_w": "145.00"
+  },
+  "software": {
+    "python": "3.12.13",
+    "kernel": "6.8.0-65-generic",
+    "torch": "2.10.0+cu128",
+    "torch_cuda": "12.8",
+    "vllm": "0.19.1",
+    "transformers": "5.15.1",
+    "compressed_tensors": "0.15.0.1",
+    "nvcc": "Cuda compilation tools, release 12.9, V12.9.86",
+    "git_head": "153f064a6179f3cbc7592ae98cdf41d234b51f1e",
+    "git_dirty": true
+  },
+  "device_properties": {
+    "name": "NVIDIA RTX PRO 4000 Blackwell",
+    "sm_count": 70,
+    "l2_cache_bytes": 50331648,
+    "total_memory_bytes": 25151537152,
+    "compute_capability": "12.0"
+  },
+  "working_set": {
+    "array_bytes": 1073741824,
+    "arrays_allocated": 3,
+    "array_over_l2_ratio": 21.3,
+    "exceeds_l2": true
+  },
+  "launch": {
+    "blocks": 2240,
+    "threads": 256,
+    "warmup_iters": 20
+  },
+  "kernel_correctness": {
+    "copy": true,
+    "triad": true
+  },
+  "results": {
+    "copy_read_plus_write": {
+      "iters": 100,
+      "median_GBs": 545.64,
+      "p95_GBs": 546.86,
+      "max_GBs": 547.66,
+      "min_GBs": 543.69,
+      "cv_pct": 0.145,
+      "traffic_bytes": 2147483648
+    },
+    "triad_2read_1write": {
+      "iters": 100,
+      "median_GBs": 564.7,
+      "p95_GBs": 565.69,
+      "max_GBs": 566.11,
+      "min_GBs": 562.47,
+      "cv_pct": 0.107,
+      "traffic_bytes": 3221225472
+    },
+    "read_only": {
+      "iters": 100,
+      "median_GBs": 620.08,
+      "p95_GBs": 620.62,
+      "max_GBs": 620.82,
+      "min_GBs": 615.2,
+      "cv_pct": 0.107,
+      "traffic_bytes": 1073741824
+    }
+  },
+  "achieved_best_median_GBs": 620.08,
+  "spec_bandwidth_GBs": 672.0,
+  "spec_bandwidth_source": "derived from CUDA device attributes: bus width x memory clock x 2 (DDR). Not a vendor datasheet quote.",
+  "memory_clock_khz": 14001000,
+  "bus_width_bits": 192,
+  "achieved_over_spec": {
+    "copy_read_plus_write": 0.812,
+    "triad_2read_1write": 0.84,
+    "read_only": 0.923
+  },
+  "is_pcie_measurement": false,
+  "telemetry_after": {
+    "memory.used": 8477.0,
+    "memory.total": 24467.0,
+    "utilization.gpu": 0.0,
+    "utilization.memory": 0.0,
+    "power.draw": 38.62,
+    "clocks.sm": 2475.0,
+    "clocks.mem": 13365.0,
+    "temperature.gpu": 41.0,
+    "pcie.link.gen.current": 4.0,
+    "pcie.link.width.current": 16.0
+  },
+  "timestamp": "2026-08-23T15:38:22-0400",
+  "not_a_citable_result": true
+}

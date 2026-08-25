@@ -42,22 +42,49 @@ Memory clock:      405 MHz
 
 Therefore the Gen1 reading should be treated as an **idle power-management state**, not the final benchmark link state. Verify negotiated PCIe generation again under sustained load before final measurements.
 
-### Memory bandwidth — NOT YET RECORDED
+### Memory bandwidth — MEASURED 2026-08-23 (pilot P4)
 
-Phase 1 is a memory-focused study (D10), which makes memory bandwidth the governing hardware constant
-for the entire below-the-wall region of the concurrency sweep. It is currently the one such constant
-this profile does not record: memory clock is captured (14,001 MHz) but bus width and bandwidth are
-not.
+Phase 1 is a memory-focused study (D10), which makes memory bandwidth the governing hardware
+constant for the entire below-the-wall region of the concurrency sweep. It is now recorded.
 
-Required before final collection:
+```text
+Memory bus width:          192 bit          (CUDA device attribute)
+Memory clock:              14.001 GHz       (CUDA device attribute)
+Spec bandwidth:            672.0 GB/s       derived: 192/8 x 14.001e9 x 2 (DDR)
+L2 cache:                  48 MiB           (50,331,648 B)
 
-- vendor spec bandwidth (bus width x effective memory clock);
-- an **achieved** bandwidth measurement on this card, not only the spec figure.
+Achieved, measured on this card:
+  read-only                620.1 GB/s       92.3% of spec
+  triad  (2 read, 1 write) 564.7 GB/s       84.0% of spec
+  copy   (1 read, 1 write) 545.8 GB/s       81.2% of spec
+```
 
-Indicative context from qualification (coarse, derived — see D10, not a measurement): dividing weight
-bytes by derived batch-1 decode rate implies roughly 620-660 GB/s for all three configurations. If
-that is close to the card's achievable bandwidth, batch-1 decode is bandwidth-saturated and the
-below-wall result is fully explained by weight bytes. Confirming or refuting this is a pilot task.
+Artifact: `results/pilot/p4_hbm_bandwidth.json`. Reproduce with
+`python scripts/pilot/hbm_bandwidth.py`.
+
+**Method, and why it is independent.** Hand-written CUDA `float4` streaming kernels, CUDA-event
+timed, 20 warmup plus 100 timed iterations, 1 GiB per array against a 48 MiB L2 — a 21.3x
+over-L2 working set, so this is HBM traffic and not a cache measurement. Device memory only; no
+host-device transfer is involved, so it is not a PCIe figure. Both kernels are validated for
+numerical correctness before timing, so a mis-launched kernel cannot masquerade as bandwidth.
+Run-to-run CV is about 0.1%, and two independent invocations agreed to 0.03%.
+
+The spec figure is **derived from driver-reported device attributes**, not quoted from a vendor
+datasheet.
+
+**Deliberately not derived from decode throughput.** The pilot's P1 job tests whether decode
+throughput is explained by weight bytes divided by bandwidth. Obtaining the bandwidth from decode
+throughput and then using it to validate a bandwidth-derived throughput prediction would be
+circular, so P4 is a standalone microbenchmark.
+
+**What this does to the qualification estimate.** D10 derived roughly 620-660 GB/s for all three
+configurations from a two-point prefill subtraction over the coarse smoke artifacts. The
+read-dominated achievable figure is 620.1 GB/s, so the FP4 derived value (618 GB/s) sits essentially
+at the ceiling while the BF16 (649) and FP8 (659) derived values sit slightly *above* it. Those two
+are therefore mildly optimistic, which is consistent with the stated caveat that the derivation
+assumes decode cost is identical at 2k and 16k context. The useful conclusion is that batch-1 decode
+on this card runs close to the achievable read bandwidth. That remains a derived statement about the
+qualification artifacts, not a measured serving result.
 
 ## GPU clocks / power state
 
@@ -236,7 +263,6 @@ Outstanding:
 - exact FP4 deployment recipe and the kernel actually dispatched at runtime;
 - low-precision KV-cache policy;
 - that a `qnt-quant` checkpoint loads in `qnt` (cross-environment compressed-tensors compatibility);
-- memory bandwidth: spec figure and achieved measurement (see above);
 - negotiated PCIe generation under sustained load;
 - whether host-side request generation becomes visible at high concurrency;
 - sustained thermals / clocks / power behavior during long benchmark runs.
