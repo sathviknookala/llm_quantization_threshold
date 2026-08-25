@@ -1,0 +1,173 @@
+{
+  "criteria": {
+    "expected_band": [
+      15,
+      25
+    ],
+    "wall_definition": "highest concurrency sustaining steady state with no KV-induced preemption/recompute, to the next concurrency with persistent KV saturation and/or preemption/recompute",
+    "waiting_requests_insufficient": true
+  },
+  "measured_kv_cache_tokens": 44688,
+  "predicted_wall_peak_basis": 17,
+  "predicted_wall_mean_basis": 29,
+  "per_concurrency_state": {
+    "12": "clean",
+    "15": "clean",
+    "16": "clean",
+    "17": "clean",
+    "18": "pressured"
+  },
+  "per_concurrency_detail": {
+    "12": [
+      {
+        "rep": 1,
+        "status": "OK",
+        "tok_s": 382.21,
+        "tpot_ms_p95": 31.29730516893727,
+        "kv_p95": 0.645487106017192,
+        "kv_max": 0.6790830945558739,
+        "preempt": 0.0,
+        "preempt_samples": 0,
+        "recomputed": 0.0,
+        "cell_preempt": 0.0,
+        "cell_recomputed": 0.0,
+        "cell_kv_max": 0.6790830945558739,
+        "waiting_max": 0.0,
+        "warmup_truncated": false,
+        "mem_mib_max": 22525.0
+      }
+    ],
+    "15": [
+      {
+        "rep": 1,
+        "status": "OK",
+        "tok_s": 464.16,
+        "tpot_ms_p95": 32.24597925911273,
+        "kv_p95": 0.8340795128939829,
+        "kv_max": 0.8595988538681949,
+        "preempt": 0.0,
+        "preempt_samples": 0,
+        "recomputed": 0.0,
+        "cell_preempt": 0.0,
+        "cell_recomputed": 0.0,
+        "cell_kv_max": 0.8595988538681949,
+        "waiting_max": 0.0,
+        "warmup_truncated": false,
+        "mem_mib_max": 22525.0
+      }
+    ],
+    "16": [
+      {
+        "rep": 1,
+        "status": "OK",
+        "tok_s": 489.61,
+        "tpot_ms_p95": 32.5881231044743,
+        "kv_p95": 0.8739255014326648,
+        "kv_max": 0.9111747851002865,
+        "preempt": 0.0,
+        "preempt_samples": 0,
+        "recomputed": 0.0,
+        "cell_preempt": 0.0,
+        "cell_recomputed": 0.0,
+        "cell_kv_max": 0.9169054441260744,
+        "waiting_max": 0.0,
+        "warmup_truncated": false,
+        "mem_mib_max": 22525.0
+      }
+    ],
+    "17": [
+      {
+        "rep": 1,
+        "status": "OK",
+        "tok_s": 425.35,
+        "tpot_ms_p95": 39.84433928623788,
+        "kv_p95": 0.9073065902578796,
+        "kv_max": 0.9620343839541547,
+        "preempt": 0.0,
+        "preempt_samples": 0,
+        "recomputed": 0.0,
+        "cell_preempt": 0.0,
+        "cell_recomputed": 0.0,
+        "cell_kv_max": 0.9620343839541547,
+        "waiting_max": 0.0,
+        "warmup_truncated": false,
+        "mem_mib_max": 22525.0
+      },
+      {
+        "rep": 2,
+        "status": "OK",
+        "tok_s": 425.96,
+        "tpot_ms_p95": 39.790101378585575,
+        "kv_p95": 0.9097421203438395,
+        "kv_max": 0.9663323782234957,
+        "preempt": 0.0,
+        "preempt_samples": 0,
+        "recomputed": 0.0,
+        "cell_preempt": 0.0,
+        "cell_recomputed": 0.0,
+        "cell_kv_max": 0.9663323782234957,
+        "waiting_max": 0.0,
+        "warmup_truncated": false,
+        "mem_mib_max": 22525.0
+      }
+    ],
+    "18": [
+      {
+        "rep": 1,
+        "status": "OK",
+        "tok_s": 437.3,
+        "tpot_ms_p95": 41.326855607841495,
+        "kv_p95": 0.9735136103151862,
+        "kv_max": 0.9845988538681948,
+        "preempt": 4.0,
+        "preempt_samples": 4,
+        "recomputed": 0.0,
+        "cell_preempt": 7.0,
+        "cell_recomputed": 0.0,
+        "cell_kv_max": 0.9992836676217765,
+        "waiting_max": 1.0,
+        "warmup_truncated": false,
+        "mem_mib_max": 22525.0
+      },
+      {
+        "rep": 2,
+        "status": "OK",
+        "tok_s": 437.27,
+        "tpot_ms_p95": 41.33447489085182,
+        "kv_p95": 0.9589720630372492,
+        "kv_max": 0.9899713467048711,
+        "preempt": 4.0,
+        "preempt_samples": 4,
+        "recomputed": 0.0,
+        "cell_preempt": 7.0,
+        "cell_recomputed": 0.0,
+        "cell_kv_max": 0.9992836676217765,
+        "waiting_max": 0.0,
+        "warmup_truncated": false,
+        "mem_mib_max": 22525.0
+      }
+    ]
+  },
+  "measured_wall_bracket": [
+    17,
+    18
+  ],
+  "reproducibility": {
+    "17": [
+      "clean",
+      "clean"
+    ],
+    "18": [
+      "pressured",
+      "pressured"
+    ]
+  },
+  "checks": {
+    "transition_observed": true,
+    "transition_in_d11_band_15_25": true,
+    "not_limited_materially_below_15": true,
+    "not_unconstrained_above_25": true,
+    "transition_reproducible": true
+  },
+  "verdict": "PASS"
+}

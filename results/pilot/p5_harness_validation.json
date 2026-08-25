@@ -1,0 +1,240 @@
+{
+  "invariants": {
+    "exact_input_512_tokens": {
+      "pass": true,
+      "violations": [],
+      "n_cells": 40
+    },
+    "exact_output_2048_requested": {
+      "pass": true,
+      "violations": [],
+      "n_cells": 40
+    },
+    "no_output_length_violation": {
+      "pass": true,
+      "violations": [],
+      "n_cells": 40
+    },
+    "no_input_length_violation": {
+      "pass": true,
+      "violations": [],
+      "n_cells": 40
+    },
+    "finish_reason_length_only": {
+      "pass": true,
+      "violations": [],
+      "n_cells": 40
+    },
+    "frozen_corpus_identical": {
+      "pass": true,
+      "violations": [],
+      "n_cells": 40
+    },
+    "prefix_caching_off_in_config": {
+      "pass": true,
+      "violations": [],
+      "n_cells": 40
+    },
+    "prefix_cache_hits_zero": {
+      "pass": true,
+      "violations": [],
+      "n_cells": 40
+    },
+    "no_request_failures": {
+      "pass": true,
+      "violations": [],
+      "n_cells": 40
+    },
+    "kernel_dispatch_as_intended": {
+      "pass": true,
+      "violations": [],
+      "n_cells": 40
+    },
+    "kv_cache_usage_recorded": {
+      "pass": true,
+      "violations": [],
+      "n_cells": 40
+    },
+    "preemption_counter_recorded": {
+      "pass": true,
+      "violations": [],
+      "n_cells": 40
+    },
+    "recomputed_tokens_counter_recorded": {
+      "pass": true,
+      "violations": [],
+      "n_cells": 40
+    },
+    "waiting_requests_counter_recorded": {
+      "pass": true,
+      "violations": [],
+      "n_cells": 40
+    },
+    "telemetry_recorded": {
+      "pass": true,
+      "violations": [],
+      "n_cells": 40
+    },
+    "window_spans_whole_periods": {
+      "pass": true,
+      "violations": [],
+      "n_cells": 40
+    },
+    "steady_state_gate_fired": {
+      "pass": true,
+      "violations": [],
+      "n_cells": 40
+    },
+    "chunk_count_matches_usage_tokens": {
+      "pass": true,
+      "violations": [],
+      "n_cells": 40
+    },
+    "engine_token_rate_agrees": {
+      "pass": true,
+      "violations": [],
+      "n_cells": 40
+    },
+    "counters_exercised_nonzero": {
+      "pass": true,
+      "cells": [
+        "BF16:C18:r1 preempt=4.0 recomp=0.0",
+        "BF16:C18:r2 preempt=4.0 recomp=0.0"
+      ],
+      "n_cells": 2
+    },
+    "cell_status_classification": {
+      "pass": true,
+      "counts": {
+        "OK": 43
+      }
+    },
+    "prefill_probe_plumbing": {
+      "pass": true,
+      "n_cells": 3,
+      "detail": [
+        {
+          "quantization": "BF16",
+          "status": "OK",
+          "input_tokens": 8192,
+          "output_tokens": 32,
+          "prefix_cache_hits": 0.0,
+          "ttft_ms_p50": 1450.2409889828414,
+          "invalid_reasons": []
+        },
+        {
+          "quantization": "FP8",
+          "status": "OK",
+          "input_tokens": 8192,
+          "output_tokens": 32,
+          "prefix_cache_hits": 0.0,
+          "ttft_ms_p50": 914.083429146558,
+          "invalid_reasons": []
+        },
+        {
+          "quantization": "FP4",
+          "status": "OK",
+          "input_tokens": 8192,
+          "output_tokens": 32,
+          "prefix_cache_hits": 0.0,
+          "ttft_ms_p50": 601.4492830727249,
+          "invalid_reasons": []
+        }
+      ]
+    },
+    "slo_visibility": {
+      "pass": true,
+      "slo_tpot_ms_p95": 50.0,
+      "per_cell": {
+        "BF16@C8": [
+          {
+            "tpot_ms_p95": 29.56472329139522,
+            "meets_slo": true
+          },
+          {
+            "tpot_ms_p95": 29.572700648371793,
+            "meets_slo": true
+          },
+          {
+            "tpot_ms_p95": 29.553475517972497,
+            "meets_slo": true
+          }
+        ],
+        "BF16@C12": [
+          {
+            "tpot_ms_p95": 31.276393805351383,
+            "meets_slo": true
+          },
+          {
+            "tpot_ms_p95": 31.274027616191887,
+            "meets_slo": true
+          },
+          {
+            "tpot_ms_p95": 31.265092015424067,
+            "meets_slo": true
+          }
+        ],
+        "FP8@C8": [
+          {
+            "tpot_ms_p95": 17.641398088641886,
+            "meets_slo": true
+          },
+          {
+            "tpot_ms_p95": 17.64387417946131,
+            "meets_slo": true
+          },
+          {
+            "tpot_ms_p95": 17.647387667914646,
+            "meets_slo": true
+          }
+        ],
+        "FP8@C12": [
+          {
+            "tpot_ms_p95": 19.223086822908336,
+            "meets_slo": true
+          },
+          {
+            "tpot_ms_p95": 19.230919345177377,
+            "meets_slo": true
+          },
+          {
+            "tpot_ms_p95": 19.23227615575531,
+            "meets_slo": true
+          }
+        ],
+        "FP4@C8": [
+          {
+            "tpot_ms_p95": 13.978340168088643,
+            "meets_slo": true
+          },
+          {
+            "tpot_ms_p95": 13.987385122903722,
+            "meets_slo": true
+          },
+          {
+            "tpot_ms_p95": 13.983793085751282,
+            "meets_slo": true
+          }
+        ],
+        "FP4@C12": [
+          {
+            "tpot_ms_p95": 15.502652647805187,
+            "meets_slo": true
+          },
+          {
+            "tpot_ms_p95": 15.516754801520003,
+            "meets_slo": true
+          },
+          {
+            "tpot_ms_p95": 15.51148773238798,
+            "meets_slo": true
+          }
+        ]
+      },
+      "bf16_within_slo_at_c8_c12": true,
+      "note": "recorded for visibility; a BF16 breach at C=8-12 collapses its max-concurrency-at-SLO and must be surfaced before the sweep"
+    }
+  },
+  "failed_invariants": [],
+  "verdict": "PASS"
+}
