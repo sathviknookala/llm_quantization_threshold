@@ -143,8 +143,8 @@ the number, never as a bandwidth or weight-residency benefit.
    P8-P9  collect_kl.py / analyze_kl.py                        DONE 2026-08-26
    P10    real smoke, 4 traj x 10 pos x 3 configs              DONE 2026-08-26
    P11    replication floor + fp16/fp32 storage gate           DONE 2026-08-26
-   P12    full preflight                                       <- next, NOT authorised
-   P13    64-trajectory production KL run                      NOT authorised
+   P12    full preflight, 35/35                               DONE 2026-08-26
+   P13    64-trajectory production KL run                      <- next, NOT authorised
    PPL and downstream tasks still need D14/D15
 6. marginal tradeoff: quality loss vs sustainable concurrency
 ```
