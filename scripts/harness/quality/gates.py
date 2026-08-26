@@ -14,7 +14,8 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from harness import common  # noqa: E402
-from harness.quality import kl_math as K, qcommon as q  # noqa: E402
+from harness.quality import kl_math as K, positions as P, qcommon as q  # noqa: E402
+from harness.quality import qengine as E  # noqa: E402
 
 LEGACY_EPS = 1e-12
 GATE_LOGITS = os.path.join(common.PILOT_DIR, "gate_logits")
@@ -109,12 +110,211 @@ def numerics_compat(logits_dir=GATE_LOGITS, reference="results/pilot/correctness
     }
 
 
+
+
+# G9 profiles. B is the candidate production profile; B2 repeats it under an independent launch so
+# the replication floor is measured in the same pass that measures the profile differences.
+PROFILES = {
+    "eager_2048":  {"enforce_eager": True,  "max_num_batched_tokens": 2048},
+    "graph_2048":  {"enforce_eager": False, "max_num_batched_tokens": 2048},
+    "graph_2048_r2": {"enforce_eager": False, "max_num_batched_tokens": 2048},
+    "graph_8192":  {"enforce_eager": False, "max_num_batched_tokens": 8192},
+}
+PROFILE_COMPARISONS = (
+    ("replication_floor", "graph_2048", "graph_2048_r2",
+     "same profile, independent launches -- the noise floor"),
+    ("eager_vs_graph", "eager_2048", "graph_2048",
+     "only enforce_eager flipped"),
+    ("chunked_vs_unchunked", "graph_2048", "graph_8192",
+     "serving-compatible 2048 vs the offline default 8192"),
+)
+
+
+def _provisional_trajectories(out_dir, n_traj, allow_dirty):
+    """Throwaway continuations so the profile can be settled before production trajectories exist.
+
+    Deliberately not written to the production artifact: freezing is gated on this gate's result.
+    """
+    path = os.path.join(out_dir, "provisional_trajectories.json")
+    if os.path.exists(path):
+        return json.load(open(path))
+    prompts, manifest = q.load_prompts(n=n_traj)
+    job = {
+        "config_id": q.REFERENCE_CONFIG, "task": "generate",
+        "prompts": [p["token_ids"] for p in prompts],
+        "out_json": os.path.join(out_dir, "_provisional_gen.json"),
+        "out_npy": os.path.join(out_dir, "_unused.npy"),
+        "engine_overrides": PROFILES["graph_2048"],
+    }
+    meta = E.run_job(job, os.path.join(out_dir, "logs", "provisional_generate.log"),
+                     allow_dirty=allow_dirty)
+    bad = [i for i, n in enumerate(meta["continuation_lengths"]) if n != q.GENERATION_TOKENS]
+    if bad:
+        raise SystemExit(f"ABORT: provisional trajectories {bad} are not exactly "
+                         f"{q.GENERATION_TOKENS} tokens: {meta['continuation_lengths']}")
+    rec = {
+        "PROVISIONAL": True,
+        "purpose": "engine-profile gate only; NOT the production trajectory artifact",
+        "n_trajectories": n_traj,
+        "prompt_set_hash": manifest["prompt_set_hash"],
+        "corpus_version": manifest["corpus_version"],
+        "generation": dict(q.GENERATION_SAMPLING),
+        "engine_profile": PROFILES["graph_2048"],
+        "observed": meta.get("observed"),
+        "trajectories": [
+            {"trajectory_index": i, "prompt_index": p["index"],
+             "prompt_sha256": q.prompt_hash(p["token_ids"]),
+             "prompt_token_ids": p["token_ids"],
+             "continuation_token_ids": c,
+             "continuation_sha256": q.prompt_hash(c)}
+            for i, (p, c) in enumerate(zip(prompts, meta["continuations"]))],
+    }
+    common.write_json(path, rec)
+    return rec
+
+
+def _contexts_for(traj):
+    """Flattened in (trajectory, ascending position) order; groups of 10 match production."""
+    ctx, index = [], []
+    for t in traj["trajectories"]:
+        for cell in P.build_all(t["prompt_token_ids"], t["continuation_token_ids"]):
+            ctx.append(cell["context_ids"])
+            index.append({"trajectory_index": t["trajectory_index"],
+                          "position_p": cell["position_p"],
+                          "context_len": cell["context_len"],
+                          "target_token_id": cell["target_token_id"]})
+    return ctx, index
+
+
+def _compare(a_mat, b_mat, index, n_positions):
+    """Per-cell KL between two engine profiles, aggregated with the trajectory as the unit."""
+    vals = np.array([K.kl_nats(a_mat[i], b_mat[i]) for i in range(a_mat.shape[0])])
+    identical = int(sum(bool(np.array_equal(a_mat[i], b_mat[i])) for i in range(a_mat.shape[0])))
+    top1_same = int(sum(int(K.top1(a_mat[i]) == K.top1(b_mat[i])) for i in range(a_mat.shape[0])))
+    grid = vals.reshape(-1, n_positions)
+    by_pos = {}
+    for j, p in enumerate(P.RETAINED_POSITIONS):
+        by_pos[str(p)] = {"mean_nats": float(grid[:, j].mean()),
+                          "max_nats": float(grid[:, j].max())}
+    return {
+        "cells": int(vals.size),
+        "bit_identical_cells": identical,
+        "top1_agreement": top1_same / float(vals.size),
+        "max_nats": float(vals.max()),
+        "mean_nats": float(vals.mean()),
+        "median_nats": float(np.median(vals)),
+        "p99_nats": float(np.quantile(vals, 0.99)),
+        "trajectory_means": [float(x) for x in grid.mean(axis=1)],
+        "headline_nats": float(K.headline(grid)),
+        "by_position": by_pos,
+        "worst_cell": {**index[int(np.argmax(vals))], "kl_nats": float(vals.max())},
+    }
+
+
+def engine_profile(out_dir=None, configs=("BF16_REFERENCE", "FP4_PRIMARY"), n_traj=4,
+                   allow_dirty=False):
+    """G9 -- decide enforce_eager and the batching knob by measurement, and measure the floor.
+
+    Runs before production trajectories are frozen: generation and scoring must share one profile.
+    """
+    out_dir = out_dir or os.path.join(q.QUALITY_DIR, "gates", "engine_profile")
+    os.makedirs(out_dir, exist_ok=True)
+    traj = _provisional_trajectories(out_dir, n_traj, allow_dirty)
+    contexts, index = _contexts_for(traj)
+    n_pos = len(P.RETAINED_POSITIONS)
+
+    mats, metas = {}, {}
+    for config_id in configs:
+        for pname, overrides in PROFILES.items():
+            key = f"{config_id}:{pname}"
+            npy = os.path.join(out_dir, f"{q.QUALITY_CONFIGS[config_id]['short']}_{pname}.npy")
+            js = npy.replace(".npy", ".json")
+            if not os.path.exists(npy):
+                job = {"config_id": config_id, "task": "score", "contexts": contexts,
+                       "group_size": n_pos, "out_npy": npy, "out_json": js,
+                       "engine_overrides": overrides}
+                E.run_job(job, os.path.join(out_dir, "logs", f"{config_id}_{pname}.log"),
+                          allow_dirty=allow_dirty)
+            mats[key] = np.load(npy)
+            metas[key] = json.load(open(js))
+
+    results, checks = {}, {}
+    for config_id in configs:
+        short = q.QUALITY_CONFIGS[config_id]["short"]
+        per_cfg = {}
+        for name, a, b, why in PROFILE_COMPARISONS:
+            per_cfg[name] = {"why": why,
+                             **_compare(mats[f"{config_id}:{a}"], mats[f"{config_id}:{b}"],
+                                        index, n_pos)}
+        floor = per_cfg["replication_floor"]["max_nats"]
+        for name in ("eager_vs_graph", "chunked_vs_unchunked"):
+            m = per_cfg[name]["max_nats"]
+            per_cfg[name]["ratio_to_replication_floor"] = (
+                None if floor == 0.0 else m / floor)
+            per_cfg[name]["above_replication_floor"] = bool(m > floor)
+        results[short] = per_cfg
+        checks[f"{short}_all_cells_valid"] = all(
+            c["full_vocab"] and c["all_finite"] and c["normalized"]
+            for k, mm in metas.items() if k.startswith(config_id)
+            for c in mm["per_context"])
+        checks[f"{short}_dispatch_ok"] = all(
+            metas[k]["observed"]["dispatch_verdict"]["ok"]
+            for k in metas if k.startswith(config_id))
+        checks[f"{short}_eager_flag_observed"] = (
+            metas[f"{config_id}:eager_2048"]["resolved_config"]["enforce_eager"] is True
+            and metas[f"{config_id}:graph_2048"]["resolved_config"]["enforce_eager"] is False)
+        checks[f"{short}_batching_observed"] = (
+            metas[f"{config_id}:graph_2048"]["resolved_config"]["max_num_batched_tokens"] == 2048
+            and metas[f"{config_id}:graph_8192"]["resolved_config"]["max_num_batched_tokens"] == 8192)
+        checks[f"{short}_prefix_caching_observed"] = all(
+            metas[k]["resolved_config"]["enable_prefix_caching"] is True
+            for k in metas if k.startswith(config_id))
+        checks[f"{short}_detokenize_pinned_off"] = q.SCORING_SAMPLING["detokenize"] is False
+
+    return {
+        "gate": "engine_profile",
+        "purpose": "G9: decide enforce_eager and max_num_batched_tokens by measurement, and "
+                   "measure the BF16 replication floor in the same pass",
+        "configs": list(configs),
+        "profiles": PROFILES,
+        "n_trajectories": n_traj,
+        "cells_per_comparison": len(contexts),
+        "provisional_trajectories": {
+            "PROVISIONAL": True,
+            "prompt_set_hash": traj["prompt_set_hash"],
+            "continuation_sha256": [t["continuation_sha256"][:16] for t in traj["trajectories"]],
+        },
+        "results": results,
+        "observed_engine_identity": {
+            k: {"engine_identity_hash": v["observed"]["engine_identity_hash"],
+                "kv_cache_tokens": v["observed"]["kv_cache_tokens"],
+                "graph_capture_observed": v["observed"]["graph_capture_observed"],
+                "resolved": {kk: v["resolved_config"].get(kk) for kk in
+                             ("enforce_eager", "max_num_batched_tokens",
+                              "enable_prefix_caching", "num_gpu_blocks")},
+                "generate_seconds": v.get("generate_seconds")}
+            for k, v in metas.items()},
+        "checks": checks,
+        "passed": all(checks.values()),
+        "gpu": common.gpu_identity(),
+        "software": common.software_identity(),
+        "timestamp": common.now_iso(),
+    }
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--gate", required=True, choices=["numerics"])
+    ap.add_argument("--gate", required=True, choices=["numerics", "engine-profile"])
     ap.add_argument("--out", default="")
+    ap.add_argument("--n-traj", type=int, default=4)
+    ap.add_argument("--configs", default="BF16_REFERENCE,FP4_PRIMARY")
+    ap.add_argument("--allow-dirty", action="store_true")
     a = ap.parse_args()
-    rec = {"numerics": numerics_compat}[a.gate]()
+    if a.gate == "numerics":
+        rec = numerics_compat()
+    else:
+        rec = engine_profile(configs=tuple(c for c in a.configs.split(",") if c),
+                             n_traj=a.n_traj, allow_dirty=a.allow_dirty)
     out = a.out or os.path.join(q.QUALITY_DIR, "gates", f"{rec['gate']}.json")
     common.write_json(out, rec)
     print(json.dumps({k: v for k, v in rec.items() if k not in ("software",)}, indent=2)[:4000])
