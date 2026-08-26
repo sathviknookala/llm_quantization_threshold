@@ -120,11 +120,16 @@ PROFILES = {
     "eager_2048":  {"enforce_eager": True,  "max_num_batched_tokens": 2048},
     "graph_2048":  {"enforce_eager": False, "max_num_batched_tokens": 2048},
     "graph_2048_r2": {"enforce_eager": False, "max_num_batched_tokens": 2048},
+    "eager_2048_r2": {"enforce_eager": True, "max_num_batched_tokens": 2048},
     "graph_8192":  {"enforce_eager": False, "max_num_batched_tokens": 8192},
 }
+# each profile carries its OWN floor: a difference is only a difference relative to the
+# reproducibility of the profile it was measured under
 PROFILE_COMPARISONS = (
-    ("replication_floor", "graph_2048", "graph_2048_r2",
-     "same profile, independent launches -- the noise floor"),
+    ("replication_floor_graph", "graph_2048", "graph_2048_r2",
+     "same graph profile, independent launches -- the noise floor under CUDA graphs"),
+    ("replication_floor_eager", "eager_2048", "eager_2048_r2",
+     "same eager profile, independent launches -- the noise floor under eager"),
     ("eager_vs_graph", "eager_2048", "graph_2048",
      "only enforce_eager flipped"),
     ("chunked_vs_unchunked", "graph_2048", "graph_8192",
@@ -248,11 +253,13 @@ def engine_profile(out_dir=None, configs=("BF16_REFERENCE", "FP4_PRIMARY"), n_tr
             per_cfg[name] = {"why": why,
                              **_compare(mats[f"{config_id}:{a}"], mats[f"{config_id}:{b}"],
                                         index, n_pos)}
-        floor = per_cfg["replication_floor"]["max_nats"]
-        for name in ("eager_vs_graph", "chunked_vs_unchunked"):
+        floors = {"eager_vs_graph": max(per_cfg["replication_floor_graph"]["max_nats"],
+                                        per_cfg["replication_floor_eager"]["max_nats"]),
+                  "chunked_vs_unchunked": per_cfg["replication_floor_graph"]["max_nats"]}
+        for name, floor in floors.items():
             m = per_cfg[name]["max_nats"]
-            per_cfg[name]["ratio_to_replication_floor"] = (
-                None if floor == 0.0 else m / floor)
+            per_cfg[name]["replication_floor_used_nats"] = floor
+            per_cfg[name]["ratio_to_replication_floor"] = (None if floor == 0.0 else m / floor)
             per_cfg[name]["above_replication_floor"] = bool(m > floor)
         results[short] = per_cfg
         checks[f"{short}_all_cells_valid"] = all(
