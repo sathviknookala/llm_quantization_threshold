@@ -1,0 +1,115 @@
+{
+  "artifact": "G9 engine-profile gate",
+  "kl_spec_hash": "4ef13273db16d285",
+  "spec": {
+    "schema_version": 1,
+    "contract": "EVALUATION_RIG.md A.1, locked 2026-08-25 (D13 amendment)",
+    "ladder": [
+      "BF16_REFERENCE",
+      "FP8_PRIMARY",
+      "FP4_PRIMARY"
+    ],
+    "pairs": [
+      [
+        "BF16_REFERENCE",
+        "FP8_PRIMARY"
+      ],
+      [
+        "BF16_REFERENCE",
+        "FP4_PRIMARY"
+      ],
+      [
+        "FP8_PRIMARY",
+        "FP4_PRIMARY"
+      ]
+    ],
+    "reference_config": "BF16_REFERENCE",
+    "n_trajectories": 64,
+    "corpus_workload": "DECODE_PRIMARY",
+    "vocab_size": 128256,
+    "generation": {
+      "max_tokens": 2048,
+      "min_tokens": 2048,
+      "temperature": 0.7,
+      "top_p": 0.9,
+      "top_k": -1,
+      "min_p": 0.0,
+      "seed": 20260823,
+      "ignore_eos": true,
+      "presence_penalty": 0.0,
+      "frequency_penalty": 0.0,
+      "repetition_penalty": 1.0,
+      "detokenize": false
+    },
+    "generation_tokens": 2048,
+    "scoring": {
+      "temperature": 0.0,
+      "max_tokens": 1,
+      "logprobs": 128256,
+      "detokenize": false
+    },
+    "engine_controls": {
+      "max_model_len": 32768,
+      "gpu_memory_utilization": 0.9,
+      "max_num_seqs": 256,
+      "kv_cache_dtype": "auto",
+      "max_logprobs": 128256,
+      "enable_prefix_caching": true,
+      "max_num_batched_tokens": 2048,
+      "enforce_eager": null,
+      "seed": 0,
+      "dtype": "auto"
+    },
+    "storage_dtype": "float32",
+    "kl_working_dtype": "float64",
+    "bootstrap": {
+      "draws": 10000,
+      "seed": 20260825,
+      "ci": [
+        0.025,
+        0.975
+      ],
+      "interpolation": "linear",
+      "resampling_unit": "trajectory"
+    },
+    "gates": {
+      "prob_mass_tolerance": 0.001,
+      "kl_negative_tolerance": 1e-12,
+      "alignment_pooled_min": 0.99,
+      "replication_floor_max_frac_of_fp8": 0.01,
+      "cache_equivalence_max_frac_of_fp8": 0.01,
+      "precision_rel_p99_max": 0.001,
+      "precision_rel_max": 0.01,
+      "precision_abs_floor_nats": 0.0001,
+      "numerics_mean_abs_max_nats": 1e-06,
+      "numerics_rel_max": 0.005
+    },
+    "configs": {
+      "BF16_REFERENCE": {
+        "model": "/home/sathvik/.cache/huggingface/hub/models--NousResearch--Meta-Llama-3.1-8B-Instruct/snapshots/d10aef7999a2b5ba950ab3974312feeedbfe0b77",
+        "expected_kernel_pattern": null,
+        "forbidden_kernel_patterns": [
+          "CutlassFP8ScaledMMLinearKernel",
+          "NvFp4LinearBackend",
+          "Marlin"
+        ]
+      },
+      "FP8_PRIMARY": {
+        "model": "/home/sathvik/llm_quantization_threshold/checkpoints/llama31-8b-instruct-FP8_DYNAMIC",
+        "expected_kernel_pattern": "CutlassFP8ScaledMMLinearKernel",
+        "forbidden_kernel_patterns": [
+          "Marlin"
+        ]
+      },
+      "FP4_PRIMARY": {
+        "model": "/home/sathvik/llm_quantization_threshold/checkpoints/llama31-8b-instruct-NVFP4",
+        "expected_kernel_pattern": "FLASHINFER_CUTLASS",
+        "forbidden_kernel_patterns": [
+          "CT_EMULATIONS",
+          "emulation"
+        ]
+      }
+    }
+  },
+  "started_at": "2026-08-25T23:20:00-0400"
+}
