@@ -46,6 +46,9 @@ def engine_kwargs(config_id, overrides=None):
         "enforce_eager": c["enforce_eager"],
         "seed": c["seed"],
         "dtype": c["dtype"],
+        # LLM() defaults this to True, which makes get_metrics() report nothing; the prefix-cache
+        # counters are how cache reuse is observed rather than assumed
+        "disable_log_stats": False,
     }, c
 
 
@@ -211,9 +214,16 @@ def _child():
         raise SystemExit(f"ABORT: unknown task {job['task']!r}")
 
     try:
-        meta["engine_metrics"] = {
-            m.name: getattr(m, "value", None) for m in llm.get_metrics()
-            if "prefix_cache" in m.name or "preemption" in m.name}
+        want = ("prefix_cache", "preemption", "prompt_tokens")
+        got = {}
+        for m in llm.get_metrics():
+            if not any(w in m.name for w in want):
+                continue
+            v = getattr(m, "value", None)
+            if v is None and hasattr(m, "count"):
+                v = {"count": m.count, "sum": getattr(m, "sum", None)}
+            got[m.name] = v
+        meta["engine_metrics"] = got
     except Exception as exc:  # noqa: BLE001
         meta["engine_metrics"] = {"error": str(exc)}
 
