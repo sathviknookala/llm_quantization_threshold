@@ -54,6 +54,14 @@ QUALITY_ENGINE_CONTROLS = {
     "dtype": "auto",
 }
 
+# Knobs that differ from the measured serving axis, enumerated rather than glossed.
+ENGINE_DELTAS_VS_SERVING = {
+    "enable_prefix_caching": "True here, False for serving -- the deliberate H7 exception",
+    "max_logprobs": "128256 here, server default 20; a request-validation bound only",
+    "disable_log_stats": "False here; `vllm serve` already runs with stats on, so this matches",
+    "process_model": "in-process LLM here, `vllm serve` for the serving axis",
+}
+
 SCORING_SAMPLING = {
     "temperature": 0.0,
     "max_tokens": 1,

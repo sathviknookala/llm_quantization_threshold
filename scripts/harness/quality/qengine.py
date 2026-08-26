@@ -49,8 +49,9 @@ def engine_kwargs(config_id, overrides=None):
         "enforce_eager": c["enforce_eager"],
         "seed": c["seed"],
         "dtype": c["dtype"],
-        # LLM() defaults this to True, which makes get_metrics() report nothing; the prefix-cache
-        # counters are how cache reuse is observed rather than assumed
+        # LLM() defaults this to True while `vllm serve` runs with stats on, so this matches the
+        # serving axis rather than diverging from it; the prefix-cache counters are how cache reuse
+        # is observed rather than assumed
         "disable_log_stats": False,
     }, c
 
@@ -126,15 +127,14 @@ def run_job(job, log_path, allow_dirty=False, require_cool=True, timeout=3600):
         proc = subprocess.Popen(
             [sys.executable, os.path.abspath(__file__), "--child", job_path],
             stdout=fh, stderr=subprocess.STDOUT, env=server.CHILD_ENV, start_new_session=True)
+        # captured while the child is certainly alive: after wait() reaps it the PID may already
+        # be recycled, and re-deriving the pgid then could scope teardown to someone else's tree
+        pgid = proc.pid
         try:
             rc = proc.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
-            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            os.killpg(pgid, signal.SIGKILL)
             rc = -signal.SIGKILL
-    try:
-        pgid = os.getpgid(proc.pid)
-    except OSError:
-        pgid = None
     release = _release_gpu(pgid)
 
     log_text = open(log_path, errors="replace").read()
@@ -212,6 +212,10 @@ def _child():
                 row["entries_returned"] = len(lp)
                 row["context_len"] = len(contexts[i])
                 row["top1"] = K.top1(mat[i])
+                # observed rather than asserted from our own constant: detokenize=False must
+                # actually have suppressed per-entry decoding
+                probe = next(iter(lp.values()))
+                row["decoded_token_is_none"] = getattr(probe, "decoded_token", None) is None
                 per.append(row)
         meta["generate_seconds"] = round(time.time() - t0, 2)
         meta["group_size"] = group

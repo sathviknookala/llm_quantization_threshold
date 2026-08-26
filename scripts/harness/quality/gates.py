@@ -34,13 +34,15 @@ def _new_kl_rows(ma, mb):
     return np.array([K.kl_nats(ma[i], mb[i]) for i in range(ma.shape[0])])
 
 
-def numerics_compat(logits_dir=GATE_LOGITS, reference="results/pilot/correctness_gate.json"):
+def numerics_compat(logits_dir=GATE_LOGITS, reference="results/pilot/correctness_gate.json",
+                    allow_dirty=False):
     """G7 -- the new numerics against the historical gate, with the EPS effect isolated.
 
     The only reference data available is fp16, while production stores fp32, so old-vs-new would
     otherwise confound the EPS change with a storage change. Both formulas are therefore run over
     the SAME fp16 arrays; any residual beyond the isolated EPS delta is a real numerics change.
     """
+    git = q.require_clean_tree(allow_dirty, stage="numerics_compat")
     mats = {}
     for label in ("BF16", "BF16_selfcheck", "FP8", "FP4"):
         path = os.path.join(logits_dir, f"{label}_logprobs.npy")
@@ -103,6 +105,8 @@ def numerics_compat(logits_dir=GATE_LOGITS, reference="results/pilot/correctness
         "pairs": pairs,
         "checks": checks,
         "passed": all(checks.values()),
+        "kl_spec_hash": q.spec_hash(),
+        "git": git,
         "caveat": "the reference artifact was produced at git_head "
                   f"{tracked.get('software', {}).get('git_head', '?')[:12]} with git_dirty="
                   f"{tracked.get('software', {}).get('git_dirty')}; it is not independently "
@@ -131,7 +135,8 @@ PROFILE_COMPARISONS = (
     ("replication_floor_eager", "eager_2048", "eager_2048_r2",
      "same eager profile, independent launches -- the noise floor under eager"),
     ("eager_vs_graph", "eager_2048", "graph_2048",
-     "only enforce_eager flipped"),
+     "enforce_eager flipped; graph capture also reserves VRAM before KV profiling, so the graph "
+     "profile lands slightly fewer KV blocks -- a side effect vLLM does not let us remove"),
     ("chunked_vs_unchunked", "graph_2048", "graph_8192",
      "serving-compatible 2048 vs the offline default 8192"),
 )
@@ -236,11 +241,13 @@ def engine_profile(out_dir=None, configs=("BF16_REFERENCE", "FP4_PRIMARY"), n_tr
     """
     out_dir = out_dir or os.path.join(q.QUALITY_DIR, "gates", "engine_profile")
     os.makedirs(out_dir, exist_ok=True)
+    q.require_clean_tree(allow_dirty, stage="engine_profile:summary")
     q.guard_manifest(out_dir, "G9 engine-profile gate")
     traj = _provisional_trajectories(out_dir, n_traj, allow_dirty)
     contexts, index = _contexts_for(traj)
     n_pos = len(P.RETAINED_POSITIONS)
     contexts_hash = common.sha256_of_json(contexts)
+    identity = {c: q.config_identity(c) for c in configs}
     expected_cells = n_traj * n_pos
     if len(contexts) != expected_cells:
         raise SystemExit(f"ABORT: built {len(contexts)} contexts, expected {expected_cells}")
@@ -251,11 +258,14 @@ def engine_profile(out_dir=None, configs=("BF16_REFERENCE", "FP4_PRIMARY"), n_tr
             key = f"{config_id}:{pname}"
             npy = os.path.join(out_dir, f"{q.QUALITY_CONFIGS[config_id]['short']}_{pname}.npy")
             js = npy.replace(".npy", ".json")
+            ckpt = identity[config_id]["checkpoint_content_hash"]
             reusable = os.path.exists(npy) and os.path.exists(js)
             if reusable:
                 prior = json.load(open(js))
                 if (prior.get("kl_spec_hash") != q.spec_hash()
-                        or prior.get("contexts_hash") != contexts_hash):
+                        or prior.get("contexts_hash") != contexts_hash
+                        or (prior.get("config_identity") or {})
+                        .get("checkpoint_content_hash") != ckpt):
                     raise SystemExit(
                         f"ABORT: {npy} was produced under a different spec or context set; "
                         "move results/quality/gates/engine_profile aside rather than mixing.")
@@ -267,7 +277,7 @@ def engine_profile(out_dir=None, configs=("BF16_REFERENCE", "FP4_PRIMARY"), n_tr
                                  allow_dirty=allow_dirty)
                 meta["kl_spec_hash"] = q.spec_hash()
                 meta["contexts_hash"] = contexts_hash
-                meta["config_identity"] = q.config_identity(config_id)
+                meta["config_identity"] = identity[config_id]
                 common.write_json(js, meta)
             mats[key] = np.load(npy)
             metas[key] = json.load(open(js))
@@ -297,6 +307,13 @@ def engine_profile(out_dir=None, configs=("BF16_REFERENCE", "FP4_PRIMARY"), n_tr
             per_cfg[name]["ratio_to_replication_floor"] = (None if floor == 0.0 else m / floor)
             per_cfg[name]["above_replication_floor"] = bool(m > floor)
         results[short] = per_cfg
+        checks[f"{short}_no_preemption"] = all(
+            (metas[k].get("engine_metrics") or {}).get("vllm:num_preemptions", 0) in (0, None)
+            for k in metas if k.startswith(config_id))
+        checks[f"{short}_detokenize_observed_off"] = all(
+            c.get("decoded_token_is_none") is True
+            for k, mm in metas.items() if k.startswith(config_id)
+            for c in mm["per_context"])
         checks[f"{short}_cell_count_complete"] = all(
             per_cfg[name]["cells"] == expected_cells for name, _, _, _ in PROFILE_COMPARISONS)
         checks[f"{short}_all_cells_valid"] = all(
@@ -315,7 +332,6 @@ def engine_profile(out_dir=None, configs=("BF16_REFERENCE", "FP4_PRIMARY"), n_tr
         checks[f"{short}_prefix_caching_observed"] = all(
             metas[k]["resolved_config"]["enable_prefix_caching"] is True
             for k in metas if k.startswith(config_id))
-        checks[f"{short}_detokenize_pinned_off"] = q.SCORING_SAMPLING["detokenize"] is False
 
     return {
         "gate": "engine_profile",
@@ -327,7 +343,7 @@ def engine_profile(out_dir=None, configs=("BF16_REFERENCE", "FP4_PRIMARY"), n_tr
         "expected_cells_per_comparison": expected_cells,
         "cells_per_comparison": len(contexts),
         "contexts_hash": contexts_hash,
-        "config_identity": {c: q.config_identity(c) for c in configs},
+        "config_identity": identity,
         "kl_spec_hash": q.spec_hash(),
         "git": q.git_state(),
         "provisional_trajectories": {
@@ -346,7 +362,23 @@ def engine_profile(out_dir=None, configs=("BF16_REFERENCE", "FP4_PRIMARY"), n_tr
                 "generate_seconds": v.get("generate_seconds")}
             for k, v in metas.items()},
         "checks": checks,
-        "passed": all(checks.values()),
+        "integrity_passed": all(checks.values()),
+        # deliberately NOT a single `passed`: every integrity check can hold while eager and graph
+        # execution disagree, which is the finding this gate exists to produce
+        "profile_equivalence": {
+            short: {name: {"above_replication_floor": r[name]["above_replication_floor"],
+                           "headline_nats": r[name]["headline_nats"],
+                           "max_nats": r[name]["max_nats"],
+                           "top1_agreement": r[name]["top1_agreement"]}
+                    for name in ("eager_vs_graph", "chunked_vs_unchunked")}
+            for short, r in results.items()},
+        "profile_decision_required": True,
+        "profile_differences_exceeding_floor": sorted(
+            f"{short}:{name}" for short, r in results.items()
+            for name in ("eager_vs_graph", "chunked_vs_unchunked")
+            if r[name]["above_replication_floor"]),
+        "freeze_release": "trajectory freezing requires an explicit reviewed profile decision; "
+                          "this gate measures, it does not authorise",
         "gpu": common.gpu_identity(),
         "software": common.software_identity(),
         "timestamp": common.now_iso(),
@@ -360,17 +392,24 @@ def main():
     ap.add_argument("--n-traj", type=int, default=4)
     ap.add_argument("--configs", default="BF16_REFERENCE,FP4_PRIMARY")
     ap.add_argument("--allow-dirty", action="store_true")
+    ap.add_argument("--force", action="store_true")
     a = ap.parse_args()
     if a.gate == "numerics":
-        rec = numerics_compat()
+        rec = numerics_compat(allow_dirty=a.allow_dirty)
     else:
         rec = engine_profile(configs=tuple(c for c in a.configs.split(",") if c),
                              n_traj=a.n_traj, allow_dirty=a.allow_dirty)
     out = a.out or os.path.join(q.QUALITY_DIR, "gates", f"{rec['gate']}.json")
+    if os.path.exists(out) and not a.force:
+        prior = json.load(open(out)).get("kl_spec_hash")
+        if prior and prior != q.spec_hash():
+            raise SystemExit(
+                f"ABORT: {out} was written under KL_SPEC {prior} and this run is {q.spec_hash()}; "
+                "pass --force only if you mean to discard the earlier report.")
     common.write_json(out, rec)
     print(json.dumps({k: v for k, v in rec.items() if k not in ("software",)}, indent=2)[:4000])
     print("WROTE", out)
-    return 0 if rec.get("passed") else 1
+    return 0 if rec.get("passed", rec.get("integrity_passed")) else 1
 
 
 if __name__ == "__main__":
