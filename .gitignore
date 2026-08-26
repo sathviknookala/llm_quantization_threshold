@@ -24,3 +24,9 @@ results/sweep/server_logs/
 
 # Live-run scratch: PID of the detached completion chain.
 results/sweep/followup.pid
+
+# Quality arm. Full-vocab distribution shards and engine logs are large and regenerable from the
+# frozen trajectories; the tracked manifests, gate artifacts and raw KL cells carry the identity.
+results/quality/**/dist/
+results/quality/**/logs/
+results/quality/checkpoint_hashes.json

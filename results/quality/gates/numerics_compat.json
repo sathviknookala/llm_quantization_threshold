@@ -1,0 +1,64 @@
+{
+  "gate": "numerics_compat",
+  "purpose": "G7: new float64/no-EPS numerics vs the historical EPS-floored formula, measured on identical fp16 arrays so the EPS effect is isolated",
+  "storage_of_reference_arrays": "float16",
+  "production_storage_dtype": "float32",
+  "thresholds": {
+    "mean_abs_max_nats": 1e-06,
+    "rel_max": 0.005
+  },
+  "pairs": {
+    "BF16||BF16_selfcheck": {
+      "contexts": 32,
+      "old_mean_nats": 0.0,
+      "new_mean_nats": 0.0,
+      "mean_abs_delta_nats": 0.0,
+      "max_abs_delta_nats": 0.0,
+      "rel_delta_p99": 0.0,
+      "rel_delta_max": 0.0,
+      "legacy_reproduces_tracked_artifact_max_abs": 0.0
+    },
+    "BF16||FP8": {
+      "contexts": 32,
+      "old_mean_nats": 0.012069606205565866,
+      "new_mean_nats": 0.012069596132444071,
+      "mean_abs_delta_nats": 1.4398229171669919e-08,
+      "max_abs_delta_nats": 5.8999639852277616e-08,
+      "rel_delta_p99": 0.0014414687452455565,
+      "rel_delta_max": 0.0015515648328323713,
+      "legacy_reproduces_tracked_artifact_max_abs": 0.0
+    },
+    "BF16||FP4": {
+      "contexts": 32,
+      "old_mean_nats": 0.15083350780876836,
+      "new_mean_nats": 0.1508334987462308,
+      "mean_abs_delta_nats": 3.9781268516492154e-08,
+      "max_abs_delta_nats": 1.3908875026345194e-07,
+      "rel_delta_p99": 0.0005436146808941885,
+      "rel_delta_max": 0.0007257438374658828,
+      "legacy_reproduces_tracked_artifact_max_abs": 0.0
+    }
+  },
+  "checks": {
+    "legacy_formula_reproduces_tracked_artifact": true,
+    "eps_isolated_mean_abs_within_tolerance": true,
+    "eps_isolated_rel_within_tolerance": true,
+    "self_kl_still_exactly_zero_under_new_formula": true
+  },
+  "passed": true,
+  "caveat": "the reference artifact was produced at git_head 153f064a6179 with git_dirty=True; it is not independently reproducible and is cited as historical evidence only",
+  "software": {
+    "python": "3.12.13",
+    "kernel": "6.8.0-65-generic",
+    "torch": "2.10.0+cu128",
+    "torch_cuda": "12.8",
+    "vllm": "0.19.1",
+    "transformers": "5.15.1",
+    "compressed_tensors": "0.15.0.1",
+    "nvcc": "Cuda compilation tools, release 12.9, V12.9.86",
+    "git_head": "8c2b3e4e7584f7d38f4541afcd3d9b3ce7a0463a",
+    "git_dirty": true,
+    "git_untracked_files": 3
+  },
+  "timestamp": "2026-08-25T22:51:05-0400"
+}
