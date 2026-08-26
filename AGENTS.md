@@ -125,151 +125,109 @@ A valid result may favor BF16, FP8, FP4, different choices for different workloa
 
 ## Current focus
 
-**The D11 serving sweep is COMPLETE.** 124 cells, 14.75 h GPU-exclusive, finished 2026-08-25
-14:00:56. Artifacts in `results/sweep/` (`cells.jsonl`, `run.log`, `manifest.json`,
-`sweep_config_hash = df0f0f124d987a5c`). **Zero defect cells, zero invalid reasons, zero incomplete
-windows.**
+**The D11 serving sweep is COMPLETE** (124 cells, 14.75 h, `results/sweep/`, zero defect cells).
+Headline: maximum concurrency within the 50 ms TPOT P95 SLO is **21 / 57 / 70** for BF16 / FP8 / FP4
+(refined bisection, **n=1**), i.e. FP8 at 2.71x and FP4 at 3.33x BF16, with KV-pressure walls at
+[17,18], [38,39], [47,48] predicted exactly by peak-footprint arithmetic. The SLO ceiling is not the
+wall: every configuration serves past its wall before breaching latency. Below-wall throughput
+differences are reproducible, concurrency-dependent and **unattributed** — quote the concurrency with
+the number, never as a bandwidth or weight-residency benefit.
 
-Phase-1 deliverable's serving axis is measured. The quality axis is not, so the deployment boundary
-is **not** located yet.
-
-### Headline — maximum concurrency within the SLO (TPOT P95 <= 50 ms)
-
-Ladder points are n=3 (median, full spread). The **refined** ceilings come from the
-`SWEEP_REFINE_SLO` bisection and are **n=1, repetition 1 only**.
+**The quality arm is built and smoke-validated. The 64-trajectory production run has NOT been run.**
 
 ```text
-              ladder point   refined ceiling   first breach   tok/s at ceiling
-BF16                    16                21             22              488.2
-FP8                     48                57             58             1401.2
-FP4                     64                70             71             1745.5
-```
-
-The ladder understated every configuration by 24-31%; the bisection is what makes these numbers
-usable. Ratios at the refined ceilings: FP8 **2.71x** BF16 concurrency, FP4 **3.33x** BF16 and
-**1.23x** FP8. Throughput at the ceiling: FP8 2.87x BF16, FP4 3.57x BF16.
-
-### KV-pressure walls, refined — the peak-footprint arithmetic predicted all three exactly
-
-```text
-         predicted   measured bracket   basis
-BF16            17            [17, 18]   44,688 KV tokens / 2,560
-FP8             38            [38, 39]   97,888 / 2,560
-FP4             47            [47, 48]   120,944 / 2,560
-```
-
-BF16's bracket reproduces pilot P2 exactly. The locked ladder returned `[32,48]` for *both* FP8 and
-FP4; the refinement is what separates them, which is why it was added (D11, "Ladder resolution").
-
-**The SLO ceiling is not the wall.** Every configuration serves past its wall before breaching the
-latency bound — BF16 to 1.24x its wall, FP8 and FP4 to ~1.5x. Preemption is not SLO violation, and
-the two must not be conflated when reporting.
-
-### What may not be claimed
-
-Below-wall throughput differences are reproducible and **concurrency-dependent**, and they are not
-attributed to any mechanism. FP4-over-BF16 measures 2.43x at C=1, 2.12x at C=8, 1.93x at C=16 — quote
-the concurrency with the number, never as a bandwidth or weight-residency benefit. The capacity leg
-is confirmed by mechanism (KV arithmetic predicts the walls); the throughput leg is measured, not
-explained.
-
-The headline is **maximum in-flight requests** within the SLO, not "concurrent users": the driver is
-closed-loop with `ignore_eos` and homogeneous prompts, with no arrival process.
-
-```text
-0. D10/D11 corrected; P1 exit criterion amended               DONE 2026-08-24
-1-3. orchestrator, SKIPPED_PAST_SLO, budget/window reconciliation   DONE 2026-08-24
-4. serving sweep + refinement                                 DONE 2026-08-25
-5. quality run                                                 <- current step
-   KL contract closed 2026-08-25 (D13 amendment); PPL and tasks need D14/D15
+0-4. serving sweep + refinement                                DONE 2026-08-25
+5. quality run
+   P0-P6  contract, numerics, engine lifecycle, G7, G9         DONE 2026-08-25
+   P7     64 BF16 trajectories frozen                          DONE 2026-08-26
+   P8-P9  collect_kl.py / analyze_kl.py                        DONE 2026-08-26
+   P10    real smoke, 4 traj x 10 pos x 3 configs              DONE 2026-08-26
+   P11    replication floor + fp16/fp32 storage gate           DONE 2026-08-26
+   P12    full preflight                                       <- next, NOT authorised
+   P13    64-trajectory production KL run                      NOT authorised
+   PPL and downstream tasks still need D14/D15
 6. marginal tradeoff: quality loss vs sustainable concurrency
 ```
 
+### Locked engine profile — `graph_2048` (G9)
+
+`enforce_eager=False`, `max_num_batched_tokens=2048`, prefix caching on, `detokenize=False`. Chosen
+because it is the only profile reproducing the serving sweep's KV capacities for all three
+configurations (44,688 / 97,888 / 120,944). **Neither control is numerically inert**: flipping
+`enforce_eager` moves FP4 by 3.74e-02 nats and its argmax on 4 of 40 cells; 2048-vs-8192 moves FP4
+by 2.15e-02 and 6 of 40. BF16 sits at its own floor under both. See `LIMITATIONS.md`.
+
+### Smoke KL, 4 trajectories x 10 positions (NOT a result — n=4)
+
+```text
+              headline nats     95% CI                    floor      signal/floor
+BF16||FP8        3.690e-03      [1.748e-03, 6.016e-03]    2.98e-04        12.4x
+BF16||FP4        2.945e-02      [2.315e-02, 3.576e-02]    2.98e-04        98.7x
+FP8||FP4         3.566e-02      [2.627e-02, 4.506e-02]    3.91e-11       9.1e+08x
+```
+
+The barred subtraction proxy would have put FP8->FP4 at 2.576e-02, low by a factor of 1.38.
+
+### What the gates returned
+
+```text
+G7  numerics vs the historical EPS formula      PASS
+G9  engine profile                              MEASURED, profile locked
+    replayability                               NOT REPLAYABLE (51/64) -- informational
+G2  replication floor                           FAIL on BF16 (8.1% of FP8 signal vs 1% bound)
+G3  cache equivalence                           FAIL on BF16 (4.74%), below BF16's own floor
+G4  fp16 vs fp32 storage                        FAIL -- fp32 stays
+```
+
+Two pre-registered bounds fail, both on BF16 and both traceable to one cause: **BF16 is the
+non-reproducible configuration.** It reproduces 0 of 40 cells across launches while FP8 and FP4
+reproduce 36 and 34. Thresholds were not relaxed after seeing the results.
+
 ## Last session
 
-**Session 5 — amended the P1 exit criterion, cleared the three engineering blockers, ran the sweep.**
+**Session 6 — locked the engine profile, froze the trajectories, built and smoke-validated the whole
+KL path.** Five persistent reviewers inspected the implementation before any GPU time.
 
-- **P1 recorded as an informative falsification, not a gate.** Tolerances untouched, verdict still
-  FAIL. The contract's exit criterion was rewritten; the post-hoc three-term traffic model in D10 is
-  explicitly barred from becoming a replacement gate. The stale `NOT CLEARED` verdict was superseded
-  by changing `analyze.py`'s clearance logic rather than hand-editing the artifact, and
-  `cleared_for_full_serving_sweep` is now conjunctive so a passing science gate cannot read as
-  permission to launch.
-- **Propagated the correction** to `PROJECT_SPEC.md` and `HARDWARE_PROFILE.md`, which still carried
-  the framing D11 forbids, and withdrew the "bandwidth travels better" portability claim in
-  `LIMITATIONS.md` as unsupported.
-- **Rebuilt the cell budget.** `wall_cap_s` was flat while the window required
-  `min_periods * period_estimate_s()` recomputed every tick, so the requirement receded as
-  throughput fell and the cap bit hardest on the capacity cells. Periods are now counted from tokens
-  (`tokens / (out_tokens * C)`) — exact, verified against all 46 pilot cells to within 2.2% — and
-  budgets derive from the period frozen at gate-fire, sized to dominate the whole close conjunction.
-  Measured proof: BF16 C=32 returns a valid 5.04-period window at 908 s, past the documented 900 s
-  cap that would have discarded it.
-- **`SKIPPED_PAST_SLO`** on an SLO-only allowlist. Nothing else truncates a ladder. Validated twice
-  on real data: BF16@C18 and FP8@C48 both preempt heavily and still meet the SLO; keying the skip on
-  pressure would have understated FP8's capacity by a full ladder step.
-- **`outcome_class`** (measured / infeasible / defect) added because `valid_result` was answering two
-  questions. Unmapped statuses default to `defect`, never `infeasible`.
-- Un-clamped the stationarity half-window (the fixed 10-sample cap broke H9 above ~90 s periods);
-  made `sock_read` period-derived so starvation past a wall is not recorded as request failures;
-  serialized `CellConfig`, throttle reasons and corpus-wrap counts into every record.
-- Added a **`SWEEP_REFINE_SLO`** phase mid-run after noticing the original refinement bisects KV
-  pressure while the deliverable is the SLO crossing — a different transition. Without it every
-  headline number carried ladder granularity, understating all three by 24-31%.
-- **Two bugs found by running rather than reading.** A killed orchestrator orphaned an EngineCore
-  holding 22 GiB (`launch()` outside the `try/finally`), and `stop()`'s fallback
-  `pkill -f 'vllm serve'` had never matched anything because v1 renames the child to
-  `VLLM::EngineCore` — dead code guarding exactly that case.
-- **One self-inflicted incident, recorded.** Importing `run_sweep` in a throwaway process registered
-  its `atexit` handler, which killed any GPU-holding PID including the live sweep's engine. Cost one
-  cell (BF16 C=32 rep1), quarantined to `cells_externally_killed.jsonl` and later re-measured at
-  572.85 tok/s against the smoke's 572.4. Teardown is now process-group-scoped and `atexit` arms only
-  under `__main__`.
-- `scripts/pilot/` -> `scripts/harness/`, shared helpers extracted to `orchestration.py`; verified
-  behaviour-free by the analyzer reproducing every pilot artifact byte-identically.
-- Verification before GPU time: `selftest.py` drives the cell state machine against a stub engine
-  that oscillates, collapses, stalls, starves and mis-budgets — 27/27.
-
-**Sweep quality.** Repeatability <=0.22% throughput spread across 3 repetitions on all but one cell
-(FP4@C8, 1.73%). Pre-registered H6 drift test: worst matched-cell drift rep1 vs rep3 is 0.20%
-throughput and 0.76% clock, both inside the pilot baseline — **no drift signal, so H6 is measured
-rather than assumed for this run**. `kv_cache_tokens` was identical across all launches per
-configuration (44,688 / 97,888 / 120,944), so H10 contamination did not occur.
+- **`graph_2048` locked** on G9's evidence, and the eager/chunking sensitivity recorded as a result
+  rather than a configuration footnote.
+- **Four blockers closed before running.** `run_job` released VRAM outside its `try`, so a killed
+  parent orphaned an engine — the incident already in this file, reintroduced; the helper feeding the
+  floor and cache gates lacked its siblings' completeness checks, so a short batch would have left
+  `-inf` rows in the very floor everything is read against; two pre-registered thresholds were hashed
+  into `KL_SPEC` and never evaluated, leaving both gates unable to fail on substance; and the
+  checkpoint hash cache keyed on size+mtime, which a timestamp-preserving deploy leaves untouched
+  (reproduced returning a stale digest).
+- **A worst-cell floor comparison spanning different grid sizes was refused.** A maximum is an
+  extreme-value statistic: under a null with no signal, max-of-640 beats max-of-40 in 95% of draws.
+- **Two defects found by running, not reading.** The replayability gate defaulted to 4 trajectories,
+  which would have submitted groups of 4 against the freeze's 16 and confounded batching with launch
+  noise. And SIGTERM to a parent blocked in `wait()` orphaned an EngineCore holding 22 GiB — the
+  earlier `finally` only rescued SIGINT.
+- **P7 frozen**: 64 trajectories, 2048 tokens each, zero preemptions, `trajectory_set_hash`
+  `1dd71faeb242c7c1`, engine identity matching G9's BF16 `graph_2048` launch exactly.
+- Prefix-cache reuse **measured**: 32,192 hits of 42,876 queries, against a 76.1% ceiling.
 
 ## Known issues / unresolved premises
 
-- **The refined ceilings are n=1.** The 21 / 57 / 70 figures come from a repetition-1 bisection. The
-  ladder points bracketing them are n=3 with <=0.22% spread, and per-cell CV is tiny, so the risk is
-  low — but the headline numbers have not been replicated and must be labelled n=1 wherever they
-  appear. Replicating the three bisections is cheap (~9 cells) and is the first thing to do if the
-  numbers are going to be quoted.
-- **`PREFILL_PROBE` inherited the decode SLO, and it cost a cell.** The 50 ms TPOT bound is a decode
-  criterion; applied to a 32-output-token prefill shape it fired at C=2 for BF16, so C=8 was skipped
-  and BF16 has no C=8 probe point. BF16 at C=8 would need 65,792 KV tokens against 44,688 anyway, so
-  the point may be infeasible regardless — but the *reason* it is missing is a rule misapplied, not a
-  measurement. The probe needs its own saturation criterion (TTFT-based) before it is re-run.
-- **The below-wall gap is unattributed and that is now a settled position.** Reproducible,
-  concurrency-dependent, and not separated into weight traffic / KV traffic / kernel efficiency /
-  scheduling by this measurement. The post-hoc three-term model in D10 stays post-hoc.
-- **Latin-square carryover is unbalanced.** FP8 follows BF16 in 2 of 3 repetitions, FP4 in 0 of 3;
-  balancing carryover across three treatments needs six sequences. The thermal preflight gate and the
-  drift test stand in for it, and the drift test came back clean, but the design limitation is real.
-- **Queue *time* is still not recorded** — only depth. D11 asked for both; this build has no
-  per-request queue-time observable.
-- **`meets_slo` is survivor-biased.** Computed only over requests that both start and finish inside
-  the window, so starved requests contribute nothing. Read it with `num_waiting_reqs_max` and
-  `window_completed_requests`, both recorded.
-- **No quality axis yet.** D14 (perplexity corpus/budget) and D15 (downstream tasks) are open, and
-  chat-formatted tasks stay blocked by the `chat_template` deviation. The sweep produces one axis of
-  a two-axis deliverable; nothing here locates the deployment boundary.
-- **Checkpoint provenance has one open deviation.** Weights are SHA256-identical to official, but
-  `tokenizer_config.json` carries a shorter `chat_template`. Within-model comparability is
-  unaffected; absolute instruct-task scores would not be comparable to published Llama numbers.
-- **Calibration sensitivity is untested, and applies only to FP4.** The single FP4 draw used 128
-  ultrachat samples, seed 0.
-- **The GPU is power-limited at 145 W** and `throttle_sw_power_cap_frac` reads 1.0 for entire
-  windows, so every number is measured under a power ceiling rather than at fixed clocks.
-- **Phase 1 measures one workload shape.** The arithmetic benefit of low precision is observed only
-  in the bounded prefill probe; prefill-dominated deployments are out of scope.
+- **The BF16 replication floor fails its pre-registered bound**, at 8.1% of the BF16→FP8 KL against
+  1%. The FP8 comparison sits only 12.4x above its noise floor. This is the binding constraint on the
+  whole quality axis and it is a property of the *reference*, not of the quantized paths: BF16
+  reproduces 0 of 40 cells across launches, FP8 and FP4 reproduce 36 and 34. Decide before P13
+  whether to accept it as a stated resolution limit or to average repeated BF16 launches.
+- **Seeded generation is not replayable** — 51 of 64, earliest divergence at token 3. Reproduction
+  goes through the tracked `trajectories.json` and its hash, never by rerunning generation.
+- **Every quality figure so far is n=4 and is not a result.** The smoke exists to validate the rig.
+- **The refined serving ceilings are still n=1** (21 / 57 / 70). Replicating the three bisections is
+  ~9 cells and is the first thing to do before quoting them.
+- **`PREFILL_PROBE` inherited the decode SLO** and lost BF16's C=8 point; it needs a TTFT-based
+  criterion before it is re-run.
+- **The below-wall throughput gap is unattributed**, and that is a settled position.
+- **Latin-square carryover is unbalanced**; queue *time* is still not recorded, only depth;
+  `meets_slo` is survivor-biased.
+- **No perplexity or downstream-task axis yet.** D14 and D15 are open; chat-formatted tasks stay
+  blocked by the `chat_template` deviation.
+- **Checkpoint provenance has one open deviation** (shorter `chat_template`), and **FP4 calibration
+  sensitivity is untested** — one draw, 128 ultrachat samples, seed 0.
+- **The GPU is power-limited at 145 W**, so every number is measured under a power ceiling.
 
 At the end of a session, overwrite `Current focus`, `Last session`, and `Known issues / unresolved premises` in place. Git history is the changelog; this file should remain a current-state hub.
