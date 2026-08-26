@@ -1,0 +1,163 @@
+{
+  "artifact": "KL collection",
+  "config_id": "FP4_PRIMARY",
+  "quantization": "FP4",
+  "n_trajectories": 4,
+  "positions": [
+    1,
+    8,
+    32,
+    64,
+    128,
+    256,
+    512,
+    1024,
+    1536,
+    2048
+  ],
+  "cells": 40,
+  "provenance": {
+    "config_id": "FP4_PRIMARY",
+    "kl_spec_hash": "5565ff73dbe5e36a",
+    "trajectory_set_hash": "1dd71faeb242c7c1be0011491fb51942fb662dfeb2ba2d2d5c2cb428f7a041ad",
+    "subset_n": 4,
+    "prompt_subset_hash": "f8a89d3aeaac5dd77e0d33d4105af852918dc6389ee309dd042be67c236dc871",
+    "contexts_hash": "7d6d7045df86176d33f8844b06957fc2a6a417429aaee6e9fca3bfff9c3049f7",
+    "checkpoint_content_hash": "8866dad87d09688303026d3d683ea6ded90d3eaf41210ec4d75a7b7ff5da06ec",
+    "tokenizer_identity": {
+      "tokenizer.json": "384a7e7c676f7be2e5d2e8449c508be9b00e5b18c5b3c39ebc626e96b3f4b988",
+      "tokenizer_config.json": "941290c40ad93f86d5b8d07bbc08dd59881da5ba683e533885b523c9ba184b94",
+      "special_tokens_map.json": "6f38c73729248f6c127296386e3cdde96e254636cc58b4169d3fd32328d9a8ec"
+    },
+    "engine_profile_name": "graph_2048",
+    "storage_dtype": "float32",
+    "retained_positions": [
+      1,
+      8,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      1536,
+      2048
+    ]
+  },
+  "config_identity": {
+    "configuration_id": "FP4_PRIMARY",
+    "quantization": "FP4",
+    "model_path": "/home/sathvik/llm_quantization_threshold/checkpoints/llama31-8b-instruct-NVFP4",
+    "checkpoint_content_hash": "8866dad87d09688303026d3d683ea6ded90d3eaf41210ec4d75a7b7ff5da06ec",
+    "tokenizer_identity": {
+      "tokenizer.json": "384a7e7c676f7be2e5d2e8449c508be9b00e5b18c5b3c39ebc626e96b3f4b988",
+      "tokenizer_config.json": "941290c40ad93f86d5b8d07bbc08dd59881da5ba683e533885b523c9ba184b94",
+      "special_tokens_map.json": "6f38c73729248f6c127296386e3cdde96e254636cc58b4169d3fd32328d9a8ec"
+    },
+    "expected_kernel_pattern": "FLASHINFER_CUTLASS",
+    "forbidden_kernel_patterns": [
+      "CT_EMULATIONS",
+      "emulation"
+    ]
+  },
+  "engine_identity_hash": "434ad8fac783fb7f",
+  "shards": [
+    {
+      "shard": 0,
+      "start": 0,
+      "stop": 40,
+      "npy": "results/quality/smoke/dist/FP4/shard_000.npy",
+      "json": "results/quality/smoke/shards/FP4/shard_000.json",
+      "reused": false
+    }
+  ],
+  "shard_reuse": {
+    "0": "absent"
+  },
+  "launched": true,
+  "seconds": 5.19,
+  "wall_seconds": 24.72,
+  "engine_metrics": {
+    "vllm:prefix_cache_queries": 42876,
+    "vllm:prefix_cache_hits": 32192,
+    "vllm:external_prefix_cache_queries": 0,
+    "vllm:external_prefix_cache_hits": 0,
+    "vllm:num_preemptions": 0,
+    "vllm:prompt_tokens": 42876,
+    "vllm:prompt_tokens_by_source": 0,
+    "vllm:prompt_tokens_cached": 32192,
+    "vllm:prompt_tokens_recomputed": 0,
+    "vllm:request_prompt_tokens": {
+      "count": 40,
+      "sum": 42876.0
+    }
+  },
+  "observed": {
+    "resolved_config": {
+      "enforce_eager": false,
+      "max_num_batched_tokens": 2048,
+      "enable_prefix_caching": true,
+      "max_model_len": 32768,
+      "num_gpu_blocks": 7559,
+      "block_size": 16,
+      "kv_cache_dtype": "auto",
+      "max_logprobs": 128256,
+      "dtype": "torch.bfloat16",
+      "seed": 0,
+      "requested": {
+        "model": "/home/sathvik/llm_quantization_threshold/checkpoints/llama31-8b-instruct-NVFP4",
+        "max_model_len": 32768,
+        "gpu_memory_utilization": 0.9,
+        "max_num_seqs": 256,
+        "kv_cache_dtype": "auto",
+        "max_logprobs": 128256,
+        "enable_prefix_caching": true,
+        "max_num_batched_tokens": 2048,
+        "enforce_eager": false,
+        "seed": 0,
+        "dtype": "auto",
+        "disable_log_stats": false
+      }
+    },
+    "kv_cache_tokens": 120944,
+    "graph_capture_observed": true,
+    "kernel_lines": [
+      "(EngineCore pid=1105579) INFO 08-26 00:27:48 [nvfp4_utils.py:85] Using NvFp4LinearBackend.FLASHINFER_CUTLASS for NVFP4 GEMM"
+    ],
+    "normalized_kernel_lines": [
+      "Using NvFp4LinearBackend.FLASHINFER_CUTLASS for NVFP4 GEMM"
+    ],
+    "dispatch_verdict": {
+      "expected_pattern": "FLASHINFER_CUTLASS",
+      "expected_present": true,
+      "forbidden_present": [],
+      "ok": true
+    },
+    "engine_identity_hash": "434ad8fac783fb7f"
+  },
+  "git": {
+    "git_head": "6cbb35ca76c5fc46d573e7aa272a61bee733dea2",
+    "git_dirty": false
+  },
+  "gpu": {
+    "name": "NVIDIA RTX PRO 4000 Blackwell",
+    "uuid": "GPU-fdc11a18-6edb-7e2f-82b2-6bd0b9ed714d",
+    "driver_version": "575.64.03",
+    "memory_total_mib": "24467",
+    "power_limit_w": "145.00"
+  },
+  "software": {
+    "python": "3.12.13",
+    "kernel": "6.8.0-65-generic",
+    "torch": "2.10.0+cu128",
+    "torch_cuda": "12.8",
+    "vllm": "0.19.1",
+    "transformers": "5.15.1",
+    "compressed_tensors": "0.15.0.1",
+    "nvcc": "Cuda compilation tools, release 12.9, V12.9.86",
+    "git_head": "6cbb35ca76c5fc46d573e7aa272a61bee733dea2",
+    "git_dirty": false,
+    "git_untracked_files": 2
+  },
+  "timestamp": "2026-08-26T00:28:07-0400"
+}
