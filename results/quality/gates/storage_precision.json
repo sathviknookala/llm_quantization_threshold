@@ -1,0 +1,141 @@
+{
+  "gate": "storage_precision",
+  "purpose": "G4: fp16 vs fp32 storage of the SAME model outputs",
+  "kind": "empirical measurement with pre-registered thresholds",
+  "thresholds": {
+    "precision_rel_p99_max": 0.001,
+    "precision_rel_max": 0.01,
+    "precision_abs_floor_nats": 0.0001
+  },
+  "n_trajectories": 4,
+  "low_sample": true,
+  "cells_above_abs_floor_total": 96,
+  "cells_total": 120,
+  "pairs": {
+    "BF16||FP8": {
+      "cells": 40,
+      "cells_above_abs_floor": 24,
+      "headline_delta_bootstrap": {
+        "point": -2.1638524581911729e-07,
+        "ci_low": -1.9815373560365037e-06,
+        "ci_high": 1.633781744416634e-06,
+        "ci_half_width": 1.807659550226569e-06,
+        "bootstrap_mean": -2.0474741216919243e-07,
+        "bias": 1.1637833649924851e-08,
+        "std_error": 9.889690043885865e-07,
+        "draws": 10000
+      },
+      "abs_floor_nats": 0.0001,
+      "fp32_headline_nats": 0.0036897120485158315,
+      "fp16_headline_nats": 0.003689495663270012,
+      "headline_delta_nats": -2.163852458195517e-07,
+      "mean_abs_delta_nats": 5.895377921477643e-06,
+      "max_abs_delta_nats": 5.2450791075523556e-05,
+      "rel_p99": 0.013317812592347735,
+      "rel_max": 0.01503469480953567,
+      "max_abs_logprob_representation_error": 0.0156097412109375,
+      "entries_changed_by_fp16_frac": 0.9998892839321357,
+      "min_logprob_seen": -39.75001525878906,
+      "headline_delta_vs_floor": {
+        "value_nats": 2.163852458195517e-07,
+        "replication_floor_nats": 0.0002983571074837001,
+        "excess_over_floor_nats": -0.0002981407222378806,
+        "ratio_to_floor": 0.0007252558775774205,
+        "above_replication_floor": false,
+        "interpretation": "ratio is a reproducibility diagnostic only; read value_nats for magnitude. No materiality threshold is applied here."
+      }
+    },
+    "BF16||FP4": {
+      "cells": 40,
+      "cells_above_abs_floor": 35,
+      "headline_delta_bootstrap": {
+        "point": -9.92286211769601e-06,
+        "ci_low": -2.5634091232488953e-05,
+        "ci_high": 7.048825213682711e-06,
+        "ci_half_width": 1.6341458223085833e-05,
+        "bootstrap_mean": -1.0015060540930115e-05,
+        "bias": -9.219842323410513e-08,
+        "std_error": 8.803467485521435e-06,
+        "draws": 10000
+      },
+      "abs_floor_nats": 0.0001,
+      "fp32_headline_nats": 0.029453956481186858,
+      "fp16_headline_nats": 0.029444033619069165,
+      "headline_delta_nats": -9.922862117692222e-06,
+      "mean_abs_delta_nats": 3.476846924629853e-05,
+      "max_abs_delta_nats": 0.0003758442530518574,
+      "rel_p99": 0.00625273351868349,
+      "rel_max": 0.0065746340581333725,
+      "max_abs_logprob_representation_error": 0.0156097412109375,
+      "entries_changed_by_fp16_frac": 0.9998892839321357,
+      "min_logprob_seen": -39.75001525878906,
+      "headline_delta_vs_floor": {
+        "value_nats": 9.922862117692222e-06,
+        "replication_floor_nats": 0.0002983571074837001,
+        "excess_over_floor_nats": -0.0002884342453660079,
+        "ratio_to_floor": 0.03325833998519485,
+        "above_replication_floor": false,
+        "interpretation": "ratio is a reproducibility diagnostic only; read value_nats for magnitude. No materiality threshold is applied here."
+      }
+    },
+    "FP8||FP4": {
+      "cells": 40,
+      "cells_above_abs_floor": 37,
+      "headline_delta_bootstrap": {
+        "point": -1.0679258565548767e-05,
+        "ci_low": -4.04076101502179e-05,
+        "ci_high": 8.61685316146553e-06,
+        "ci_half_width": 2.4512231655841718e-05,
+        "bootstrap_mean": -1.0544241541305906e-05,
+        "bias": 1.350170242428616e-07,
+        "std_error": 1.2846817680129906e-05,
+        "draws": 10000
+      },
+      "abs_floor_nats": 0.0001,
+      "fp32_headline_nats": 0.03566234734577295,
+      "fp16_headline_nats": 0.035651668087207405,
+      "headline_delta_nats": -1.0679258565543526e-05,
+      "mean_abs_delta_nats": 3.5941715504248827e-05,
+      "max_abs_delta_nats": 0.0002737135340856178,
+      "rel_p99": 0.005656081328877576,
+      "rel_max": 0.006471896115692701,
+      "max_abs_logprob_representation_error": 0.0154571533203125,
+      "entries_changed_by_fp16_frac": 0.999999415232036,
+      "min_logprob_seen": -39.43751907348633,
+      "headline_delta_vs_floor": {
+        "value_nats": 1.0679258565543526e-05,
+        "replication_floor_nats": 1.508752246979599e-11,
+        "excess_over_floor_nats": 1.0679243478021055e-05,
+        "ratio_to_floor": 707820.5574787077,
+        "above_replication_floor": true,
+        "interpretation": "ratio is a reproducibility diagnostic only; read value_nats for magnitude. No materiality threshold is applied here."
+      }
+    }
+  },
+  "checks": {
+    "enough_cells_above_abs_floor_to_test": true,
+    "rel_p99_within_tolerance": false,
+    "rel_max_within_tolerance": false
+  },
+  "passed": false,
+  "recommended_storage_dtype": "float32",
+  "kl_spec_hash": "5565ff73dbe5e36a",
+  "git": {
+    "git_head": "e19fbacae3d0b64b5e56553c6246789b9f3a8dae",
+    "git_dirty": false
+  },
+  "software": {
+    "python": "3.12.13",
+    "kernel": "6.8.0-65-generic",
+    "torch": "2.10.0+cu128",
+    "torch_cuda": "12.8",
+    "vllm": "0.19.1",
+    "transformers": "5.15.1",
+    "compressed_tensors": "0.15.0.1",
+    "nvcc": "Cuda compilation tools, release 12.9, V12.9.86",
+    "git_head": "e19fbacae3d0b64b5e56553c6246789b9f3a8dae",
+    "git_dirty": false,
+    "git_untracked_files": 1
+  },
+  "timestamp": "2026-08-26T00:33:11-0400"
+}
