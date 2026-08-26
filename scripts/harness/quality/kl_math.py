@@ -150,3 +150,22 @@ def bootstrap_summary(point, draws, ci=(0.025, 0.975)):
         "std_error": float(d.std(ddof=1)),
         "draws": int(d.size),
     }
+
+
+def floor_comparison(value_nats, floor_nats):
+    """Absolute magnitude first, ratio second.
+
+    A ratio against a near-zero floor is unbounded and says nothing about magnitude: FP8's
+    chunking difference reads 15.7x its floor at 6.15e-09 nats. `above_replication_floor` is a
+    reproducibility diagnostic, not a claim that the difference matters.
+    """
+    v, f = float(value_nats), float(floor_nats)
+    return {
+        "value_nats": v,
+        "replication_floor_nats": f,
+        "excess_over_floor_nats": v - f,
+        "ratio_to_floor": (None if f == 0.0 else v / f),
+        "above_replication_floor": bool(v > f),
+        "interpretation": "ratio is a reproducibility diagnostic only; read value_nats for "
+                          "magnitude. No materiality threshold is applied here.",
+    }

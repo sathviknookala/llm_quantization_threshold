@@ -192,11 +192,38 @@ self-contained rather than depending on the corpus body, which is gitignored as 
 artifact is hashed over canonical parsed content, and every later scoring pass records the hash it
 consumed.
 
-**Freezing is gated.** Production trajectories are not generated or written until the engine-profile
-gate below has run and its result has been surfaced for review. Generation and scoring must share one
-engine profile: the alignment check compares a sampled token against the *scoring* engine's
-distribution, so freezing a trajectory under an unvalidated profile couples the two through a choice
-nobody has evidence for yet.
+Generation is submitted in groups of **16**, below BF16's measured KV wall of `[17, 18]` (D11), so no
+trajectory is produced under preemption. What recompute-preemption does to a seeded per-request
+generator is not something this project has measured, so it is avoided rather than assumed benign.
+
+**Freezing was gated on the engine profile and is now released.** Generation and scoring share one
+profile — `graph_2048` — because the alignment check compares a sampled token against the *scoring*
+engine's distribution; freezing under a different profile would couple the two through an unmeasured
+choice.
+
+Once written, `results/quality/trajectories.json` is **immutable experimental input**. Every KL
+context in the study is a prefix of one of these continuations, so regenerating them is a new
+experiment identity, not a rerun — the freezing path refuses to overwrite, and no later phase
+regenerates during resume.
+
+**Replayability is measured, not assumed.** Whether the locked seed and profile reproduce the same
+token IDs across independent BF16 launches is an empirical question answered by its own gate
+(`results/quality/gates/replayability.json`). The design does not depend on the answer: once
+generated and validated, the frozen token IDs and their hash are the authoritative evaluation
+contexts.
+
+### Grid completeness — LOCKED 2026-08-25
+
+Every trajectory must carry **all ten** retained positions in every configuration. Missing,
+duplicated, mislabeled and out-of-vector positions are hard failures at collection and again at
+analysis. A partial trajectory is never averaged: the headline is a mean of per-trajectory means, so
+nine positions would silently be weighted as if they were ten. The statistical sample stays exactly
+64 trajectory means.
+
+Stored cells are not trusted. Analysis independently reconstructs each context and target from the
+frozen trajectory, its trajectory index and its recorded position, and requires a byte-for-byte match
+with what was stored — the check that catches a position-label scramble, which no same-cell
+self-consistency check can see.
 
 Seeded generation is not assumed to be replayable: vLLM's per-request seed fixes sampling given the
 logits, but the logits depend on batch composition. Replayability is measured and recorded; the
@@ -245,7 +272,7 @@ Report the bootstrap bias and standard error beside every interval. Percentile i
 a right-skewed non-negative statistic are not guaranteed nominal coverage; that caveat travels with
 the number (see `LIMITATIONS.md`). A bias-corrected variant is deferred, not adopted.
 
-### Engine profile — GATED 2026-08-25
+### Engine profile — LOCKED 2026-08-25 (G9)
 
 The quality rig drives an in-process engine while the serving axis ran an HTTP server, so the engine
 controls that can change execution are pinned, recorded from **observed** state rather than from
@@ -261,19 +288,52 @@ max_num_batched_tokens     2048   the value the measured serving axis actually r
 enable_prefix_caching      true   the deliberate H7 exception
 max_logprobs             128256   differs from serving's default of 20; a request-validation bound
                                   with no effect on kernels, memory or dispatch
-enforce_eager           decided   by the gate below
+enforce_eager             false   CUDA graphs; decided by G9, see below
 ```
 
-Two equivalences are measured before the profile is fixed:
+The profile is named **`graph_2048`**. Both equivalences were measured before it was fixed
+(`results/quality/gates/engine_profile.json`, 16 launches, 40 cells each, 4 provisional
+trajectories):
 
 - **eager versus CUDA-graph execution** — identical contexts and checkpoint, with only
   `enforce_eager` flipped;
 - **chunked versus unchunked prefill** — `max_num_batched_tokens = 2048`, which splits the longest
-  retained context (2,559 tokens) across scheduler steps, against the unchunked offline alternative.
+  retained context (2,559 tokens) across scheduler steps, against the offline default of 8192.
 
-Both are reported against the replication floor, since a difference smaller than the floor is not a
-difference this rig can resolve. The outcome fixes the production profile and releases trajectory
-freezing.
+```text
+                floor(graph)   floor(eager)   eager_vs_graph   chunk_vs_unchunk
+BF16               3.984e-04      3.834e-04        5.812e-04          4.280e-04
+FP8                1.140e-11      2.765e-06        4.032e-03          1.629e-10
+FP4                7.798e-11      4.632e-06        3.739e-02          2.153e-02
+```
+
+Headline nats, mean-within-trajectory then across trajectories. **Neither control is numerically
+inert.** For BF16 both differences sit at its own replication floor, but FP4 moves 3.74e-02 nats
+when `enforce_eager` flips (top-1 changes in 4 of 40 cells) and 2.15e-02 nats between 2048 and 8192
+(top-1 changes in 6 of 40). FP8 moves 4.03e-03 nats under the eager flip. These are quantified
+results about the engine, not merely a configuration choice; `LIMITATIONS.md` carries them.
+
+`graph_2048` is selected because it is the profile the quality axis must share with the measured
+serving axis:
+
+- it is the only profile that reproduces the serving sweep's KV capacities for **all three**
+  configurations — 44,688 / 97,888 / 120,944, matching `results/sweep/`. Eager lands
+  44,864 / 98,064 / 121,120 and 8192 lands 41,728 / 95,888 / 119,360;
+- 2048 is the batching profile the completed sweep actually ran;
+- it gives the lowest headline replication floor for every configuration, and 5 orders lower than
+  eager for FP8 and FP4.
+
+The decision releases trajectory freezing. Locking `enforce_eager` changes `KL_SPEC`, so the G9
+artifact carries the earlier spec hash `4ef13273db16d285` — the hash under which it was measured.
+
+### Reading a difference against the replication floor
+
+Every engine-level difference is reported as an **absolute magnitude in nats first**, with the ratio
+to the measured floor as a secondary reproducibility diagnostic. The two must not be conflated: FP8's
+chunking difference is 15.7x its replication floor and simultaneously 6.15e-09 nats, which is
+nothing. `above_replication_floor` says a difference is reproducible, not that it matters. No
+post-hoc materiality threshold is applied to KL values; the raw numbers are preserved and the
+thresholds that exist are correctness trip-wires with pre-registered bounds.
 
 ### Persisted distribution precision — GATED 2026-08-25
 

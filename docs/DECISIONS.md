@@ -771,6 +771,38 @@ operational detail lives in `EVALUATION_RIG.md` A.1; this entry records the deci
   (H10). `enforce_eager` and chunked-versus-unchunked prefill are decided by a gate that measures
   them, and **production trajectories are not frozen until that gate has run and been reviewed**.
 
+**Amended 2026-08-25 — the engine profile is locked to `graph_2048` (G9 result).**
+`enforce_eager = False`, `max_num_batched_tokens = 2048`, prefix caching on, `detokenize = False`.
+The gate ran over 16 launches and 40 cells per comparison
+(`results/quality/gates/engine_profile.json`, measured under KL_SPEC `4ef13273db16d285`, the hash
+before `enforce_eager` was fixed).
+
+The deciding evidence is correspondence with the measured serving axis, not numerical convenience:
+`graph_2048` is the only profile that reproduces the sweep's KV capacities for all three
+configurations (44,688 / 97,888 / 120,944), and 2048 is the batching profile the sweep ran. It also
+gives the lowest replication floor for every configuration.
+
+The gate's other finding is a result in its own right and is **not** to be reported as a settled
+configuration detail: **neither control is numerically inert for the quantized paths.** FP4 moves
+3.74e-02 nats at the headline under the eager flip (top-1 changes in 4 of 40 cells) and 2.15e-02
+between 2048 and 8192 (6 of 40); FP8 moves 4.03e-03 under the eager flip. BF16 sits at its own
+replication floor under both. `LIMITATIONS.md` carries this as a quantified limitation of what the
+KL numbers describe.
+
+Three consequences were locked with it:
+
+- **Grid completeness is a hard failure, not a filter.** All ten retained positions per trajectory
+  per configuration; missing, duplicate, mislabeled or extra positions abort at collection and again
+  at analysis. The headline sample stays exactly 64 trajectory means.
+- **Stored cells are re-derived, on the production path.** Collection re-derives each context and
+  target before the GPU is touched, and analysis reconstructs them independently from the frozen
+  trajectory, index and position and requires a byte-for-byte match. A check with no production
+  caller does not satisfy the contract.
+- **Floor ratios are diagnostics, magnitudes are the result.** Under CUDA graphs FP8 and FP4
+  replicate to ~1e-11 nats, so a few nanonats reads as a large multiple of the floor. Absolute nats
+  are reported first; `above_replication_floor` means reproducible, not material. No post-hoc
+  materiality threshold is introduced.
+
 **Historical prototypes, superseded.** `scripts/logits_probe.py` (synthetic contexts, one position)
 and `scripts/compute_kl.py` (single-position qualification artifact layout, epsilon floor inside the
 logarithm) produced the feasibility evidence cited above and are retained byte-unchanged so that

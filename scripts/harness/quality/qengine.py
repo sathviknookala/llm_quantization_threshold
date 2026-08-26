@@ -185,7 +185,7 @@ def _child():
     meta = {"config_id": job["config_id"], "task": job["task"], "resolved_config": resolved,
             "controls": controls}
 
-    if job["task"] == "score":
+    if job["task"] in ("score", "score_shards"):
         contexts = job["contexts"]
         # one group per trajectory, ascending length, so the shorter prefix's blocks are committed
         # before the longer prefix asks for them
@@ -194,48 +194,79 @@ def _child():
         V = q.VOCAB_SIZE
         mat = np.full((len(contexts), V), -np.inf, dtype=np.float32)
         per, t0 = [], time.time()
-        for start in range(0, len(contexts), group):
-            chunk = contexts[start:start + group]
-            if [len(c) for c in chunk] != sorted(len(c) for c in chunk):
-                raise SystemExit("ABORT: scoring group is not in ascending length order")
-            outs = llm.generate([{"prompt_token_ids": c} for c in chunk], sp)
-            for j, o in enumerate(outs):
-                i = start + j
-                # vLLM sorts by request id and ids are assigned in submission order, so this holds
-                # today; asserting it turns an inherited guarantee into a checked one
-                if list(o.prompt_token_ids) != list(chunk[j]):
-                    raise SystemExit(f"ABORT: output {j} does not correspond to its request")
-                lp = o.outputs[0].logprobs[0]
-                for tid, obj in lp.items():
-                    mat[i, tid] = obj.logprob
-                row = K.validate_distribution(mat[i], V, q.GATES["prob_mass_tolerance"])
-                row["entries_returned"] = len(lp)
-                row["context_len"] = len(contexts[i])
-                row["top1"] = K.top1(mat[i])
-                # observed rather than asserted from our own constant: detokenize=False must
-                # actually have suppressed per-entry decoding
-                probe = next(iter(lp.values()))
-                row["decoded_token_is_none"] = getattr(probe, "decoded_token", None) is None
-                per.append(row)
+        # a shard is a contiguous run of rows; writing each one as it completes means a killed
+        # launch loses at most one shard rather than the whole configuration
+        shards = job.get("shards") or [{"start": 0, "stop": len(contexts),
+                                        "npy": job["out_npy"], "json": None}]
+        shard_meta = []
+        for sh in shards:
+            s_t0 = time.time()
+            s_per = []
+            for start in range(sh["start"], sh["stop"], group):
+                chunk = contexts[start:min(start + group, sh["stop"])]
+                if [len(c) for c in chunk] != sorted(len(c) for c in chunk):
+                    raise SystemExit("ABORT: scoring group is not in ascending length order")
+                outs = llm.generate([{"prompt_token_ids": c} for c in chunk], sp)
+                for j, o in enumerate(outs):
+                    i = start + j
+                    # vLLM sorts by request id and ids are assigned in submission order, so this
+                    # holds today; asserting it turns an inherited guarantee into a checked one
+                    if list(o.prompt_token_ids) != list(chunk[j]):
+                        raise SystemExit(f"ABORT: output {j} does not correspond to its request")
+                    lp = o.outputs[0].logprobs[0]
+                    for tid, obj in lp.items():
+                        mat[i, tid] = obj.logprob
+                    row = K.validate_distribution(mat[i], V, q.GATES["prob_mass_tolerance"])
+                    row["row"] = i
+                    row["entries_returned"] = len(lp)
+                    row["context_len"] = len(contexts[i])
+                    row["top1"] = K.top1(mat[i])
+                    # observed rather than asserted from our own constant: detokenize=False must
+                    # actually have suppressed per-entry decoding
+                    probe = next(iter(lp.values()))
+                    row["decoded_token_is_none"] = getattr(probe, "decoded_token", None) is None
+                    per.append(row)
+                    s_per.append(row)
+            block = mat[sh["start"]:sh["stop"]]
+            np.save(sh["npy"], block)
+            sm = {"start": sh["start"], "stop": sh["stop"], "npy": sh["npy"],
+                  "rows": int(block.shape[0]), "storage_dtype": str(block.dtype),
+                  "seconds": round(time.time() - s_t0, 2), "per_context": s_per}
+            if sh.get("json"):
+                common.write_json(sh["json"], {**sm, "resolved_config": resolved,
+                                               "config_id": job["config_id"],
+                                               "provenance": job.get("provenance", {})})
+            shard_meta.append({k: v for k, v in sm.items() if k != "per_context"})
+        meta["shards"] = shard_meta
         meta["generate_seconds"] = round(time.time() - t0, 2)
         meta["group_size"] = group
-        np.save(job["out_npy"], mat)
+        if not job.get("shards"):
+            np.save(job["out_npy"], mat)
         meta["per_context"] = per
         meta["storage_dtype"] = str(mat.dtype)
     elif job["task"] == "generate":
         sp = SamplingParams(**q.GENERATION_SAMPLING)
-        t0 = time.time()
-        outs = llm.generate([{"prompt_token_ids": p} for p in job["prompts"]], sp)
+        prompts = job["prompts"]
+        # groups stay under the measured BF16 KV wall so no trajectory is generated under
+        # preemption; recompute-preemption's effect on a seeded per-request generator is not
+        # something this project has measured, so it is avoided rather than assumed benign
+        group = int(job.get("group_size") or len(prompts))
+        cont, t0 = [], time.time()
+        for start in range(0, len(prompts), group):
+            chunk = prompts[start:start + group]
+            outs = llm.generate([{"prompt_token_ids": p} for p in chunk], sp)
+            for o, sent in zip(outs, chunk):
+                # a silent prompt/continuation mispairing here would corrupt the frozen trajectory
+                # artifact permanently, with nothing downstream able to detect it
+                if list(o.prompt_token_ids) != list(sent):
+                    raise SystemExit("ABORT: generation output does not correspond to its prompt")
+            # token IDs straight from the engine: decode/re-encode could change the sequence at
+            # the prompt/continuation boundary
+            cont.extend(list(o.outputs[0].token_ids) for o in outs)
         meta["generate_seconds"] = round(time.time() - t0, 2)
-        # token IDs straight from the engine: decode/re-encode could change the sequence at the
-        # prompt/continuation boundary
-        for o, sent in zip(outs, job["prompts"]):
-            # a silent prompt/continuation mispairing here would corrupt the frozen trajectory
-            # artifact permanently, with nothing downstream able to detect it
-            if list(o.prompt_token_ids) != list(sent):
-                raise SystemExit("ABORT: generation output does not correspond to its prompt")
-        meta["continuations"] = [list(o.outputs[0].token_ids) for o in outs]
-        meta["continuation_lengths"] = [len(c) for c in meta["continuations"]]
+        meta["group_size"] = group
+        meta["continuations"] = cont
+        meta["continuation_lengths"] = [len(c) for c in cont]
     else:
         raise SystemExit(f"ABORT: unknown task {job['task']!r}")
 

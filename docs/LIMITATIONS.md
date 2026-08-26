@@ -219,6 +219,43 @@ difference between scoring with prefix caching on versus off, and the difference
 CUDA-graph execution. Where a measured effect is not large relative to these, the study says so
 instead of reporting the effect.
 
+**A floor ratio is not a magnitude.** Under CUDA graphs FP8 and FP4 replicate to ~1e-11 nats, so a
+difference of a few nanonats reads as many multiples of the floor while being numerically nothing.
+Every comparison here reports the absolute nats first and the ratio as a reproducibility diagnostic;
+"above the replication floor" means reproducible, not important.
+
+## The execution profile changes quantized model outputs, and that is a result, not a footnote
+
+The quality axis runs `graph_2048` — CUDA graphs, `max_num_batched_tokens = 2048` — because that is
+the execution profile the measured serving axis ran under, confirmed by its exactly reproducing the
+sweep's KV capacities for all three configurations. Choosing it was necessary for comparability. But
+G9 also measured what the alternatives do, and the finding stands on its own
+(`results/quality/gates/engine_profile.json`, 4 trajectories x 10 positions = 40 cells per
+comparison):
+
+```text
+                   eager vs graph              chunked 2048 vs unchunked 8192
+BF16    5.81e-04 nats, top-1 40/40       4.28e-04 nats, top-1 40/40
+FP8     4.03e-03 nats, top-1 39/40       1.63e-10 nats, top-1 40/40
+FP4     3.74e-02 nats, top-1 36/40       2.15e-02 nats, top-1 34/40
+```
+
+FP4's sensitivity to `enforce_eager` — 3.74e-02 nats at the headline, 2.95e-01 at the worst cell — is
+the same order as the historical BF16-to-FP4 position-1 median. In other words, for the FP4
+deployment an execution-profile change can move the next-token distribution about as far as the
+quantization step itself does at short contexts, and it flips the argmax on a tenth of the sampled
+cells. BF16 is indistinguishable from its own replication floor under both flips, so the sensitivity
+is a property of the quantized paths, not of the rig in general.
+
+Two consequences travel with every quality number:
+
+- KL values here describe these checkpoints **under this execution profile**. A deployment serving
+  the same FP4 checkpoint eagerly, or with unchunked prefill, is not guaranteed the same
+  distribution, and this study has not measured how far that generalizes.
+- The study has not attributed the effect to a mechanism. Graph capture, kernel autotuning
+  selection, and prefill chunk boundaries all differ between the profiles; separating them was not
+  attempted.
+
 ## The quality engine is the deployed configuration, but not the serving process
 
 Quality is measured through the same checkpoints, backend and kernels as the serving axis, verified

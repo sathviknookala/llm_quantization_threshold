@@ -15,6 +15,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from harness import common  # noqa: E402
+from harness.quality.positions import RETAINED_POSITIONS  # noqa: E402
 
 QUALITY_DIR = os.path.join(common.REPO, "results", "quality")
 KL_DIR = os.path.join(QUALITY_DIR, "kl")
@@ -49,10 +50,17 @@ QUALITY_ENGINE_CONTROLS = {
     # LLM_CLASS would default to 8192 while the measured serving axis ran the server default of
     # 2048, so the longest KL context would chunk differently across the two axes
     "max_num_batched_tokens": 2048,
-    "enforce_eager": None,
+    # LOCKED by G9 2026-08-25. Not a neutral knob: flipping it moves FP4 by 3.74e-02 nats and
+    # flips top-1 in 4/40 cells (results/quality/gates/engine_profile.json).
+    "enforce_eager": False,
     "seed": 0,
     "dtype": "auto",
 }
+PROFILE_NAME = "graph_2048"
+
+# Generation runs below BF16's measured KV wall (D11: [17,18]) so no trajectory is produced under
+# preemption; 16 x 2560 = 40,960 tokens against 44,688.
+GENERATION_GROUP_SIZE = 16
 
 # Knobs that differ from the measured serving axis, enumerated rather than glossed.
 ENGINE_DELTAS_VS_SERVING = {
@@ -122,6 +130,9 @@ KL_SPEC = {
     "vocab_size": VOCAB_SIZE,
     "generation": dict(GENERATION_SAMPLING),
     "generation_tokens": GENERATION_TOKENS,
+    "generation_group_size": GENERATION_GROUP_SIZE,
+    "engine_profile_name": PROFILE_NAME,
+    "retained_positions": list(RETAINED_POSITIONS),
     "scoring": dict(SCORING_SAMPLING),
     "engine_controls": dict(QUALITY_ENGINE_CONTROLS),
     "storage_dtype": STORAGE_DTYPE,

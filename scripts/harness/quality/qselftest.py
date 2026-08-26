@@ -229,8 +229,141 @@ def test_bootstrap():
           round((summ["ci_high"] - summ["ci_low"]) / 2.0, 12))
 
 
+def test_completeness():
+    print("completeness: the ten-position rule")
+    full = [{"trajectory_index": t, "position_p": pp} for t, pp in P.grid_order(3)]
+    check("a complete 3x10 grid passes", P.assert_complete_grid(full, 3), True)
+
+    raises("a trajectory missing one position fails",
+           lambda: P.assert_complete_grid([c for c in full if not
+                                           (c["trajectory_index"] == 1 and c["position_p"] == 256)],
+                                          3),
+           P.GridIncompleteError)
+    raises("a duplicated cell fails",
+           lambda: P.assert_complete_grid(full + [full[5]], 3), P.GridIncompleteError)
+    raises("an unretained position fails",
+           lambda: P.assert_complete_grid(full + [{"trajectory_index": 0, "position_p": 777}], 3),
+           P.GridIncompleteError)
+    raises("a trajectory index outside the range fails",
+           lambda: P.assert_complete_grid(
+               full + [{"trajectory_index": 9, "position_p": pp} for pp in P.RETAINED_POSITIONS],
+               3),
+           P.GridIncompleteError)
+    raises("an entirely absent trajectory fails",
+           lambda: P.assert_complete_grid([c for c in full if c["trajectory_index"] != 2], 3),
+           P.GridIncompleteError)
+    mislabeled = [dict(c) for c in full]
+    mislabeled[3]["position_p"] = mislabeled[2]["position_p"]
+    raises("a mislabeled position fails as a duplicate-and-gap",
+           lambda: P.assert_complete_grid(mislabeled, 3), P.GridIncompleteError)
+    check("canonical order is trajectory-major, position-ascending",
+          P.grid_order(2)[:11],
+          [(0, p) for p in P.RETAINED_POSITIONS] + [(1, 1)])
+
+
+def test_floor_reporting():
+    print("floor: absolute magnitude travels with the ratio")
+    fc = K.floor_comparison(6.148e-09, 3.92e-10)
+    check("a large ratio over a near-zero floor still reports its absolute value",
+          fc["value_nats"] < 1e-8 and fc["ratio_to_floor"] > 10.0, True)
+    check("above_replication_floor is reported", fc["above_replication_floor"], True)
+    check("excess is absolute, not relative",
+          round(fc["excess_over_floor_nats"], 15), round(6.148e-09 - 3.92e-10, 15))
+    check("a zero floor yields no ratio rather than an infinity",
+          K.floor_comparison(1e-3, 0.0)["ratio_to_floor"], None)
+    check("a value at the floor is not above it",
+          K.floor_comparison(1e-3, 1e-3)["above_replication_floor"], False)
+    check("no materiality verdict is emitted",
+          any(k in fc for k in ("material", "significant", "meaningful")), False)
+
+
+def test_analysis_verification():
+    print("analysis: independent re-derivation of stored cells")
+    from harness.quality import analyze_kl as A
+    prompt, cont = synthetic()
+    traj = {"n_trajectories": 2,
+            "trajectories": [{"trajectory_index": i, "prompt_index": i,
+                              "prompt_token_ids": [x + i for x in prompt],
+                              "continuation_token_ids": [x + i for x in cont]}
+                             for i in range(2)]}
+
+    def cells_for(traj_rec):
+        out = []
+        for t in traj_rec["trajectories"]:
+            for cell in P.build_all(t["prompt_token_ids"], t["continuation_token_ids"]):
+                out.append({"trajectory_index": t["trajectory_index"],
+                            "position_p": cell["position_p"],
+                            "context_len": cell["context_len"],
+                            "target_token_id": cell["target_token_id"]})
+        return out
+
+    good = cells_for(traj)
+    check("a faithful grid verifies", A.verify_cells(good, traj), 20)
+
+    shifted = [dict(c) for c in good]
+    shifted[4]["target_token_id"] += 1
+    raises("a corrupted target is caught", lambda: A.verify_cells(shifted, traj), SystemExit)
+
+    swapped = [dict(c) for c in good]
+    swapped[0]["trajectory_index"], swapped[10]["trajectory_index"] = 1, 0
+    raises("a cross-trajectory swap is caught", lambda: A.verify_cells(swapped, traj), SystemExit)
+
+    scrambled = [dict(c) for c in good]
+    scrambled[1]["position_p"], scrambled[2]["position_p"] = (scrambled[2]["position_p"],
+                                                              scrambled[1]["position_p"])
+    raises("a position-label scramble is caught",
+           lambda: A.verify_cells(scrambled, traj), SystemExit)
+
+    partial = [c for c in good if c["position_p"] != 2048]
+    raises("a 9/10 grid is refused rather than averaged",
+           lambda: A.verify_cells(partial, traj), SystemExit)
+
+    unknown = [dict(c) for c in good]
+    unknown[0]["trajectory_index"] = 7
+    raises("a cell naming an unknown trajectory is caught",
+           lambda: A.verify_cells(unknown, traj), SystemExit)
+
+
+def test_collection_contract():
+    print("collection: grid construction and shard planning")
+    from harness.quality import collect_kl as C
+    prompt, cont = synthetic()
+    traj = {"n_trajectories": 2, "trajectory_set_hash": "x", "prompt_subset_hash": "y",
+            "trajectories": [{"trajectory_index": i, "prompt_index": i,
+                              "prompt_token_ids": [x + i for x in prompt],
+                              "continuation_token_ids": [x + i for x in cont]}
+                             for i in range(2)]}
+    contexts, index = C.build_grid(traj)
+    check("grid holds n x 10 contexts", len(contexts), 20)
+    check("contexts are emitted in canonical order",
+          [(c["trajectory_index"], c["position_p"]) for c in index], P.grid_order(2))
+    check("each trajectory's ten contexts ascend in length",
+          all(len(contexts[i]) < len(contexts[i + 1]) for i in range(0, 9))
+          and all(len(contexts[i]) < len(contexts[i + 1]) for i in range(10, 19)), True)
+    check("the trajectory boundary resets the length",
+          len(contexts[10]) < len(contexts[9]), True)
+
+    bad = {**traj, "trajectories": [dict(traj["trajectories"][0]), traj["trajectories"][1]]}
+    bad["trajectories"][0] = {**bad["trajectories"][0],
+                              "continuation_token_ids": cont[:-1]}
+    raises("a short continuation is refused before the GPU is touched",
+           lambda: C.build_grid(bad), P.PositionContractError)
+
+    plan = C.shard_plan(64, "BF16", root="/tmp/x", shard_trajectories=8)
+    check("64 trajectories plan into 8 shards", len(plan), 8)
+    check("shards tile the grid with no gap or overlap",
+          [(p["start"], p["stop"]) for p in plan],
+          [(k * 80, (k + 1) * 80) for k in range(8)])
+    check("shard boundaries fall on trajectory boundaries",
+          all(p["start"] % 10 == 0 and p["stop"] % 10 == 0 for p in plan), True)
+    ragged = C.shard_plan(4, "BF16", root="/tmp/x", shard_trajectories=3)
+    check("a ragged tail is still covered", [(p["start"], p["stop"]) for p in ragged],
+          [(0, 30), (30, 40)])
+
+
 def main():
-    tests = [test_positions, test_kl_math, test_bootstrap]
+    tests = [test_positions, test_kl_math, test_bootstrap, test_completeness,
+             test_floor_reporting, test_analysis_verification, test_collection_contract]
     if os.environ.get("QSELFTEST_ONLY"):
         want = os.environ["QSELFTEST_ONLY"]
         tests = [t for t in tests if want in t.__name__]

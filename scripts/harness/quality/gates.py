@@ -302,10 +302,11 @@ def engine_profile(out_dir=None, configs=("BF16_REFERENCE", "FP4_PRIMARY"), n_tr
                                         per_cfg["replication_floor_eager"]["max_nats"]),
                   "chunked_vs_unchunked": per_cfg["replication_floor_graph"]["max_nats"]}
         for name, floor in floors.items():
-            m = per_cfg[name]["max_nats"]
+            fc = K.floor_comparison(per_cfg[name]["max_nats"], floor)
+            per_cfg[name]["vs_replication_floor"] = fc
             per_cfg[name]["replication_floor_used_nats"] = floor
-            per_cfg[name]["ratio_to_replication_floor"] = (None if floor == 0.0 else m / floor)
-            per_cfg[name]["above_replication_floor"] = bool(m > floor)
+            per_cfg[name]["ratio_to_replication_floor"] = fc["ratio_to_floor"]
+            per_cfg[name]["above_replication_floor"] = fc["above_replication_floor"]
         results[short] = per_cfg
         checks[f"{short}_no_preemption"] = all(
             (metas[k].get("engine_metrics") or {}).get("vllm:num_preemptions", 0) in (0, None)
@@ -385,20 +386,38 @@ def engine_profile(out_dir=None, configs=("BF16_REFERENCE", "FP4_PRIMARY"), n_tr
     }
 
 
+GATE_NAMES = ("numerics", "engine-profile", "replayability", "cache-equivalence",
+              "replication-floor", "storage-precision")
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--gate", required=True, choices=["numerics", "engine-profile"])
+    ap.add_argument("--gate", required=True, choices=list(GATE_NAMES))
     ap.add_argument("--out", default="")
     ap.add_argument("--n-traj", type=int, default=4)
-    ap.add_argument("--configs", default="BF16_REFERENCE,FP4_PRIMARY")
+    ap.add_argument("--configs", default="")
+    ap.add_argument("--root", default="", help="collection root for the data-dependent gates")
+    ap.add_argument("--floor", default="")
     ap.add_argument("--allow-dirty", action="store_true")
     ap.add_argument("--force", action="store_true")
     a = ap.parse_args()
+    cfgs = tuple(c for c in a.configs.split(",") if c)
     if a.gate == "numerics":
         rec = numerics_compat(allow_dirty=a.allow_dirty)
-    else:
-        rec = engine_profile(configs=tuple(c for c in a.configs.split(",") if c),
+    elif a.gate == "engine-profile":
+        rec = engine_profile(configs=cfgs or ("BF16_REFERENCE", "FP4_PRIMARY"),
                              n_traj=a.n_traj, allow_dirty=a.allow_dirty)
+    elif a.gate == "replayability":
+        rec = replayability(n_traj=a.n_traj or None, allow_dirty=a.allow_dirty)
+    elif a.gate == "cache-equivalence":
+        rec = cache_equivalence(a.root, configs=cfgs or ("BF16_REFERENCE", "FP4_PRIMARY"),
+                                n_traj=a.n_traj, allow_dirty=a.allow_dirty)
+    elif a.gate == "replication-floor":
+        rec = replication_floor(a.root, configs=cfgs or None, n_traj=a.n_traj,
+                                allow_dirty=a.allow_dirty)
+    else:
+        rec = storage_precision(a.root, n_traj=a.n_traj, allow_dirty=a.allow_dirty,
+                                floor_path=a.floor or None)
     out = a.out or os.path.join(q.QUALITY_DIR, "gates", f"{rec['gate']}.json")
     if os.path.exists(out) and not a.force:
         prior = json.load(open(out)).get("kl_spec_hash")
@@ -414,3 +433,288 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+def replayability(out_dir=None, n_traj=None, allow_dirty=False):
+    """Is seeded BF16 generation reproducible across independent launches?
+
+    Empirical, not an invariant. If it is not replayable the design still holds: the frozen token
+    IDs are the evaluation contexts, and nothing downstream regenerates them.
+    """
+    from harness.quality import trajectories as T
+    out_dir = out_dir or os.path.join(q.QUALITY_DIR, "gates", "replayability")
+    os.makedirs(out_dir, exist_ok=True)
+    q.require_clean_tree(allow_dirty, stage="replayability")
+    frozen = T.load()
+    n = n_traj or frozen["n_trajectories"]
+    prompts = [t["prompt_token_ids"] for t in frozen["trajectories"][:n]]
+
+    replay_json = os.path.join(out_dir, "_gen_replay.json")
+    if os.path.exists(replay_json):
+        meta = json.load(open(replay_json))
+    else:
+        meta = T.generate(q.REFERENCE_CONFIG, prompts, out_dir, "replay", allow_dirty=allow_dirty)
+
+    rows, identical = [], 0
+    for i, (t, c) in enumerate(zip(frozen["trajectories"][:n], meta["continuations"])):
+        a = list(t["continuation_token_ids"])
+        same = (a == list(c))
+        identical += int(same)
+        first = None
+        if not same:
+            first = next((j for j in range(min(len(a), len(c))) if a[j] != c[j]), min(len(a), len(c)))
+        rows.append({"trajectory_index": i, "identical": same, "first_divergence": first,
+                     "matching_prefix_tokens": len(a) if same else first,
+                     "replay_length": len(c)})
+    replayable = identical == n
+    return {
+        "gate": "replayability",
+        "purpose": "P7: does the locked seed and profile reproduce BF16 token IDs across "
+                   "independent launches?",
+        "kind": "empirical measurement, not a correctness invariant",
+        "n_trajectories": n,
+        "engine_profile_name": q.PROFILE_NAME,
+        "generation": dict(q.GENERATION_SAMPLING),
+        "generation_group_size": q.GENERATION_GROUP_SIZE,
+        "trajectory_set_hash": frozen["trajectory_set_hash"],
+        "frozen_engine_identity": (frozen.get("observed") or {}).get("engine_identity_hash"),
+        "replay_engine_identity": (meta.get("observed") or {}).get("engine_identity_hash"),
+        "identical_trajectories": identical,
+        "replayable": replayable,
+        "min_matching_prefix_tokens": min(r["matching_prefix_tokens"] for r in rows),
+        "per_trajectory": rows,
+        "consequence": ("generation is replayable under this profile" if replayable else
+                        "generation is NOT bit-reproducible across launches; the frozen token IDs "
+                        "in trajectories.json are the authoritative contexts and are never "
+                        "regenerated"),
+        "kl_spec_hash": q.spec_hash(),
+        "git": q.git_state(),
+        "gpu": common.gpu_identity(),
+        "software": common.software_identity(),
+        "timestamp": common.now_iso(),
+    }
+
+
+def _score_contexts(config_id, contexts, out_stem, overrides, allow_dirty, contexts_hash):
+    """One scoring launch into a bare .npy/.json pair, reused only under matching identity."""
+    npy, js = out_stem + ".npy", out_stem + ".json"
+    ident = q.config_identity(config_id)
+    if os.path.exists(npy) and os.path.exists(js):
+        prior = json.load(open(js))
+        if (prior.get("kl_spec_hash") == q.spec_hash()
+                and prior.get("contexts_hash") == contexts_hash
+                and (prior.get("config_identity") or {}).get("checkpoint_content_hash")
+                == ident["checkpoint_content_hash"]
+                and prior.get("engine_overrides") == dict(overrides or {})):
+            return np.load(npy), prior
+        raise SystemExit(f"ABORT: {npy} was produced under a different spec, context set, "
+                         "checkpoint or engine override; move it aside rather than mixing.")
+    job = {"config_id": config_id, "task": "score", "contexts": contexts,
+           "group_size": len(P.RETAINED_POSITIONS), "out_npy": npy, "out_json": js,
+           "engine_overrides": dict(overrides or {})}
+    meta = E.run_job(job, os.path.join(os.path.dirname(out_stem), "logs",
+                                       os.path.basename(out_stem) + ".log"),
+                     allow_dirty=allow_dirty, timeout=7200)
+    meta["kl_spec_hash"] = q.spec_hash()
+    meta["contexts_hash"] = contexts_hash
+    meta["config_identity"] = ident
+    meta["engine_overrides"] = dict(overrides or {})
+    common.write_json(js, meta)
+    return np.load(npy), meta
+
+
+def _grid_from(root, cfg, n):
+    from harness.quality import collect_kl as C
+    mat, cells, summary = C.load_matrix(cfg, root=root, n_traj=n)
+    return mat, cells, summary
+
+
+def cache_equivalence(root, out_dir=None, configs=("BF16_REFERENCE", "FP4_PRIMARY"), n_traj=4,
+                      allow_dirty=False):
+    """G3 -- prefix caching is the H7 exception; this measures what it costs numerically.
+
+    The cached side is the production collection itself, so the comparison is against the very
+    arrays the study will use rather than a re-run of them.
+    """
+    from harness.quality import collect_kl as C, trajectories as T
+    out_dir = out_dir or os.path.join(q.QUALITY_DIR, "gates", "cache_equivalence")
+    os.makedirs(out_dir, exist_ok=True)
+    q.require_clean_tree(allow_dirty, stage="cache_equivalence")
+    traj = C.subset(T.load(), n_traj)
+    contexts, index = C.build_grid(traj)
+    contexts_hash = common.sha256_of_json(contexts)
+
+    per_cfg, checks = {}, {}
+    for cfg in configs:
+        short = q.QUALITY_CONFIGS[cfg]["short"]
+        cached, csum = _grid_from(root, cfg, n_traj)
+        uncached, umeta = _score_contexts(
+            cfg, contexts, os.path.join(out_dir, f"{short}_nocache"),
+            {"enable_prefix_caching": False}, allow_dirty, contexts_hash)
+        if umeta["resolved_config"]["enable_prefix_caching"] is not False:
+            raise SystemExit(f"ABORT: {cfg} uncached run still reports prefix caching on")
+        cmp = _compare(cached, uncached, index, len(P.RETAINED_POSITIONS))
+        cmp["vs_replication_floor_note"] = ("compare against the production-profile floor in "
+                                            "replication_floor.json")
+        cmp["cached_engine_identity"] = csum["engine_identity_hash"]
+        cmp["uncached_engine_identity"] = umeta["observed"]["engine_identity_hash"]
+        cmp["cached_prefix_cache_metrics"] = {
+            k: v for k, v in (csum.get("engine_metrics") or {}).items() if "prefix" in k}
+        cmp["uncached_prefix_cache_metrics"] = {
+            k: v for k, v in (umeta.get("engine_metrics") or {}).items() if "prefix" in k}
+        per_cfg[short] = cmp
+        checks[f"{short}_uncached_caching_observed_off"] = True
+        checks[f"{short}_cells_complete"] = cmp["cells"] == n_traj * len(P.RETAINED_POSITIONS)
+    return {
+        "gate": "cache_equivalence",
+        "purpose": "G3: prefix caching on (the production setting) vs off, same contexts",
+        "kind": "empirical measurement",
+        "configs": list(configs),
+        "n_trajectories": n_traj,
+        "contexts_hash": contexts_hash,
+        "results": per_cfg,
+        "checks": checks,
+        "integrity_passed": all(checks.values()),
+        "kl_spec_hash": q.spec_hash(),
+        "git": q.git_state(),
+        "gpu": common.gpu_identity(),
+        "software": common.software_identity(),
+        "timestamp": common.now_iso(),
+    }
+
+
+def replication_floor(root, out_dir=None, configs=None, n_traj=4, allow_dirty=False):
+    """G2 -- the noise floor of the production profile, from an independent second launch.
+
+    Measured against the production collection itself, per configuration, so every KL reported
+    later has a same-profile floor to be read beside.
+    """
+    from harness.quality import collect_kl as C, trajectories as T
+    configs = tuple(configs or q.LADDER)
+    out_dir = out_dir or os.path.join(q.QUALITY_DIR, "gates", "replication_floor")
+    os.makedirs(out_dir, exist_ok=True)
+    q.require_clean_tree(allow_dirty, stage="replication_floor")
+    traj = C.subset(T.load(), n_traj)
+    contexts, index = C.build_grid(traj)
+    contexts_hash = common.sha256_of_json(contexts)
+    n_pos = len(P.RETAINED_POSITIONS)
+
+    per_cfg, checks = {}, {}
+    for cfg in configs:
+        short = q.QUALITY_CONFIGS[cfg]["short"]
+        a, asum = _grid_from(root, cfg, n_traj)
+        b, bmeta = _score_contexts(cfg, contexts, os.path.join(out_dir, f"{short}_r2"),
+                                   {}, allow_dirty, contexts_hash)
+        if asum["engine_identity_hash"] == bmeta["observed"]["engine_identity_hash"]:
+            same_engine = True
+        else:
+            same_engine = False
+        cmp = _compare(a, b, index, n_pos)
+        cmp["engine_identity_a"] = asum["engine_identity_hash"]
+        cmp["engine_identity_b"] = bmeta["observed"]["engine_identity_hash"]
+        cmp["same_observed_engine_identity"] = same_engine
+        per_cfg[short] = cmp
+        checks[f"{short}_independent_launches_same_profile"] = same_engine
+        checks[f"{short}_cells_complete"] = cmp["cells"] == n_traj * n_pos
+    return {
+        "gate": "replication_floor",
+        "purpose": "G2: same configuration, same graph_2048 profile, two independent launches",
+        "kind": "empirical measurement -- the resolution limit of every KL reported here",
+        "engine_profile_name": q.PROFILE_NAME,
+        "configs": list(configs),
+        "n_trajectories": n_traj,
+        "contexts_hash": contexts_hash,
+        "per_config": {k: {"headline_nats": v["headline_nats"], "max_nats": v["max_nats"],
+                           "mean_nats": v["mean_nats"], "p99_nats": v["p99_nats"],
+                           "top1_agreement": v["top1_agreement"],
+                           "bit_identical_cells": v["bit_identical_cells"],
+                           "by_position": v["by_position"]}
+                       for k, v in per_cfg.items()},
+        "results": per_cfg,
+        "checks": checks,
+        "integrity_passed": all(checks.values()),
+        "kl_spec_hash": q.spec_hash(),
+        "git": q.git_state(),
+        "gpu": common.gpu_identity(),
+        "software": common.software_identity(),
+        "timestamp": common.now_iso(),
+    }
+
+
+def storage_precision(root, n_traj=4, allow_dirty=False, floor_path=None):
+    """G4 -- fp16 vs fp32 STORAGE, derived from the same fp32 arrays.
+
+    Both sides come from one set of model outputs, so the only variable is the stored
+    representation. Comparing separately generated fp16 and fp32 runs would confound storage with
+    the launch-to-launch floor.
+    """
+    from harness.quality import collect_kl as C, trajectories as T
+    q.require_clean_tree(allow_dirty, stage="storage_precision")
+    traj = C.subset(T.load(), n_traj)
+    n = traj["n_trajectories"]
+    mats = {}
+    for cfg in q.LADDER:
+        mat, cells, summary = C.load_matrix(cfg, root=root, n_traj=n)
+        if str(mat.dtype) != "float32":
+            raise SystemExit(f"ABORT: {cfg} is stored as {mat.dtype}; G4 needs the fp32 arrays")
+        mats[cfg] = mat
+    floor = json.load(open(floor_path)) if floor_path and os.path.exists(floor_path) else None
+
+    idx = K.bootstrap_indices(n, q.BOOTSTRAP["draws"], q.BOOTSTRAP["seed"])
+    pairs, worst_rel_p99, worst_rel_max, worst_abs = {}, 0.0, 0.0, 0.0
+    for a, b in q.KL_PAIRS:
+        label = f"{q.QUALITY_CONFIGS[a]['short']}||{q.QUALITY_CONFIGS[b]['short']}"
+        f32 = np.array([K.kl_nats(mats[a][i], mats[b][i]) for i in range(mats[a].shape[0])])
+        ha = mats[a].astype(np.float16).astype(np.float32)
+        hb = mats[b].astype(np.float16).astype(np.float32)
+        f16 = np.array([K.kl_nats(ha[i], hb[i]) for i in range(ha.shape[0])])
+        d = f16 - f32
+        # AND-exclude: the relative bound is only meaningful where the true KL is above the
+        # absolute floor, otherwise a 1e-12 baseline manufactures enormous relative errors
+        keep = f32 >= q.GATES["precision_abs_floor_nats"]
+        rel = np.abs(d[keep]) / f32[keep] if keep.any() else np.zeros(0)
+        rec = {
+            "cells": int(f32.size),
+            "cells_above_abs_floor": int(keep.sum()),
+            "abs_floor_nats": q.GATES["precision_abs_floor_nats"],
+            "fp32_headline_nats": float(K.headline(f32.reshape(n, -1))),
+            "fp16_headline_nats": float(K.headline(f16.reshape(n, -1))),
+            "headline_delta_nats": float(K.headline(f16.reshape(n, -1))
+                                         - K.headline(f32.reshape(n, -1))),
+            "mean_abs_delta_nats": float(np.abs(d).mean()),
+            "max_abs_delta_nats": float(np.abs(d).max()),
+            "rel_p99": float(np.quantile(rel, 0.99)) if rel.size else None,
+            "rel_max": float(rel.max()) if rel.size else None,
+            "underflowed_entries_fp16": int((np.isneginf(ha) & ~np.isneginf(mats[a])).sum()),
+        }
+        if floor:
+            fl = ((floor.get("per_config") or {}).get(q.QUALITY_CONFIGS[a]["short"]) or {})
+            if fl.get("headline_nats") is not None:
+                rec["headline_delta_vs_floor"] = K.floor_comparison(
+                    abs(rec["headline_delta_nats"]), fl["headline_nats"])
+        pairs[label] = rec
+        if rec["rel_p99"] is not None:
+            worst_rel_p99 = max(worst_rel_p99, rec["rel_p99"])
+            worst_rel_max = max(worst_rel_max, rec["rel_max"])
+        worst_abs = max(worst_abs, rec["max_abs_delta_nats"])
+
+    checks = {
+        "rel_p99_within_tolerance": worst_rel_p99 <= q.GATES["precision_rel_p99_max"],
+        "rel_max_within_tolerance": worst_rel_max <= q.GATES["precision_rel_max"],
+    }
+    return {
+        "gate": "storage_precision",
+        "purpose": "G4: fp16 vs fp32 storage of the SAME model outputs",
+        "kind": "empirical measurement with pre-registered thresholds",
+        "thresholds": {k: q.GATES[k] for k in
+                       ("precision_rel_p99_max", "precision_rel_max", "precision_abs_floor_nats")},
+        "n_trajectories": n,
+        "pairs": pairs,
+        "checks": checks,
+        "passed": all(checks.values()),
+        "recommended_storage_dtype": "float16" if all(checks.values()) else "float32",
+        "kl_spec_hash": q.spec_hash(),
+        "git": q.git_state(),
+        "software": common.software_identity(),
+        "timestamp": common.now_iso(),
+    }

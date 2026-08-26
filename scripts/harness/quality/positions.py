@@ -91,3 +91,49 @@ def rederive_and_check(prompt_ids, cont_ids, position_p, context_len_seen, targe
     if list(context_ids_seen) != context:
         problems.append("context token IDs differ from re-derivation")
     return (problems == []), problems
+
+
+class GridIncompleteError(PositionContractError):
+    pass
+
+
+def assert_complete_grid(cells, n_trajectories):
+    """Every trajectory carries all ten retained positions, exactly once.
+
+    A partial trajectory must not be averaged: the headline is a mean of per-trajectory means, so a
+    trajectory scored at 9 positions would silently weight those nine as if they were ten.
+    """
+    seen = {}
+    for c in cells:
+        t, p = c["trajectory_index"], c["position_p"]
+        if p not in RETAINED_POSITIONS:
+            raise GridIncompleteError(
+                f"trajectory {t}: position {p!r} is not in the retained vector "
+                f"{list(RETAINED_POSITIONS)}")
+        key = (t, p)
+        if key in seen:
+            raise GridIncompleteError(f"trajectory {t}: position {p} appears more than once")
+        seen[key] = c
+    want_t = set(range(n_trajectories))
+    got_t = {t for t, _ in seen}
+    if got_t - want_t:
+        raise GridIncompleteError(
+            f"trajectory indices outside 0..{n_trajectories - 1}: {sorted(got_t - want_t)}")
+    incomplete = {}
+    for t in sorted(want_t):
+        missing = [p for p in RETAINED_POSITIONS if (t, p) not in seen]
+        if missing:
+            incomplete[t] = missing
+    if incomplete:
+        raise GridIncompleteError(
+            f"{len(incomplete)} trajectory/ies are not 10/10: "
+            + "; ".join(f"traj {t} missing {m}" for t, m in sorted(incomplete.items())[:8]))
+    expected = n_trajectories * len(RETAINED_POSITIONS)
+    if len(seen) != expected:
+        raise GridIncompleteError(f"grid holds {len(seen)} cells, contract requires {expected}")
+    return True
+
+
+def grid_order(n_trajectories):
+    """Canonical (trajectory, ascending position) enumeration; the storage row order."""
+    return [(t, p) for t in range(n_trajectories) for p in RETAINED_POSITIONS]

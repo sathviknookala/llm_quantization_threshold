@@ -27,8 +27,11 @@ runners over it; `analyze.py` turns pilot cells into the pilot verdict; `selftes
 cell state machine against a stub engine with no GPU. Renamed from `scripts/pilot/` on 2026-08-24 —
 the harness outlives the pilot.
 
-`scripts/harness/quality/` is the quality arm, KL first. It imports `common.py` and `server.py` and
-edits neither: the serving contract is frozen. `scripts/logits_probe.py`, `scripts/compute_kl.py` and
+`scripts/harness/quality/` is the quality arm, KL first — `positions.py` (retained-position
+contract), `kl_math.py` (float64 KL, trajectory bootstrap), `qcommon.py` (identity, provenance,
+`KL_SPEC`), `qengine.py` (engine lifecycle, observed identity), `trajectories.py` (the frozen BF16
+continuations), `collect_kl.py`, `analyze_kl.py`, `gates.py`, `qselftest.py`. It imports `common.py`
+and `server.py` and edits neither: the serving contract is frozen. `scripts/logits_probe.py`, `scripts/compute_kl.py` and
 `scripts/harness/correctness_gate.py` are **historical qualification/prototype paths**, kept
 byte-unchanged so `results/qualification/` and `results/pilot/` stay reproducible. They are not the
 quality runner and their KL numbers are not quality results.
