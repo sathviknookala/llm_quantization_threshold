@@ -608,7 +608,7 @@ def cache_equivalence(root, out_dir=None, configs=("BF16_REFERENCE", "FP4_PRIMAR
     per_cfg, checks = {}, {}
     for cfg in configs:
         short = q.QUALITY_CONFIGS[cfg]["short"]
-        cached, csum = _grid_from(root, cfg, n_traj)
+        cached, _, csum = _grid_from(root, cfg, n_traj)
         uncached, umeta = _score_contexts(
             cfg, contexts, os.path.join(out_dir, f"{short}_nocache"),
             {"enable_prefix_caching": False}, allow_dirty, contexts_hash)
@@ -675,7 +675,7 @@ def replication_floor(root, out_dir=None, configs=None, n_traj=4, allow_dirty=Fa
     per_cfg, checks = {}, {}
     for cfg in configs:
         short = q.QUALITY_CONFIGS[cfg]["short"]
-        a, asum = _grid_from(root, cfg, n_traj)
+        a, _, asum = _grid_from(root, cfg, n_traj)
         b, bmeta = _score_contexts(cfg, contexts, os.path.join(out_dir, f"{short}_r2"),
                                    {}, allow_dirty, contexts_hash)
         if asum["engine_identity_hash"] == bmeta["observed"]["engine_identity_hash"]:
