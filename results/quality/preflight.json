@@ -1,0 +1,485 @@
+{
+  "artifact": "P12 production preflight",
+  "purpose": "prove the 64-trajectory run would collect the right thing; collects none of it",
+  "n_trajectories": 64,
+  "cells_per_config": 640,
+  "trajectory_set_hash": "1dd71faeb242c7c1be0011491fb51942fb662dfeb2ba2d2d5c2cb428f7a041ad",
+  "kl_spec_hash": "5565ff73dbe5e36a",
+  "engine_profile_name": "graph_2048",
+  "config_identity": {
+    "BF16_REFERENCE": {
+      "configuration_id": "BF16_REFERENCE",
+      "quantization": "BF16",
+      "model_path": "/home/sathvik/.cache/huggingface/hub/models--NousResearch--Meta-Llama-3.1-8B-Instruct/snapshots/d10aef7999a2b5ba950ab3974312feeedbfe0b77",
+      "checkpoint_content_hash": "ced0573c8e17cd04aa5d33b9d8bb10bce81a061a394cabb7771a16232c874f5b",
+      "tokenizer_identity": {
+        "tokenizer.json": "79e3e522635f3171300913bb421464a87de6222182a0570b9b2ccba2a964b2b4",
+        "tokenizer_config.json": "24e8a6dc2547164b7002e3125f10b415105644fcf02bf9ad8b674c87b1eaaed6",
+        "special_tokens_map.json": "6f38c73729248f6c127296386e3cdde96e254636cc58b4169d3fd32328d9a8ec"
+      },
+      "expected_kernel_pattern": null,
+      "forbidden_kernel_patterns": [
+        "CutlassFP8ScaledMMLinearKernel",
+        "NvFp4LinearBackend",
+        "Marlin"
+      ]
+    },
+    "FP8_PRIMARY": {
+      "configuration_id": "FP8_PRIMARY",
+      "quantization": "FP8",
+      "model_path": "/home/sathvik/llm_quantization_threshold/checkpoints/llama31-8b-instruct-FP8_DYNAMIC",
+      "checkpoint_content_hash": "5c0c3e0aaefadde93e18bfd4af6b7a4608aed80e05aa14ce9ad80b7d1c006e50",
+      "tokenizer_identity": {
+        "tokenizer.json": "6b9e4e7fb171f92fd137b777cc2714bf87d11576700a1dcd7a399e7bbe39537b",
+        "tokenizer_config.json": "941290c40ad93f86d5b8d07bbc08dd59881da5ba683e533885b523c9ba184b94",
+        "special_tokens_map.json": "6f38c73729248f6c127296386e3cdde96e254636cc58b4169d3fd32328d9a8ec"
+      },
+      "expected_kernel_pattern": "CutlassFP8ScaledMMLinearKernel",
+      "forbidden_kernel_patterns": [
+        "Marlin"
+      ]
+    },
+    "FP4_PRIMARY": {
+      "configuration_id": "FP4_PRIMARY",
+      "quantization": "FP4",
+      "model_path": "/home/sathvik/llm_quantization_threshold/checkpoints/llama31-8b-instruct-NVFP4",
+      "checkpoint_content_hash": "8866dad87d09688303026d3d683ea6ded90d3eaf41210ec4d75a7b7ff5da06ec",
+      "tokenizer_identity": {
+        "tokenizer.json": "384a7e7c676f7be2e5d2e8449c508be9b00e5b18c5b3c39ebc626e96b3f4b988",
+        "tokenizer_config.json": "941290c40ad93f86d5b8d07bbc08dd59881da5ba683e533885b523c9ba184b94",
+        "special_tokens_map.json": "6f38c73729248f6c127296386e3cdde96e254636cc58b4169d3fd32328d9a8ec"
+      },
+      "expected_kernel_pattern": "FLASHINFER_CUTLASS",
+      "forbidden_kernel_patterns": [
+        "CT_EMULATIONS",
+        "emulation"
+      ]
+    }
+  },
+  "smoke_reference": {
+    "BF16": {
+      "engine_identity_hash": "ca16377ea4206028",
+      "kv_cache_tokens": 44688,
+      "seconds_per_context": 0.142
+    },
+    "FP8": {
+      "engine_identity_hash": "176a222edae755ff",
+      "kv_cache_tokens": 97888,
+      "seconds_per_context": 0.14125000000000001
+    },
+    "FP4": {
+      "engine_identity_hash": "434ad8fac783fb7f",
+      "kv_cache_tokens": 120944,
+      "seconds_per_context": 0.12975
+    }
+  },
+  "engine_probe": {
+    "BF16": {
+      "engine_identity_hash": "ca16377ea4206028",
+      "kv_cache_tokens": 44688,
+      "dispatch_ok": true,
+      "graph_capture_observed": true,
+      "resolved": {
+        "enforce_eager": false,
+        "max_num_batched_tokens": 2048,
+        "enable_prefix_caching": true
+      },
+      "prefix_cache": {
+        "vllm:prefix_cache_queries": 10719,
+        "vllm:prefix_cache_hits": 8048
+      },
+      "seconds": 1.82
+    },
+    "FP8": {
+      "engine_identity_hash": "176a222edae755ff",
+      "kv_cache_tokens": 97888,
+      "dispatch_ok": true,
+      "graph_capture_observed": true,
+      "resolved": {
+        "enforce_eager": false,
+        "max_num_batched_tokens": 2048,
+        "enable_prefix_caching": true
+      },
+      "prefix_cache": {
+        "vllm:prefix_cache_queries": 10719,
+        "vllm:prefix_cache_hits": 8048
+      },
+      "seconds": 1.8
+    },
+    "FP4": {
+      "engine_identity_hash": "434ad8fac783fb7f",
+      "kv_cache_tokens": 120944,
+      "dispatch_ok": true,
+      "graph_capture_observed": true,
+      "resolved": {
+        "enforce_eager": false,
+        "max_num_batched_tokens": 2048,
+        "enable_prefix_caching": true
+      },
+      "prefix_cache": {
+        "vllm:prefix_cache_queries": 10719,
+        "vllm:prefix_cache_hits": 8048
+      },
+      "seconds": 1.58
+    }
+  },
+  "projection": {
+    "cells_per_config": 640,
+    "configs": 3,
+    "seconds_per_context_measured": {
+      "BF16": 0.142,
+      "FP8": 0.1413,
+      "FP4": 0.1298
+    },
+    "projected_scoring_minutes_total": 4.4,
+    "projected_bytes_gib": 0.92,
+    "shards_per_config": 8
+  },
+  "checks": [
+    {
+      "check": "frozen_trajectories_load_and_verify",
+      "ok": true,
+      "detail": {
+        "n": 64,
+        "trajectory_set_hash": "1dd71faeb242c7c1be0011491fb51942fb662dfeb2ba2d2d5c2cb428f7a041ad"
+      }
+    },
+    {
+      "check": "full_grid_rederived",
+      "ok": true,
+      "detail": {
+        "cells": 640,
+        "expected": 640,
+        "every_cell_rederive_checked": true
+      }
+    },
+    {
+      "check": "canonical_order",
+      "ok": true,
+      "detail": {
+        "trajectory_major_position_ascending": true
+      }
+    },
+    {
+      "check": "context_lengths_match_contract",
+      "ok": true,
+      "detail": {
+        "min": 512,
+        "max": 2559,
+        "longest_is_2559": true
+      }
+    },
+    {
+      "check": "targets_match_continuation",
+      "ok": true,
+      "detail": {
+        "cells_checked": 640
+      }
+    },
+    {
+      "check": "shard_plan_tiles_grid",
+      "ok": true,
+      "detail": {
+        "shards": 8,
+        "tiles": [
+          [
+            0,
+            80
+          ],
+          [
+            80,
+            160
+          ],
+          [
+            160,
+            240
+          ],
+          [
+            240,
+            320
+          ],
+          [
+            320,
+            400
+          ],
+          [
+            400,
+            480
+          ],
+          [
+            480,
+            560
+          ],
+          [
+            560,
+            640
+          ]
+        ]
+      }
+    },
+    {
+      "check": "max_model_len_covers_longest_context",
+      "ok": true,
+      "detail": {
+        "max_model_len": 32768,
+        "longest": 2559
+      }
+    },
+    {
+      "check": "engine_profile_is_locked",
+      "ok": true,
+      "detail": {
+        "profile": "graph_2048",
+        "enforce_eager": false,
+        "max_num_batched_tokens": 2048,
+        "enable_prefix_caching": true,
+        "detokenize": false
+      }
+    },
+    {
+      "check": "checkpoint_identity_resolves",
+      "ok": true,
+      "detail": {
+        "BF16_REFERENCE": "ced0573c8e17cd04",
+        "FP8_PRIMARY": "5c0c3e0aaefadde9",
+        "FP4_PRIMARY": "8866dad87d096883"
+      }
+    },
+    {
+      "check": "disk_space_for_full_run",
+      "ok": true,
+      "detail": {
+        "required_gib": 0.92,
+        "free_gib": 4229.9
+      }
+    },
+    {
+      "check": "production_root_unclaimed",
+      "ok": true,
+      "detail": {
+        "root": "results/quality/kl",
+        "distinct_from_smoke": true
+      }
+    },
+    {
+      "check": "faithful_shard_is_reusable",
+      "ok": true,
+      "detail": {
+        "reason": "reused"
+      }
+    },
+    {
+      "check": "resume_refuses_mismatched_spec",
+      "ok": true,
+      "detail": {
+        "reason": "provenance mismatch on kl_spec_hash"
+      }
+    },
+    {
+      "check": "resume_refuses_mismatched_trajectory_set",
+      "ok": true,
+      "detail": {
+        "reason": "provenance mismatch on trajectory_set_hash"
+      }
+    },
+    {
+      "check": "resume_refuses_mismatched_checkpoint",
+      "ok": true,
+      "detail": {
+        "reason": "provenance mismatch on checkpoint_content_hash"
+      }
+    },
+    {
+      "check": "resume_refuses_mismatched_subset_n",
+      "ok": true,
+      "detail": {
+        "reason": "provenance mismatch on subset_n"
+      }
+    },
+    {
+      "check": "resume_refuses_incomplete_shard",
+      "ok": true,
+      "detail": {
+        "reason": "incomplete per-context validation"
+      }
+    },
+    {
+      "check": "sandbox_matrix_loads",
+      "ok": true,
+      "detail": {
+        "shape": [
+          20,
+          128256
+        ]
+      }
+    },
+    {
+      "check": "load_refuses_summary_identity_disagreement",
+      "ok": true,
+      "detail": {
+        "raised": "ABORT: BF16 shards were scored under ['eng000'] but collection_BF16.json claims different"
+      }
+    },
+    {
+      "check": "load_refuses_out_of_order_grid",
+      "ok": true,
+      "detail": {
+        "raised": "ABORT: BF16 shards reassemble out of canonical order; the (trajectory, position) reshape in analysis would average the wrong ten rows together"
+      }
+    },
+    {
+      "check": "verify_cells_accepts_faithful_grid",
+      "ok": true,
+      "detail": {
+        "cells": 20
+      }
+    },
+    {
+      "check": "verify_cells_refuses_position_scramble",
+      "ok": true,
+      "detail": {
+        "raised": "ABORT: trajectory 0 position 32 fails re-derivation: ['context_len 519 != 543', 'target 315 != 89230']"
+      }
+    },
+    {
+      "check": "verify_cells_refuses_partial_trajectory",
+      "ok": true,
+      "detail": {
+        "raised": "ABORT: 2 trajectory/ies are not 10/10: traj 0 missing [2048]; traj 1 missing [2048]. A partial trajectory must not be averaged: the headline is a mean of per-trajectory means."
+      }
+    },
+    {
+      "check": "verify_cells_refuses_missing_context_hash",
+      "ok": true,
+      "detail": {
+        "raised": "ABORT: trajectory 0 position 1 carries no context_sha256; interior content would be unverifiable"
+      }
+    },
+    {
+      "check": "verify_cells_detects_tampered_trajectory",
+      "ok": true,
+      "detail": {
+        "raised": "ABORT: trajectory 0 position 1024: stored context hash differs from re-derivation"
+      }
+    },
+    {
+      "check": "freeze_refuses_to_overwrite",
+      "ok": true,
+      "detail": {
+        "raised": "ABORT: /home/sathvik/llm_quantization_threshold/results/quality/trajectories.json already exists. Production trajectories are immutable experimental input; regenerating them is a n"
+      }
+    },
+    {
+      "check": "manifest_guard_refuses_changed_trajectory_set",
+      "ok": true,
+      "detail": {
+        "raised": "ABORT: /home/sathvik/llm_quantization_threshold/results/quality/preflight/sandbox/mguard/manifest.json records trajectory_set_hash='aaa' but this run has 'bbb'; resume must not mix"
+      }
+    },
+    {
+      "check": "engine_refuses_undecided_enforce_eager",
+      "ok": true,
+      "detail": {
+        "raised": "ABORT: enforce_eager is undecided; the engine-profile gate (G9) fixes it"
+      }
+    },
+    {
+      "check": "kl_refuses_infinite_divergence",
+      "ok": true,
+      "detail": {
+        "raised": "KLDomainError: comparison assigns no mass at 1 token(s) where the reference does; KL is infinite and must not be floored"
+      }
+    },
+    {
+      "check": "BF16_dispatch_verified",
+      "ok": true,
+      "detail": {
+        "expected_pattern": null,
+        "expected_present": null,
+        "forbidden_present": [],
+        "ok": true
+      }
+    },
+    {
+      "check": "BF16_engine_identity_matches_smoke",
+      "ok": true,
+      "detail": {
+        "now": "ca16377ea4206028",
+        "smoke": "ca16377ea4206028",
+        "kv_now": 44688,
+        "kv_smoke": 44688
+      }
+    },
+    {
+      "check": "FP8_dispatch_verified",
+      "ok": true,
+      "detail": {
+        "expected_pattern": "CutlassFP8ScaledMMLinearKernel",
+        "expected_present": true,
+        "forbidden_present": [],
+        "ok": true
+      }
+    },
+    {
+      "check": "FP8_engine_identity_matches_smoke",
+      "ok": true,
+      "detail": {
+        "now": "176a222edae755ff",
+        "smoke": "176a222edae755ff",
+        "kv_now": 97888,
+        "kv_smoke": 97888
+      }
+    },
+    {
+      "check": "FP4_dispatch_verified",
+      "ok": true,
+      "detail": {
+        "expected_pattern": "FLASHINFER_CUTLASS",
+        "expected_present": true,
+        "forbidden_present": [],
+        "ok": true
+      }
+    },
+    {
+      "check": "FP4_engine_identity_matches_smoke",
+      "ok": true,
+      "detail": {
+        "now": "434ad8fac783fb7f",
+        "smoke": "434ad8fac783fb7f",
+        "kv_now": 120944,
+        "kv_smoke": 120944
+      }
+    }
+  ],
+  "checks_total": 35,
+  "checks_failed": [],
+  "passed": true,
+  "authorises": "nothing on its own; P13 remains a separate decision and the BF16 replication-floor question is not settled by this artifact",
+  "git": {
+    "git_head": "c415642d67fdbe501c9f974ca3ee9b75baa256c9",
+    "git_dirty": false,
+    "allow_dirty": false,
+    "stage": "preflight"
+  },
+  "gpu": {
+    "name": "NVIDIA RTX PRO 4000 Blackwell",
+    "uuid": "GPU-fdc11a18-6edb-7e2f-82b2-6bd0b9ed714d",
+    "driver_version": "575.64.03",
+    "memory_total_mib": "24467",
+    "power_limit_w": "145.00"
+  },
+  "software": {
+    "python": "3.12.13",
+    "kernel": "6.8.0-65-generic",
+    "torch": "2.10.0+cu128",
+    "torch_cuda": "12.8",
+    "vllm": "0.19.1",
+    "transformers": "5.15.1",
+    "compressed_tensors": "0.15.0.1",
+    "nvcc": "Cuda compilation tools, release 12.9, V12.9.86",
+    "git_head": "c415642d67fdbe501c9f974ca3ee9b75baa256c9",
+    "git_dirty": false,
+    "git_untracked_files": 3
+  },
+  "timestamp": "2026-08-26T19:04:50-0400"
+}

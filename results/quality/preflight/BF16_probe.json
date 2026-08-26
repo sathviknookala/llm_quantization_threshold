@@ -1,0 +1,278 @@
+{
+  "config_id": "BF16_REFERENCE",
+  "task": "score",
+  "resolved_config": {
+    "enforce_eager": false,
+    "max_num_batched_tokens": 2048,
+    "enable_prefix_caching": true,
+    "max_model_len": 32768,
+    "num_gpu_blocks": 2793,
+    "block_size": 16,
+    "kv_cache_dtype": "auto",
+    "max_logprobs": 128256,
+    "dtype": "torch.bfloat16",
+    "seed": 0,
+    "requested": {
+      "model": "/home/sathvik/.cache/huggingface/hub/models--NousResearch--Meta-Llama-3.1-8B-Instruct/snapshots/d10aef7999a2b5ba950ab3974312feeedbfe0b77",
+      "max_model_len": 32768,
+      "gpu_memory_utilization": 0.9,
+      "max_num_seqs": 256,
+      "kv_cache_dtype": "auto",
+      "max_logprobs": 128256,
+      "enable_prefix_caching": true,
+      "max_num_batched_tokens": 2048,
+      "enforce_eager": false,
+      "seed": 0,
+      "dtype": "auto",
+      "disable_log_stats": false
+    }
+  },
+  "controls": {
+    "max_model_len": 32768,
+    "gpu_memory_utilization": 0.9,
+    "max_num_seqs": 256,
+    "kv_cache_dtype": "auto",
+    "max_logprobs": 128256,
+    "enable_prefix_caching": true,
+    "max_num_batched_tokens": 2048,
+    "enforce_eager": false,
+    "seed": 0,
+    "dtype": "auto"
+  },
+  "shards": [
+    {
+      "start": 0,
+      "stop": 10,
+      "npy": "/home/sathvik/llm_quantization_threshold/results/quality/preflight/BF16_probe.npy",
+      "rows": 10,
+      "storage_dtype": "float32",
+      "seconds": 1.82
+    }
+  ],
+  "generate_seconds": 1.82,
+  "group_size": 10,
+  "per_context": [
+    {
+      "entries": 128256,
+      "entries_finite": 128256,
+      "full_vocab": true,
+      "all_finite": true,
+      "mass_presum": 0.9999998890433391,
+      "normalized": true,
+      "min_logprob": -31.475584030151367,
+      "row": 0,
+      "entries_returned": 128256,
+      "context_len": 512,
+      "top1": 11,
+      "decoded_token_is_none": true
+    },
+    {
+      "entries": 128256,
+      "entries_finite": 128256,
+      "full_vocab": true,
+      "all_finite": true,
+      "mass_presum": 1.0000000970817557,
+      "normalized": true,
+      "min_logprob": -34.939876556396484,
+      "row": 1,
+      "entries_returned": 128256,
+      "context_len": 519,
+      "top1": 315,
+      "decoded_token_is_none": true
+    },
+    {
+      "entries": 128256,
+      "entries_finite": 128256,
+      "full_vocab": true,
+      "all_finite": true,
+      "mass_presum": 1.0000002771860652,
+      "normalized": true,
+      "min_logprob": -30.6298770904541,
+      "row": 2,
+      "entries_returned": 128256,
+      "context_len": 543,
+      "top1": 89230,
+      "decoded_token_is_none": true
+    },
+    {
+      "entries": 128256,
+      "entries_finite": 128256,
+      "full_vocab": true,
+      "all_finite": true,
+      "mass_presum": 1.0000003766845658,
+      "normalized": true,
+      "min_logprob": -30.806867599487305,
+      "row": 3,
+      "entries_returned": 128256,
+      "context_len": 575,
+      "top1": 1690,
+      "decoded_token_is_none": true
+    },
+    {
+      "entries": 128256,
+      "entries_finite": 128256,
+      "full_vocab": true,
+      "all_finite": true,
+      "mass_presum": 1.000000108757796,
+      "normalized": true,
+      "min_logprob": -30.952741622924805,
+      "row": 4,
+      "entries_returned": 128256,
+      "context_len": 639,
+      "top1": 57968,
+      "decoded_token_is_none": true
+    },
+    {
+      "entries": 128256,
+      "entries_finite": 128256,
+      "full_vocab": true,
+      "all_finite": true,
+      "mass_presum": 1.0000001507223404,
+      "normalized": true,
+      "min_logprob": -32.74631118774414,
+      "row": 5,
+      "entries_returned": 128256,
+      "context_len": 767,
+      "top1": 627,
+      "decoded_token_is_none": true
+    },
+    {
+      "entries": 128256,
+      "entries_finite": 128256,
+      "full_vocab": true,
+      "all_finite": true,
+      "mass_presum": 1.0000000338250639,
+      "normalized": true,
+      "min_logprob": -34.15629196166992,
+      "row": 6,
+      "entries_returned": 128256,
+      "context_len": 1023,
+      "top1": 15999,
+      "decoded_token_is_none": true
+    },
+    {
+      "entries": 128256,
+      "entries_finite": 128256,
+      "full_vocab": true,
+      "all_finite": true,
+      "mass_presum": 1.0000001803124907,
+      "normalized": true,
+      "min_logprob": -28.313249588012695,
+      "row": 7,
+      "entries_returned": 128256,
+      "context_len": 1535,
+      "top1": 220,
+      "decoded_token_is_none": true
+    },
+    {
+      "entries": 128256,
+      "entries_finite": 128256,
+      "full_vocab": true,
+      "all_finite": true,
+      "mass_presum": 1.000000458779731,
+      "normalized": true,
+      "min_logprob": -28.126951217651367,
+      "row": 8,
+      "entries_returned": 128256,
+      "context_len": 2047,
+      "top1": 8,
+      "decoded_token_is_none": true
+    },
+    {
+      "entries": 128256,
+      "entries_finite": 128256,
+      "full_vocab": true,
+      "all_finite": true,
+      "mass_presum": 1.000000177186846,
+      "normalized": true,
+      "min_logprob": -29.501323699951172,
+      "row": 9,
+      "entries_returned": 128256,
+      "context_len": 2559,
+      "top1": 19711,
+      "decoded_token_is_none": true
+    }
+  ],
+  "storage_dtype": "float32",
+  "engine_metrics": {
+    "vllm:prefix_cache_queries": 10719,
+    "vllm:prefix_cache_hits": 8048,
+    "vllm:external_prefix_cache_queries": 0,
+    "vllm:external_prefix_cache_hits": 0,
+    "vllm:num_preemptions": 0,
+    "vllm:prompt_tokens": 10719,
+    "vllm:prompt_tokens_by_source": 0,
+    "vllm:prompt_tokens_cached": 8048,
+    "vllm:prompt_tokens_recomputed": 0,
+    "vllm:request_prompt_tokens": {
+      "count": 10,
+      "sum": 10719.0
+    }
+  },
+  "returncode": 0,
+  "wall_seconds": 20.37,
+  "observed": {
+    "resolved_config": {
+      "enforce_eager": false,
+      "max_num_batched_tokens": 2048,
+      "enable_prefix_caching": true,
+      "max_model_len": 32768,
+      "num_gpu_blocks": 2793,
+      "block_size": 16,
+      "kv_cache_dtype": "auto",
+      "max_logprobs": 128256,
+      "dtype": "torch.bfloat16",
+      "seed": 0,
+      "requested": {
+        "model": "/home/sathvik/.cache/huggingface/hub/models--NousResearch--Meta-Llama-3.1-8B-Instruct/snapshots/d10aef7999a2b5ba950ab3974312feeedbfe0b77",
+        "max_model_len": 32768,
+        "gpu_memory_utilization": 0.9,
+        "max_num_seqs": 256,
+        "kv_cache_dtype": "auto",
+        "max_logprobs": 128256,
+        "enable_prefix_caching": true,
+        "max_num_batched_tokens": 2048,
+        "enforce_eager": false,
+        "seed": 0,
+        "dtype": "auto",
+        "disable_log_stats": false
+      }
+    },
+    "kv_cache_tokens": 44688,
+    "graph_capture_observed": true,
+    "kernel_lines": [],
+    "normalized_kernel_lines": [],
+    "dispatch_verdict": {
+      "expected_pattern": null,
+      "expected_present": null,
+      "forbidden_present": [],
+      "ok": true
+    },
+    "engine_identity_hash": "ca16377ea4206028"
+  },
+  "vram_release": {
+    "released": true,
+    "escalated": []
+  },
+  "log_path": "/home/sathvik/llm_quantization_threshold/results/quality/preflight/logs/BF16_probe.log",
+  "kl_spec_hash": "5565ff73dbe5e36a",
+  "contexts_hash": "b341068c7d9fbd682c427fce7f66e0df65333c3ac0be803e0a9a4c9da767de23",
+  "config_identity": {
+    "configuration_id": "BF16_REFERENCE",
+    "quantization": "BF16",
+    "model_path": "/home/sathvik/.cache/huggingface/hub/models--NousResearch--Meta-Llama-3.1-8B-Instruct/snapshots/d10aef7999a2b5ba950ab3974312feeedbfe0b77",
+    "checkpoint_content_hash": "ced0573c8e17cd04aa5d33b9d8bb10bce81a061a394cabb7771a16232c874f5b",
+    "tokenizer_identity": {
+      "tokenizer.json": "79e3e522635f3171300913bb421464a87de6222182a0570b9b2ccba2a964b2b4",
+      "tokenizer_config.json": "24e8a6dc2547164b7002e3125f10b415105644fcf02bf9ad8b674c87b1eaaed6",
+      "special_tokens_map.json": "6f38c73729248f6c127296386e3cdde96e254636cc58b4169d3fd32328d9a8ec"
+    },
+    "expected_kernel_pattern": null,
+    "forbidden_kernel_patterns": [
+      "CutlassFP8ScaledMMLinearKernel",
+      "NvFp4LinearBackend",
+      "Marlin"
+    ]
+  },
+  "engine_overrides": {}
+}
