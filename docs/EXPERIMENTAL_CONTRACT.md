@@ -90,6 +90,18 @@ Hold constant within quality comparisons:
 - decoding policy for generated-answer tasks;
 - scoring implementation.
 
+Added 2026-08-25, once the KL rig made them load-bearing:
+
+- the frozen trajectory artifact and its hash — every configuration is scored on the same token
+  sequence, never on its own generated history;
+- the retained-position contract (context construction at each position, and the position vector);
+- the engine profile, item by item: `detokenize`, `max_num_batched_tokens`, eager/graph mode,
+  prefix-cache policy, `max_model_len`, `gpu_memory_utilization`, `max_num_seqs`, `kv_cache_dtype`,
+  `max_logprobs`, seed;
+- request submission order within a trajectory;
+- persisted storage precision and the KL working precision;
+- the checkpoint content actually loaded, identified by hash rather than by path.
+
 ## Workload profiles
 
 **LOCKED 2026-08-23 (D10).** Phase 1 is a memory-focused study with one primary workload and one
@@ -716,6 +728,28 @@ A quality comparison is invalid if:
 - generated-answer scoring changes between runs;
 - a quantized checkpoint is produced from a different base checkpoint/revision;
 - calibration data leaks into an evaluation set where that would bias the result.
+
+Extended 2026-08-25 for the KL rig. A run is also invalid if:
+
+- the observation grid is incomplete, duplicated, or unbalanced — any trajectory contributing fewer
+  than its full set of retained positions invalidates the run rather than being aggregated as-is;
+- a consumed trajectory, prompt-set, or checkpoint-content hash differs from the one the run
+  contracted for;
+- any KL value is non-finite, or negative beyond floating-point tolerance;
+- the reference distribution assigns mass where the comparison distribution has none;
+- the pre-run correctness/self-KL gate fails;
+- dispatch verification does not reproduce the configuration's expected kernel, or a forbidden
+  fallback pattern appears;
+- distributions collected under different observed engine identities are pooled within one
+  configuration;
+- the persisted storage dtype differs from the one the run contracted for;
+- the working tree was dirty and the override was not explicitly requested and recorded;
+- the returned distribution is not the full vocabulary, is not finite, or does not normalise within
+  the recorded tolerance.
+
+A failed empirical gate — replication floor, cache equivalence, precision, engine-profile
+equivalence — is a **measurement about the rig**, and is reported as such. It invalidates a quality
+result only where the contract above says it does; it is not silently absorbed into the number.
 
 ## Measurement hazards found during model qualification (2026-08-22)
 

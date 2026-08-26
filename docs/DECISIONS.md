@@ -727,8 +727,14 @@ drift between configurations. `compute_kl.py` aborts if the stored contexts are 
 **Extended 2026-08-23 for position-resolved KL.** D10's decode-dominated workload made
 single-position KL insufficient — it would evaluate quality at position 1 of a 2,048-position
 generation. The rig now measures teacher-forced KL at ten strided positions along a BF16-generated
-continuation, using **truncated prefixes**: for each position `p`, feed `prompt_token_ids[:p]` and
-read the next-token distribution through this same proven path. Full policy in `EVALUATION_RIG.md`.
+continuation, using **truncated prefixes**.
+
+This entry previously stated the indexing as "feed `prompt_token_ids[:p]`", an independent copy of a
+formula that was wrong in `EVALUATION_RIG.md` for the same reason. **Corrected 2026-08-25**; the
+exact indexing contract is owned by `EVALUATION_RIG.md` A.1 and is not restated here, so the two
+cannot drift again. The short form: the context at retained position `p` is the 512 prompt tokens
+followed by the first `p-1` continuation tokens, and the returned distribution predicts continuation
+token `p`.
 
 **`prompt_logprobs` was specified first and then measured infeasible (vLLM 0.19.1, 2026-08-23).** The
 earlier note here suggested it as the natural route to per-position KL. It is not:
@@ -740,6 +746,38 @@ earlier note here suggested it as the natural route to per-position KL. It is no
 
 Ten truncated-prefix passes cost 1.28 million objects (~64 MB) and keep prefix caching available.
 Do not reintroduce the one-pass formulation.
+
+**Amended 2026-08-25 — the KL measurement contract is closed.** The path decision above is unchanged;
+what follows are the remaining choices the path did not settle, locked before implementation. Full
+operational detail lives in `EVALUATION_RIG.md` A.1; this entry records the decisions and why.
+
+- **Evaluation sample: the first 64 prompts** of the frozen `DECODE_PRIMARY` set, in stored order.
+  Not redrawn, not reshuffled. Supersedes the "first 32" figure in D16, which described the
+  pre-sweep correctness gate's sample rather than the quality run's.
+- **Only BF16 generates trajectories**, one per prompt, exactly 2,048 token IDs, under a recorded
+  sampling policy. FP8 and FP4 are always scored on BF16's trajectory. Independent per-configuration
+  histories would measure divergence between different token sequences, which is not the quantity.
+- **The marginal step is `D_KL(P_FP8 || P_FP4)`, computed directly.** Subtracting BF16-anchored
+  divergences is barred: KL is not additive and the difference is not a divergence.
+- **Aggregation is mean-within-trajectory then mean-across-trajectories**, and **the trajectory is
+  the independent statistical unit** for uncertainty — 64 units, not 640. The ten positions inside a
+  trajectory are correlated repeated measurements on one context.
+- **Persisted-logprob precision is a gate, not an assumption.** fp32 by default; KL in float64 with
+  log-normalisation and no epsilon floor. The earlier fp16 practice in the qualification prototypes
+  was never justified numerically. The gate itself has not been run — no fp32 array exists yet — so
+  no fp16-versus-fp32 figure may be quoted until it does.
+- **Engine controls that can change execution are pinned and recorded from observed state**, not
+  from requested flags, because vLLM is documented here to deviate silently from what was requested
+  (H10). `enforce_eager` and chunked-versus-unchunked prefill are decided by a gate that measures
+  them, and **production trajectories are not frozen until that gate has run and been reviewed**.
+
+**Historical prototypes, superseded.** `scripts/logits_probe.py` (synthetic contexts, one position)
+and `scripts/compute_kl.py` (single-position qualification artifact layout, epsilon floor inside the
+logarithm) produced the feasibility evidence cited above and are retained byte-unchanged so that
+`results/qualification/` stays reproducible. `scripts/harness/correctness_gate.py` is the pre-sweep
+sanity trip-wire and likewise stays unchanged. **None of the three is the quality runner**, none of
+their outputs is a quality result, and the production implementation lives under
+`scripts/harness/quality/`.
 
 ---
 
@@ -822,7 +860,12 @@ Reproduce with `python scripts/pilot/corpus.py --workload DECODE_PRIMARY`.
 **Why (a) and not (b).** For pure serving timing the token content is irrelevant, so random token
 IDs would have been defensible on measurement grounds. Real text is chosen because it costs one prep
 script and preserves D10's link between the quality and serving distributions — the KL contexts are
-literally the first 32 serving prompts, same corpus, same chunking.
+literally the first serving prompts, same corpus, same chunking.
+
+**Clarified 2026-08-25.** This sentence previously said "the first 32 serving prompts". Thirty-two
+was the pre-sweep correctness gate's context count (`results/pilot/correctness_gate.json`), not a
+sample size this gate ever fixed for the quality run. The KL evaluation sample is the **first 64**
+prompts of this corpus; see D13's 2026-08-25 amendment and `EVALUATION_RIG.md` A.1.
 
 **Why C4 and not something else.** General web text rather than chat-formatted, so it sidesteps the
 `chat_template` provenance deviation; cleanly disjoint from `HuggingFaceH4/ultrachat_200k`, which

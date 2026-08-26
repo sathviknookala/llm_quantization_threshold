@@ -27,6 +27,12 @@ runners over it; `analyze.py` turns pilot cells into the pilot verdict; `selftes
 cell state machine against a stub engine with no GPU. Renamed from `scripts/pilot/` on 2026-08-24 —
 the harness outlives the pilot.
 
+`scripts/harness/quality/` is the quality arm, KL first. It imports `common.py` and `server.py` and
+edits neither: the serving contract is frozen. `scripts/logits_probe.py`, `scripts/compute_kl.py` and
+`scripts/harness/correctness_gate.py` are **historical qualification/prototype paths**, kept
+byte-unchanged so `results/qualification/` and `results/pilot/` stay reproducible. They are not the
+quality runner and their KL numbers are not quality results.
+
 ## Research contract
 
 The unit under study is a **complete deployment configuration**, not a precision label in isolation. A configuration includes, where applicable:
@@ -172,7 +178,7 @@ closed-loop with `ignore_eos` and homogeneous prompts, with no arrival process.
 1-3. orchestrator, SKIPPED_PAST_SLO, budget/window reconciliation   DONE 2026-08-24
 4. serving sweep + refinement                                 DONE 2026-08-25
 5. quality run                                                 <- current step
-   KL first (D13 path, proven); PPL and tasks need D14/D15
+   KL contract closed 2026-08-25 (D13 amendment); PPL and tasks need D14/D15
 6. marginal tradeoff: quality loss vs sustainable concurrency
 ```
 

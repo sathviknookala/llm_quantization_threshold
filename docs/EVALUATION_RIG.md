@@ -50,19 +50,50 @@ is central, and the rig is extended accordingly.
 
 **Teacher-forced continuation KL at strided positions, via truncated prefixes.**
 
-1. Generate a continuation from the BF16 reference for each context (512 prompt + 2048 generated).
-   This token sequence is the fixed evaluation context; it is stored and reused byte-identically.
-2. For each strided position `p`, feed `prompt_token_ids[:p]` to every configuration and take the
-   next-token distribution with the ordinary `SamplingParams(logprobs=128256)` call proven in D13.
-3. Strided positions:
+1. Generate one continuation from the BF16 reference for each context: 512 prompt tokens, then
+   exactly 2,048 generated tokens. Only BF16 generates. The token sequence is frozen, hashed, and
+   reused byte-identically by BF16, FP8 and FP4 scoring alike.
+2. Retained positions are positions **in the generated continuation**, not offsets into the
+   concatenated sequence:
 
 ```text
 1, 8, 32, 64, 128, 256, 512, 1024, 1536, 2048
 ```
 
-Ten passes per context per configuration. Feeding the prefix that ends at `p` and reading the
-next-token distribution is exactly teacher-forced KL at position `p`, so this is equivalent to the
-one-pass formulation and not an approximation of it.
+3. For retained position `p`, every configuration is fed the context
+
+```text
+context(p) = prompt[0:512] + continuation[0:p-1]      length = 511 + p
+target(p)  = continuation[p-1]                        never appended before scoring
+```
+
+   and the returned next-token distribution is the one that predicts `target(p)`. Distributions come
+   from the ordinary `SamplingParams(logprobs=128256)` call proven in D13, driven by explicit
+   `prompt_token_ids`.
+
+Worked, so the convention cannot be re-derived incorrectly from prose:
+
+```text
+p =    1   context = prompt[0:512]                     len  512   predicts continuation[0]
+p =    8   context = prompt[0:512] + cont[0:7]         len  519   predicts continuation[7]
+p =  512   context = prompt[0:512] + cont[0:511]       len 1023   predicts continuation[511]
+p = 2048   context = prompt[0:512] + cont[0:2047]      len 2559   predicts continuation[2047]
+```
+
+**Corrected 2026-08-25.** This section previously said "feed `prompt_token_ids[:p]`", which is wrong
+under either reading and silently so. Read against the concatenated 2,560-token sequence, `p = 1`
+feeds a single BOS token and `p = 1..512` all target positions inside the *original prompt*, never
+touching generated content — the exact defect this section exists to remove; `p = 2048` would score
+generated token 1537. Read against the 512-token prompt instead, `p = 1024`, `1536` and `2048`
+collapse to three byte-identical contexts, because a Python slice beyond a list's length returns the
+whole list without raising. The formula above replaces that wording; D13 carried an independent copy
+of the same error and is corrected with it.
+
+Ten passes per context per configuration. Feeding the prefix that ends before `target(p)` and
+reading the next-token distribution is exactly teacher-forced KL at generation position `p`, so this
+is equivalent to the one-pass formulation and not an approximation of it. Contexts within a
+trajectory are strictly nested — `context(p_i)` is a byte-identical prefix of `context(p_j)` for
+`p_i < p_j` — and that nesting is asserted at runtime before any scoring call is issued.
 
 **Why not `prompt_logprobs` in a single pass — measured against vLLM 0.19.1, 2026-08-23.** The
 one-pass formulation was specified first and does not work at this scale:
@@ -77,17 +108,34 @@ one-pass formulation was specified first and does not work at this scale:
 
 The truncated-prefix formulation costs 10 x 128,256 = 1.28 million objects per context (~64 MB) and,
 because it uses `logprobs` rather than `prompt_logprobs`, keeps prefix caching available — so the ten
-passes over a shared context reuse the prefill. Storage is unchanged at 250 KiB per retained
-position, 2.5 MiB per context, 250 MiB at 100 contexts.
+passes over a shared context reuse the prefill.
+
+**Storage — fp32, revised 2026-08-25.** Earlier revisions of this section costed storage at fp16
+(250 KiB per retained position, 2.5 MiB per context). Persisted-logprob precision is now a
+pre-registered numerical gate rather than an assumption, and fp32 is the default (see *Persisted
+distribution precision* below), so the real figures are **501 KiB per retained position, 4.89 MiB per
+trajectory, 939 MiB for the locked 3 x 64 x 10 grid**. That is negligible against the machine's free
+disk and buys the study out of a numerical argument it would otherwise have to keep making.
 
 **Prefix caching is ENABLED for the quality rig.** This is the opposite of the serving contract, and
-deliberately so: here the shared prefix is the same token sequence by construction, caching changes
-no returned distribution, and it is what makes ten passes affordable. Prefix caching remains disabled
-for all serving runs (H7).
+deliberately so: here the shared prefix is the same token sequence by construction and caching is
+what makes ten passes affordable. Prefix caching remains disabled for all serving runs (H7).
+
+That caching "changes no returned distribution" was asserted here from 2026-08-23 and never
+measured. It is now an empirical gate: cache-on versus cache-off distributions are compared on a
+fixed subset for BF16 **and** FP4, and the observed difference is reported against the replication
+floor below. Failure aborts and escalates rather than silently falling back, because scoring with
+caching off reintroduces exactly the cost the truncated-prefix design exists to avoid.
+
+The ten nested prefixes are submitted in **ascending length order** so the shorter prefix's blocks
+are committed before the longer prefix asks for them, and observed cache-reuse counters are recorded
+per trajectory rather than assumed.
 
 **Contexts are drawn from the same corpus and the same 512-token chunking as the serving workload**
-(corpus itself is open gate **D16**),
-so quality and serving are measured on the same distribution. Narrowing to one workload removes the
+(corpus resolved in **D16**), so quality and serving are measured on the same distribution. The
+locked evaluation sample is the **first 64 prompts of the frozen `DECODE_PRIMARY` set**, taken in
+their stored order. They are not redrawn, reshuffled or resampled, and they are supplied as token
+IDs rather than reconstructed text. Narrowing to one workload removes the
 need to stratify KL across context-length buckets: one stratum, sampled along the generation axis
 instead of across prompt lengths.
 
@@ -109,7 +157,152 @@ Marginal analysis must also quantify the additional behavioral movement associat
 FP8 -> FP4
 ```
 
-This may be computed directly where the metric definition is appropriate, or interpreted through the two BF16-anchored distributions. The final method should be declared before analysis.
+**Method declared 2026-08-25, as this section required: the marginal step is computed directly as
+`D_KL(P_FP8 || P_FP4)`, with the FP8 distribution as the reference.** All three configurations are
+scored on the same contexts, so the FP8-referenced pair is measured, not inferred.
+
+Deriving it as `D_KL(P_BF16 || P_FP4) - D_KL(P_BF16 || P_FP8)` is **barred**. KL is not additive, the
+difference of two BF16-anchored divergences is not a divergence between FP8 and FP4, and it can take
+either sign for reasons that have nothing to do with the FP8 -> FP4 step.
+
+### BF16 trajectory generation — LOCKED 2026-08-25
+
+Each of the 64 prompts receives **exactly one** BF16 reference continuation. Only `BF16_REFERENCE`
+generates. FP8 and FP4 never generate their own evaluation histories for this experiment: their
+distributions are always measured on BF16's trajectory, which is what makes the three configurations
+comparable at all.
+
+```text
+max_tokens           2048          temperature          0.7
+min_tokens           2048          top_p                0.9
+ignore_eos           true          top_k                -1   (disabled; this build canonicalises to 0)
+seed                 20260823      min_p                0
+detokenize           false         presence_penalty     0
+                                   frequency_penalty    0
+                                   repetition_penalty   1.0
+```
+
+The continuation must contain **exactly 2,048 generated token IDs**; a short or long trajectory
+aborts the run. Token IDs are taken directly from the engine's output token-ID list and are never
+obtained by decoding to text and re-encoding — BPE merges across the prompt/continuation boundary
+would silently produce a different sequence from the one actually sampled.
+
+Trajectories are frozen with the source prompt token IDs **inlined**, so the artifact is
+self-contained rather than depending on the corpus body, which is gitignored as regenerable. The
+artifact is hashed over canonical parsed content, and every later scoring pass records the hash it
+consumed.
+
+**Freezing is gated.** Production trajectories are not generated or written until the engine-profile
+gate below has run and its result has been surfaced for review. Generation and scoring must share one
+engine profile: the alignment check compares a sampled token against the *scoring* engine's
+distribution, so freezing a trajectory under an unvalidated profile couples the two through a choice
+nobody has evidence for yet.
+
+Seeded generation is not assumed to be replayable: vLLM's per-request seed fixes sampling given the
+logits, but the logits depend on batch composition. Replayability is measured and recorded; the
+guarantee the experiment actually relies on is the frozen artifact and its hash, not re-derivation.
+
+### Aggregation — LOCKED 2026-08-25
+
+```text
+K_c          = mean KL over trajectory c's 10 retained positions      -> 64 values
+headline_KL  = mean(K_1 .. K_64)
+```
+
+computed separately for `BF16||FP8`, `BF16||FP4` and `FP8||FP4`. The position-resolved curve across
+all ten retained positions is preserved and reported alongside the headline; it is not a diagnostic
+but a first-class result, since whether degradation is flat or accumulates over a generation is the
+question a decode-heavy deployment actually asks.
+
+Under this balanced design — every trajectory contributing exactly ten positions — the mean of
+trajectory means is *algebraically identical* to pooling all 640 cells. The aggregation order is
+specified anyway because the two diverge as soon as group sizes differ, and because the order is what
+makes the resampling unit unambiguous. **A trajectory with fewer than ten valid positions aborts the
+run**; the grid is never silently aggregated unbalanced.
+
+### Uncertainty — LOCKED 2026-08-25
+
+The independent statistical unit is the **trajectory**, not the retained position. There are 64
+independent units, not 640: the ten positions within a trajectory are correlated repeated measurements
+on one sampled context.
+
+```text
+draws                10,000        resampling unit    trajectory (whole position structure travels with it)
+sample               64 trajectories with replacement from the original 64
+statistic            that resample's headline mean
+interval             percentile 95%: lower = 2.5th, upper = 97.5th
+interpolation        linear (matching common.quantiles)
+seed                 pre-registered constant, recorded in the run manifest
+```
+
+The original 64-trajectory headline remains the point estimate; the bootstrap distribution estimates
+its context-sampling uncertainty. Position-resolved CIs use the **same** draw indices, so the ten
+position curves are jointly consistent. The same indices are shared across the three pairs, which
+means a paired quantity such as "is the FP8 -> FP4 step costlier than BF16 -> FP8" must be computed
+from the shared draws directly and **never** inferred from whether two marginal CIs overlap.
+
+Report the bootstrap bias and standard error beside every interval. Percentile intervals at n = 64 on
+a right-skewed non-negative statistic are not guaranteed nominal coverage; that caveat travels with
+the number (see `LIMITATIONS.md`). A bias-corrected variant is deferred, not adopted.
+
+### Engine profile — GATED 2026-08-25
+
+The quality rig drives an in-process engine while the serving axis ran an HTTP server, so the engine
+controls that can change execution are pinned, recorded from **observed** state rather than from
+requested flags, and — where they can move a number — measured rather than assumed. vLLM is
+documented in this project to deviate silently from what was requested (H10), which is why a
+requested-flag hash is not an engine identity.
+
+```text
+detokenize                false   pinned; the logprob path otherwise detokenises every returned
+                                  vocab entry individually, which nothing here reads
+max_num_batched_tokens     2048   the value the measured serving axis actually ran under; the
+                                  offline engine would otherwise default to 8192
+enable_prefix_caching      true   the deliberate H7 exception
+max_logprobs             128256   differs from serving's default of 20; a request-validation bound
+                                  with no effect on kernels, memory or dispatch
+enforce_eager           decided   by the gate below
+```
+
+Two equivalences are measured before the profile is fixed:
+
+- **eager versus CUDA-graph execution** — identical contexts and checkpoint, with only
+  `enforce_eager` flipped;
+- **chunked versus unchunked prefill** — `max_num_batched_tokens = 2048`, which splits the longest
+  retained context (2,559 tokens) across scheduler steps, against the unchunked offline alternative.
+
+Both are reported against the replication floor, since a difference smaller than the floor is not a
+difference this rig can resolve. The outcome fixes the production profile and releases trajectory
+freezing.
+
+### Persisted distribution precision — GATED 2026-08-25
+
+Full-vocabulary distributions are persisted as **fp32 by default**, and KL is computed in **float64**
+from log-normalised values (`logp = lp - logsumexp(lp)`), with no epsilon floor inside the logarithm.
+A zero comparison probability where the reference has mass is a validity failure, not a value to be
+floored.
+
+Storage precision is a pre-registered gate, not an assumption. From one set of collected fp32
+distributions, KL is recomputed with both operands rounded to the candidate representation, and the
+candidate is adopted only if per-cell relative error stays within its pre-registered bound above an
+absolute-nats floor.
+
+**The gate has not been run.** No fp32 distribution array exists anywhere in this repository yet —
+every persisted logprob array to date is fp16 — so there is currently nothing to compare against and
+no measured fp16-versus-fp32 figure may be quoted. fp32 is the default on the grounds that it costs
+under a gigabyte and removes the question, not on the grounds of a measurement. Whether fp16 would
+pass is an open expectation until the gate runs on collected fp32 data.
+
+### Replication floor — LOCKED 2026-08-25
+
+BF16 is scored against BF16 across two **independent engine launches** on a fixed trajectory subset,
+under the real ten-prefix workload. The resulting self-KL is the measurement's noise floor and is
+reported alongside every KL result, so a `BF16 -> FP8` or `BF16 -> FP4` effect can be read against
+engine and run noise rather than against zero.
+
+This is a distinct quantity from the pre-sweep correctness gate's self-check, which compared batch
+orderings within a single launch and returned exactly 0.0 — a bit-identity result under one batch
+shape that says nothing about the batching this rig actually uses.
 
 ## 2. Perplexity
 

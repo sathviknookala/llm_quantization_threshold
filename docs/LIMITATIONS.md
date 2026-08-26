@@ -195,6 +195,40 @@ generation drifts from BF16's, which is the quantity a user of a decode-heavy de
 experiences. The two coincide only if divergence does not compound through the sampling loop, which
 this study does not test.
 
+## What the KL sample can and cannot support
+
+The KL result rests on **64 sampled contexts**. That is the statistical sample, and the uncertainty
+reported with it is context-sampling uncertainty at n = 64 — not uncertainty over models, corpora,
+hardware, or quantization draws. The ten retained positions inside a trajectory are correlated
+repeated measurements on one context and are never counted as independent observations.
+
+The interval is a plain percentile bootstrap. At n = 64 on a right-skewed, non-negative statistic
+like KL, percentile intervals are known to under-cover, more so in the upper tail, so "95%" is
+nominal rather than guaranteed. The bootstrap bias and standard error are reported with every
+interval so a reader can see the skew rather than infer it.
+
+## Quality numbers carry a measurement floor
+
+KL between two deployments is only interpretable against the noise of the measurement itself. Two
+independent BF16 launches scored on the same trajectories produce a non-negative self-KL — the
+replication floor — and any BF16 -> FP8 or FP8 -> FP4 movement of comparable magnitude is not
+resolvable by this rig. The floor is reported alongside every KL result for that reason.
+
+Two related quantities are measured rather than assumed, and each bounds interpretation: the
+difference between scoring with prefix caching on versus off, and the difference between eager and
+CUDA-graph execution. Where a measured effect is not large relative to these, the study says so
+instead of reporting the effect.
+
+## The quality engine is the deployed configuration, but not the serving process
+
+Quality is measured through the same checkpoints, backend and kernels as the serving axis, verified
+by dispatch. It is not measured through the same *process*: the serving sweep ran an HTTP server
+under its own scheduler settings, while the quality rig drives an in-process engine with prefix
+caching deliberately enabled. Engine controls that can affect execution are pinned and recorded from
+observed state, and the ones that differ from serving are enumerated rather than glossed. A claim
+that quality and serving were measured under one identical runtime would be stronger than the
+evidence.
+
 ## Quality metrics are incomplete views of behavior
 
 KL divergence is sensitive but does not directly state whether a behavioral change matters to users. Perplexity is corpus-dependent. Downstream benchmarks are sparse and task-dependent.
