@@ -143,9 +143,20 @@ def _provisional_trajectories(out_dir, n_traj, allow_dirty):
     Deliberately not written to the production artifact: freezing is gated on this gate's result.
     """
     path = os.path.join(out_dir, "provisional_trajectories.json")
-    if os.path.exists(path):
-        return json.load(open(path))
     prompts, manifest = q.load_prompts(n=n_traj)
+    want = {"prompt_set_hash": manifest["prompt_set_hash"],
+            "subset_hash": manifest["subset_hash"],
+            "n_trajectories": n_traj,
+            "generation": dict(q.GENERATION_SAMPLING),
+            "kl_spec_hash": q.spec_hash()}
+    if os.path.exists(path):
+        prior = json.load(open(path))
+        got = {k: prior.get(k) for k in want}
+        if got != want:
+            raise SystemExit(
+                f"ABORT: {path} was built under a different corpus/policy/spec and must not be "
+                f"reused.\n  on disk: {got}\n  active : {want}\nMove it aside to rebuild.")
+        return prior
     job = {
         "config_id": q.REFERENCE_CONFIG, "task": "generate",
         "prompts": [p["token_ids"] for p in prompts],
@@ -162,10 +173,9 @@ def _provisional_trajectories(out_dir, n_traj, allow_dirty):
     rec = {
         "PROVISIONAL": True,
         "purpose": "engine-profile gate only; NOT the production trajectory artifact",
-        "n_trajectories": n_traj,
-        "prompt_set_hash": manifest["prompt_set_hash"],
+        "not_a_production_trajectory_artifact": True,
         "corpus_version": manifest["corpus_version"],
-        "generation": dict(q.GENERATION_SAMPLING),
+        **want,
         "engine_profile": PROFILES["graph_2048"],
         "observed": meta.get("observed"),
         "trajectories": [
@@ -226,9 +236,14 @@ def engine_profile(out_dir=None, configs=("BF16_REFERENCE", "FP4_PRIMARY"), n_tr
     """
     out_dir = out_dir or os.path.join(q.QUALITY_DIR, "gates", "engine_profile")
     os.makedirs(out_dir, exist_ok=True)
+    q.guard_manifest(out_dir, "G9 engine-profile gate")
     traj = _provisional_trajectories(out_dir, n_traj, allow_dirty)
     contexts, index = _contexts_for(traj)
     n_pos = len(P.RETAINED_POSITIONS)
+    contexts_hash = common.sha256_of_json(contexts)
+    expected_cells = n_traj * n_pos
+    if len(contexts) != expected_cells:
+        raise SystemExit(f"ABORT: built {len(contexts)} contexts, expected {expected_cells}")
 
     mats, metas = {}, {}
     for config_id in configs:
@@ -236,14 +251,34 @@ def engine_profile(out_dir=None, configs=("BF16_REFERENCE", "FP4_PRIMARY"), n_tr
             key = f"{config_id}:{pname}"
             npy = os.path.join(out_dir, f"{q.QUALITY_CONFIGS[config_id]['short']}_{pname}.npy")
             js = npy.replace(".npy", ".json")
-            if not os.path.exists(npy):
+            reusable = os.path.exists(npy) and os.path.exists(js)
+            if reusable:
+                prior = json.load(open(js))
+                if (prior.get("kl_spec_hash") != q.spec_hash()
+                        or prior.get("contexts_hash") != contexts_hash):
+                    raise SystemExit(
+                        f"ABORT: {npy} was produced under a different spec or context set; "
+                        "move results/quality/gates/engine_profile aside rather than mixing.")
+            if not reusable:
                 job = {"config_id": config_id, "task": "score", "contexts": contexts,
                        "group_size": n_pos, "out_npy": npy, "out_json": js,
                        "engine_overrides": overrides}
-                E.run_job(job, os.path.join(out_dir, "logs", f"{config_id}_{pname}.log"),
-                          allow_dirty=allow_dirty)
+                meta = E.run_job(job, os.path.join(out_dir, "logs", f"{config_id}_{pname}.log"),
+                                 allow_dirty=allow_dirty)
+                meta["kl_spec_hash"] = q.spec_hash()
+                meta["contexts_hash"] = contexts_hash
+                meta["config_identity"] = q.config_identity(config_id)
+                common.write_json(js, meta)
             mats[key] = np.load(npy)
             metas[key] = json.load(open(js))
+            if mats[key].shape != (len(contexts), q.VOCAB_SIZE):
+                raise SystemExit(
+                    f"ABORT: {npy} has shape {mats[key].shape}, expected "
+                    f"{(len(contexts), q.VOCAB_SIZE)}")
+            if len(metas[key].get("per_context", [])) != len(contexts):
+                raise SystemExit(
+                    f"ABORT: {js} holds {len(metas[key].get('per_context', []))} validated "
+                    f"contexts, expected {len(contexts)}")
 
     results, checks = {}, {}
     for config_id in configs:
@@ -262,6 +297,8 @@ def engine_profile(out_dir=None, configs=("BF16_REFERENCE", "FP4_PRIMARY"), n_tr
             per_cfg[name]["ratio_to_replication_floor"] = (None if floor == 0.0 else m / floor)
             per_cfg[name]["above_replication_floor"] = bool(m > floor)
         results[short] = per_cfg
+        checks[f"{short}_cell_count_complete"] = all(
+            per_cfg[name]["cells"] == expected_cells for name, _, _, _ in PROFILE_COMPARISONS)
         checks[f"{short}_all_cells_valid"] = all(
             c["full_vocab"] and c["all_finite"] and c["normalized"]
             for k, mm in metas.items() if k.startswith(config_id)
@@ -287,7 +324,12 @@ def engine_profile(out_dir=None, configs=("BF16_REFERENCE", "FP4_PRIMARY"), n_tr
         "configs": list(configs),
         "profiles": PROFILES,
         "n_trajectories": n_traj,
+        "expected_cells_per_comparison": expected_cells,
         "cells_per_comparison": len(contexts),
+        "contexts_hash": contexts_hash,
+        "config_identity": {c: q.config_identity(c) for c in configs},
+        "kl_spec_hash": q.spec_hash(),
+        "git": q.git_state(),
         "provisional_trajectories": {
             "PROVISIONAL": True,
             "prompt_set_hash": traj["prompt_set_hash"],
