@@ -1,0 +1,507 @@
+{
+  "gate": "replayability",
+  "purpose": "P7: does the locked seed and profile reproduce BF16 token IDs across independent launches?",
+  "kind": "empirical measurement, not a correctness invariant",
+  "n_trajectories": 64,
+  "engine_profile_name": "graph_2048",
+  "generation": {
+    "max_tokens": 2048,
+    "min_tokens": 2048,
+    "temperature": 0.7,
+    "top_p": 0.9,
+    "top_k": -1,
+    "min_p": 0.0,
+    "seed": 20260823,
+    "ignore_eos": true,
+    "presence_penalty": 0.0,
+    "frequency_penalty": 0.0,
+    "repetition_penalty": 1.0,
+    "detokenize": false
+  },
+  "generation_group_size": 16,
+  "trajectory_set_hash": "1dd71faeb242c7c1be0011491fb51942fb662dfeb2ba2d2d5c2cb428f7a041ad",
+  "frozen_engine_identity": "ca16377ea4206028",
+  "replay_engine_identity": "ca16377ea4206028",
+  "identical_trajectories": 51,
+  "replayable": false,
+  "passed": null,
+  "verdict_is_informational": true,
+  "min_matching_prefix_tokens": 3,
+  "per_trajectory": [
+    {
+      "trajectory_index": 0,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 1,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 2,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 3,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 4,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 5,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 6,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 7,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 8,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 9,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 10,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 11,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 12,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 13,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 14,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 15,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 16,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 17,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 18,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 19,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 20,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 21,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 22,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 23,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 24,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 25,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 26,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 27,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 28,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 29,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 30,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 31,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 32,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 33,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 34,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 35,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 36,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 37,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 38,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 39,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 40,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 41,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 42,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 43,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 44,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 45,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 46,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 47,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 48,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 49,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 50,
+      "identical": false,
+      "first_divergence": 13,
+      "matching_prefix_tokens": 13,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 51,
+      "identical": false,
+      "first_divergence": 96,
+      "matching_prefix_tokens": 96,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 52,
+      "identical": false,
+      "first_divergence": 8,
+      "matching_prefix_tokens": 8,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 53,
+      "identical": false,
+      "first_divergence": 4,
+      "matching_prefix_tokens": 4,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 54,
+      "identical": false,
+      "first_divergence": 35,
+      "matching_prefix_tokens": 35,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 55,
+      "identical": false,
+      "first_divergence": 92,
+      "matching_prefix_tokens": 92,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 56,
+      "identical": false,
+      "first_divergence": 43,
+      "matching_prefix_tokens": 43,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 57,
+      "identical": false,
+      "first_divergence": 30,
+      "matching_prefix_tokens": 30,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 58,
+      "identical": true,
+      "first_divergence": null,
+      "matching_prefix_tokens": 2048,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 59,
+      "identical": false,
+      "first_divergence": 3,
+      "matching_prefix_tokens": 3,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 60,
+      "identical": false,
+      "first_divergence": 17,
+      "matching_prefix_tokens": 17,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 61,
+      "identical": false,
+      "first_divergence": 34,
+      "matching_prefix_tokens": 34,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 62,
+      "identical": false,
+      "first_divergence": 19,
+      "matching_prefix_tokens": 19,
+      "replay_length": 2048
+    },
+    {
+      "trajectory_index": 63,
+      "identical": false,
+      "first_divergence": 63,
+      "matching_prefix_tokens": 63,
+      "replay_length": 2048
+    }
+  ],
+  "consequence": "generation is NOT bit-reproducible across launches; the frozen token IDs in trajectories.json are the authoritative contexts and are never regenerated",
+  "kl_spec_hash": "5565ff73dbe5e36a",
+  "git": {
+    "git_head": "cad25532a30d8cc2dcd9e49708b80a4651b5c3c0",
+    "git_dirty": false
+  },
+  "gpu": {
+    "name": "NVIDIA RTX PRO 4000 Blackwell",
+    "uuid": "GPU-fdc11a18-6edb-7e2f-82b2-6bd0b9ed714d",
+    "driver_version": "575.64.03",
+    "memory_total_mib": "24467",
+    "power_limit_w": "145.00"
+  },
+  "software": {
+    "python": "3.12.13",
+    "kernel": "6.8.0-65-generic",
+    "torch": "2.10.0+cu128",
+    "torch_cuda": "12.8",
+    "vllm": "0.19.1",
+    "transformers": "5.15.1",
+    "compressed_tensors": "0.15.0.1",
+    "nvcc": "Cuda compilation tools, release 12.9, V12.9.86",
+    "git_head": "cad25532a30d8cc2dcd9e49708b80a4651b5c3c0",
+    "git_dirty": false,
+    "git_untracked_files": 2
+  },
+  "timestamp": "2026-08-26T00:25:35-0400"
+}

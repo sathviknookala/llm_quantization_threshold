@@ -206,11 +206,29 @@ context in the study is a prefix of one of these continuations, so regenerating 
 experiment identity, not a rerun — the freezing path refuses to overwrite, and no later phase
 regenerates during resume.
 
-**Replayability is measured, not assumed.** Whether the locked seed and profile reproduce the same
-token IDs across independent BF16 launches is an empirical question answered by its own gate
-(`results/quality/gates/replayability.json`). The design does not depend on the answer: once
-generated and validated, the frozen token IDs and their hash are the authoritative evaluation
-contexts.
+**Replayability is measured, not assumed — and the answer is no.** Whether the locked seed and
+profile reproduce the same token IDs across independent BF16 launches was tested directly by
+regenerating all 64 trajectories in a second launch under an identical engine identity, seed,
+profile and group size (`results/quality/gates/replayability.json`):
+
+```text
+identical trajectories   51 / 64
+diverging                13
+earliest divergence      token 3 of 2048
+median divergence        token 30
+```
+
+The two launches resolved to the same `engine_identity_hash` (`ca16377ea4206028`) and the same
+44,688-token KV cache, so this is not a configuration difference. Sampling at `temperature = 0.7`
+draws from a distribution whose logits differ in the last bits between launches — non-deterministic
+reduction order in the kernels — and a seeded RNG stream lands on a different token whenever those
+last bits straddle a sampling boundary. Once it does, the trajectories diverge for good.
+
+**This does not invalidate the design; it is the reason the artifact is frozen.** Once generated and
+validated, the token IDs in `trajectories.json` and their hash *are* the evaluation contexts. Nothing
+downstream regenerates them, resume never re-derives them, and every scoring pass records the
+`trajectory_set_hash` it consumed. What would be invalid is treating the generation *procedure* as
+the contract; the generated *tokens* are the contract.
 
 ### Grid completeness — LOCKED 2026-08-25
 

@@ -256,6 +256,23 @@ Two consequences travel with every quality number:
   selection, and prefill chunk boundaries all differ between the profiles; separating them was not
   attempted.
 
+## The trajectory set is reproducible by hash, not by rerunning generation
+
+Regenerating the 64 BF16 trajectories under an identical engine identity, seed, sampling policy and
+group size reproduced only **51 of 64** exactly; 13 diverged, the earliest at token 3 of 2048
+(`results/quality/gates/replayability.json`). Stochastic sampling over logits that differ in their
+last bits between launches is enough to select a different token, after which the sequences part
+permanently.
+
+The consequence for anyone reproducing this work: running the generation step again will **not**
+recreate these evaluation contexts. Reproduction goes through the tracked `trajectories.json` and
+its `trajectory_set_hash`, which is why the prompt token IDs are inlined and the artifact is
+committed rather than regenerated on demand. A study that quoted a KL number and told the reader to
+"regenerate with seed 20260823" would be quoting a number the reader could not obtain.
+
+This also bounds a claim the study does not make: the measured KL values describe these particular
+2,048-token continuations, not the expectation over the sampling distribution that produced them.
+
 ## The quality engine is the deployed configuration, but not the serving process
 
 Quality is measured through the same checkpoints, backend and kernels as the serving axis, verified
