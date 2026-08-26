@@ -83,6 +83,8 @@ def numerics_compat(logits_dir=GATE_LOGITS, reference="results/pilot/correctness
     repro_ok = all(v["legacy_reproduces_tracked_artifact_max_abs"] is not None
                    and v["legacy_reproduces_tracked_artifact_max_abs"] <= 1e-12
                    for v in pairs.values())
+    # G7 bounds the EPS effect via the max; the p99 threshold belongs to G4, which compares
+    # storage representations rather than formulas
     checks = {
         "legacy_formula_reproduces_tracked_artifact": repro_ok,
         "eps_isolated_mean_abs_within_tolerance":

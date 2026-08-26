@@ -113,6 +113,9 @@ def test_positions():
     raises("nesting invariant catches a mutated context",
            lambda: P.assert_nesting(broken))
 
+    raises("re-derivation refuses to run without the context tokens",
+           lambda: P.rederive_and_check(prompt, cont, 8, 519, 7), TypeError)
+
     print("positions: re-derivation accepts the truth")
     allgood = all(P.rederive_and_check(prompt, cont, c["position_p"], c["context_len"],
                                        c["target_token_id"], c["context_ids"])[0]
@@ -147,6 +150,14 @@ def test_kl_math():
     check("reference may itself have zero-mass tokens", K.kl_nats(zeroed, a) > 0.0, True)
     raises("all-(-inf) distribution raises",
            lambda: K.kl_nats(np.full(3, -np.inf), a), K.KLDomainError)
+    raises("+inf in the reference raises",
+           lambda: K.kl_nats(np.array([np.inf, -1.0, -2.0]), a), K.KLDomainError)
+    raises("NaN in the reference raises",
+           lambda: K.kl_nats(np.array([np.nan, -1.0, -2.0]), a), K.KLDomainError)
+    raises("+inf in the comparison raises",
+           lambda: K.kl_nats(a, np.array([np.inf, -1.0, -2.0])), K.KLDomainError)
+    raises("NaN in the comparison raises",
+           lambda: K.kl_nats(a, np.array([np.nan, -1.0, -2.0])), K.KLDomainError)
     raises("non-finite grid raises",
            lambda: K.headline(np.array([[0.1, np.nan], [0.2, 0.3]])), K.KLDomainError)
     raises("1-D grid raises", lambda: K.headline(np.array([0.1, 0.2])), K.KLDomainError)

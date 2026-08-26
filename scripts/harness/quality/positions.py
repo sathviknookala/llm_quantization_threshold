@@ -77,7 +77,7 @@ def assert_nesting(cells):
 
 
 def rederive_and_check(prompt_ids, cont_ids, position_p, context_len_seen, target_token_id_seen,
-                       context_ids_seen=None):
+                       context_ids_seen):
     """Independent re-derivation, for checking a stored record against the contract.
 
     Catches a position-label scramble, which a same-cell self-consistency check cannot see.
@@ -88,6 +88,6 @@ def rederive_and_check(prompt_ids, cont_ids, position_p, context_len_seen, targe
         problems.append(f"context_len {context_len_seen} != {len(context)}")
     if target_token_id_seen != target:
         problems.append(f"target {target_token_id_seen} != {target}")
-    if context_ids_seen is not None and list(context_ids_seen) != context:
+    if list(context_ids_seen) != context:
         problems.append("context token IDs differ from re-derivation")
     return (problems == []), problems

@@ -21,6 +21,9 @@ from harness import common, orchestration as orch, server  # noqa: E402
 from harness.quality import kl_math as K, positions as P, qcommon as q  # noqa: E402
 
 KV_RE = re.compile(r"GPU KV cache size:\s*([\d,]+)\s*tokens")
+# vLLM prefixes log lines with a pid and a timestamp; hashing them raw made two identical engines
+# hash differently, which would defeat resume and misreport mixed engine identity
+LOG_PREFIX_RE = re.compile(r"^\(\S+ pid=\d+\)\s*|^(INFO|WARNING|ERROR)\s+[\d-]+\s+[\d:]+\s*")
 GRAPH_RE = re.compile(r"Graph capturing finished in", re.I)
 CAPTURE_RE = re.compile(r"Capturing CUDA graphs", re.I)
 
@@ -52,6 +55,14 @@ def engine_kwargs(config_id, overrides=None):
     }, c
 
 
+def _strip_log_prefix(line):
+    prev = None
+    while prev != line:
+        prev = line
+        line = LOG_PREFIX_RE.sub("", line).strip()
+    return re.sub(r"^\[[^\]]+\]\s*", "", line)
+
+
 def observed_identity(log_text, resolved, config_id):
     """Engine identity from what the engine actually did, not from what it was asked for.
 
@@ -61,11 +72,13 @@ def observed_identity(log_text, resolved, config_id):
     kv = KV_RE.search(log_text)
     kernel_lines = sorted({ln.strip() for ln in log_text.splitlines()
                            if any(p in ln for p in server.KERNEL_PATTERNS)})[:20]
+    normalized_kernel_lines = sorted({_strip_log_prefix(ln) for ln in kernel_lines})
     obs = {
         "resolved_config": resolved,
         "kv_cache_tokens": int(kv.group(1).replace(",", "")) if kv else None,
         "graph_capture_observed": bool(GRAPH_RE.search(log_text) or CAPTURE_RE.search(log_text)),
         "kernel_lines": kernel_lines,
+        "normalized_kernel_lines": normalized_kernel_lines,
     }
     cfg = q.QUALITY_CONFIGS[config_id]
     blob = " | ".join(kernel_lines)
@@ -82,7 +95,7 @@ def observed_identity(log_text, resolved, config_id):
         "resolved_config": resolved,
         "kv_cache_tokens": obs["kv_cache_tokens"],
         "graph_capture_observed": obs["graph_capture_observed"],
-        "kernel_lines": kernel_lines,
+        "kernel_lines": normalized_kernel_lines,
     })[:16]
     return obs
 
@@ -188,6 +201,10 @@ def _child():
             outs = llm.generate([{"prompt_token_ids": c} for c in chunk], sp)
             for j, o in enumerate(outs):
                 i = start + j
+                # vLLM sorts by request id and ids are assigned in submission order, so this holds
+                # today; asserting it turns an inherited guarantee into a checked one
+                if list(o.prompt_token_ids) != list(chunk[j]):
+                    raise SystemExit(f"ABORT: output {j} does not correspond to its request")
                 lp = o.outputs[0].logprobs[0]
                 for tid, obj in lp.items():
                     mat[i, tid] = obj.logprob
@@ -208,6 +225,11 @@ def _child():
         meta["generate_seconds"] = round(time.time() - t0, 2)
         # token IDs straight from the engine: decode/re-encode could change the sequence at the
         # prompt/continuation boundary
+        for o, sent in zip(outs, job["prompts"]):
+            # a silent prompt/continuation mispairing here would corrupt the frozen trajectory
+            # artifact permanently, with nothing downstream able to detect it
+            if list(o.prompt_token_ids) != list(sent):
+                raise SystemExit("ABORT: generation output does not correspond to its prompt")
         meta["continuations"] = [list(o.outputs[0].token_ids) for o in outs]
         meta["continuation_lengths"] = [len(c) for c in meta["continuations"]]
     else:

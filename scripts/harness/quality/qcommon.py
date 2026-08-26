@@ -93,6 +93,9 @@ GATES = {
     "alignment_pooled_min": 0.99,
     "replication_floor_max_frac_of_fp8": 0.01,
     "cache_equivalence_max_frac_of_fp8": 0.01,
+    # AND-exclude, not OR-pass: the relative bounds are evaluated only on cells whose TRUE KL is
+    # at or above the floor. Read as OR-pass the floor would auto-pass nearly every cell, since
+    # storage-induced absolute deltas sit well below it.
     "precision_rel_p99_max": 1e-3,
     "precision_rel_max": 1e-2,
     "precision_abs_floor_nats": 1e-4,
@@ -288,6 +291,13 @@ def load_prompts(n=N_TRAJECTORIES, workload=CORPUS_WORKLOAD):
     stem = os.path.join(common.CORPUS_DIR, f"{workload.lower()}_{tokens}tok")
     body = json.load(open(stem + ".json"))
     manifest = json.load(open(stem + "_manifest.json"))
+    # the body is gitignored as regenerable, so it is pinned to the tracked manifest rather than
+    # trusted; a body that regenerated non-identically would otherwise pass the per-prompt checks
+    full_hash = common.sha256_of_json([p["token_ids"] for p in body["prompts"]])
+    if full_hash != manifest["prompt_set_hash"]:
+        raise SystemExit(
+            f"ABORT: corpus body hashes to {full_hash[:16]} but the tracked manifest says "
+            f"{manifest['prompt_set_hash'][:16]}; this is not the frozen D16 corpus")
     prompts = body["prompts"][:n]
     if len(prompts) != n:
         raise SystemExit(f"ABORT: corpus holds {len(body['prompts'])} prompts, need {n}")
@@ -297,6 +307,9 @@ def load_prompts(n=N_TRAJECTORIES, workload=CORPUS_WORKLOAD):
                              "the first-N subset is only well defined in stored order")
         if p["n_tokens"] != tokens or len(p["token_ids"]) != tokens:
             raise SystemExit(f"ABORT: corpus prompt {i} has {p['n_tokens']} tokens, want {tokens}")
+    manifest = dict(manifest)
+    manifest["subset_n"] = n
+    manifest["subset_hash"] = common.sha256_of_json([p["token_ids"] for p in prompts])
     return prompts, manifest
 
 

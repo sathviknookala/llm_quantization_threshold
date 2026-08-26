@@ -33,14 +33,28 @@ def mass_presum(lp):
     return float(np.exp(np.asarray(lp, dtype=WORKING_DTYPE)).sum())
 
 
+def _reject_non_logprob(lp, role):
+    a = np.asarray(lp, dtype=WORKING_DTYPE)
+    if np.isnan(a).any():
+        raise KLDomainError(f"{role} distribution holds NaN; it is not a log-distribution")
+    if np.isposinf(a).any():
+        raise KLDomainError(f"{role} distribution holds +inf; it is not a log-distribution")
+
+
 def kl_nats(lp_ref, lp_cmp, negative_tolerance=1e-12):
     """D_KL(ref || cmp) in nats, from unnormalised logprob vectors."""
+    _reject_non_logprob(lp_ref, "reference")
+    _reject_non_logprob(lp_cmp, "comparison")
     lr = log_normalize(lp_ref)
     lc = log_normalize(lp_cmp)
     if lr.shape != lc.shape:
         raise KLDomainError(f"shape mismatch {lr.shape} vs {lc.shape}")
     p = np.exp(lr)
     support = p > 0.0
+    if not support.any():
+        # nan > 0.0 is False everywhere, so a corrupted reference would otherwise sum an empty
+        # support and return a clean-looking 0.0
+        raise KLDomainError("reference distribution has no probability mass anywhere")
     if not np.isfinite(lc[support]).all():
         n = int((~np.isfinite(lc[support])).sum())
         raise KLDomainError(
