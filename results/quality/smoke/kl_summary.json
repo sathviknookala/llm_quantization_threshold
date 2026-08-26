@@ -43,7 +43,164 @@
     "FP8_PRIMARY": "5c0c3e0aaefadde93e18bfd4af6b7a4608aed80e05aa14ce9ad80b7d1c006e50",
     "FP4_PRIMARY": "8866dad87d09688303026d3d683ea6ded90d3eaf41210ec4d75a7b7ff5da06ec"
   },
-  "replication_floor": null,
+  "replication_floor": {
+    "BF16": {
+      "headline_nats": 0.0002983571074837001,
+      "max_nats": 0.0030084606348134094,
+      "cells": 40,
+      "n_trajectories": 4,
+      "mean_nats": 0.0002983571074837001,
+      "p99_nats": 0.0025321479624843494,
+      "top1_agreement": 1.0,
+      "bit_identical_cells": 0,
+      "by_position": {
+        "1": {
+          "mean_nats": 0.0008745230012527156,
+          "max_nats": 0.0030084606348134094
+        },
+        "8": {
+          "mean_nats": 0.00017377500003103706,
+          "max_nats": 0.00030827326167821015
+        },
+        "32": {
+          "mean_nats": 0.0005933856810530571,
+          "max_nats": 0.0016049419792560843
+        },
+        "64": {
+          "mean_nats": 0.0006871274545202394,
+          "max_nats": 0.0015793085402875978
+        },
+        "128": {
+          "mean_nats": 5.211794249388757e-05,
+          "max_nats": 0.00017650902356180156
+        },
+        "256": {
+          "mean_nats": 8.21973321493313e-05,
+          "max_nats": 0.00032640326276087465
+        },
+        "512": {
+          "mean_nats": 5.119779763849686e-05,
+          "max_nats": 0.00017934860550054054
+        },
+        "1024": {
+          "mean_nats": 7.955390154474525e-06,
+          "max_nats": 1.6210584667888277e-05
+        },
+        "1536": {
+          "mean_nats": 0.00045064596914737927,
+          "max_nats": 0.001787146090379924
+        },
+        "2048": {
+          "mean_nats": 1.064550639638253e-05,
+          "max_nats": 3.355339033027874e-05
+        }
+      }
+    },
+    "FP8": {
+      "headline_nats": 1.508752246979599e-11,
+      "max_nats": 3.9196048709431093e-10,
+      "cells": 40,
+      "n_trajectories": 4,
+      "mean_nats": 1.508752246979599e-11,
+      "p99_nats": 3.0319050442433636e-10,
+      "top1_agreement": 1.0,
+      "bit_identical_cells": 36,
+      "by_position": {
+        "1": {
+          "mean_nats": 1.3907640850230007e-10,
+          "max_nats": 3.9196048709431093e-10
+        },
+        "8": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "32": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "64": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "128": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "256": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "512": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "1024": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "1536": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "2048": {
+          "mean_nats": 1.1798816195659837e-11,
+          "max_nats": 2.9923589799922364e-11
+        }
+      }
+    },
+    "FP4": {
+      "headline_nats": 3.9093883143190764e-11,
+      "max_nats": 1.173667458503524e-09,
+      "cells": 40,
+      "n_trajectories": 4,
+      "mean_nats": 3.909388314319076e-11,
+      "p99_nats": 7.883537832535095e-10,
+      "top1_agreement": 1.0,
+      "bit_identical_cells": 34,
+      "by_position": {
+        "1": {
+          "mean_nats": 3.398377835786762e-10,
+          "max_nats": 1.173667458503524e-09
+        },
+        "8": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "32": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "64": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "128": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "256": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "512": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "1024": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "1536": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "2048": {
+          "mean_nats": 5.110104785323138e-11,
+          "max_nats": 1.0812118853467998e-10
+        }
+      }
+    }
+  },
   "pairs": {
     "BF16||FP8": {
       "pair": "BF16||FP8",
@@ -227,7 +384,31 @@
         }
       },
       "reference_config": "BF16_REFERENCE",
-      "comparison_config": "FP8_PRIMARY"
+      "comparison_config": "FP8_PRIMARY",
+      "vs_replication_floor": {
+        "floor_source": "results/quality/gates/replication_floor.json",
+        "floor_configs": [
+          "BF16",
+          "FP8"
+        ],
+        "floor_rule": "max over both sides of the pair",
+        "headline": {
+          "value_nats": 0.0036897120485158315,
+          "replication_floor_nats": 0.0002983571074837001,
+          "excess_over_floor_nats": 0.003391354941032131,
+          "ratio_to_floor": 12.366764377206627,
+          "above_replication_floor": true,
+          "interpretation": "ratio is a reproducibility diagnostic only; read value_nats for magnitude. No materiality threshold is applied here."
+        },
+        "worst_cell": {
+          "value_nats": 0.04128875104329357,
+          "replication_floor_nats": 0.0030084606348134094,
+          "excess_over_floor_nats": 0.03828029040848016,
+          "ratio_to_floor": 13.72421183295768,
+          "above_replication_floor": true,
+          "interpretation": "ratio is a reproducibility diagnostic only; read value_nats for magnitude. No materiality threshold is applied here."
+        }
+      }
     },
     "BF16||FP4": {
       "pair": "BF16||FP4",
@@ -411,7 +592,31 @@
         }
       },
       "reference_config": "BF16_REFERENCE",
-      "comparison_config": "FP4_PRIMARY"
+      "comparison_config": "FP4_PRIMARY",
+      "vs_replication_floor": {
+        "floor_source": "results/quality/gates/replication_floor.json",
+        "floor_configs": [
+          "BF16",
+          "FP4"
+        ],
+        "floor_rule": "max over both sides of the pair",
+        "headline": {
+          "value_nats": 0.029453956481186858,
+          "replication_floor_nats": 0.0002983571074837001,
+          "excess_over_floor_nats": 0.029155599373703156,
+          "ratio_to_floor": 98.72047872295447,
+          "above_replication_floor": true,
+          "interpretation": "ratio is a reproducibility diagnostic only; read value_nats for magnitude. No materiality threshold is applied here."
+        },
+        "worst_cell": {
+          "value_nats": 0.15973935932058358,
+          "replication_floor_nats": 0.0030084606348134094,
+          "excess_over_floor_nats": 0.15673089868577017,
+          "ratio_to_floor": 53.09670915155283,
+          "above_replication_floor": true,
+          "interpretation": "ratio is a reproducibility diagnostic only; read value_nats for magnitude. No materiality threshold is applied here."
+        }
+      }
     },
     "FP8||FP4": {
       "pair": "FP8||FP4",
@@ -596,6 +801,30 @@
       },
       "reference_config": "FP8_PRIMARY",
       "comparison_config": "FP4_PRIMARY",
+      "vs_replication_floor": {
+        "floor_source": "results/quality/gates/replication_floor.json",
+        "floor_configs": [
+          "FP8",
+          "FP4"
+        ],
+        "floor_rule": "max over both sides of the pair",
+        "headline": {
+          "value_nats": 0.03566234734577295,
+          "replication_floor_nats": 3.9093883143190764e-11,
+          "excess_over_floor_nats": 0.03566234730667907,
+          "ratio_to_floor": 912223204.2069347,
+          "above_replication_floor": true,
+          "interpretation": "ratio is a reproducibility diagnostic only; read value_nats for magnitude. No materiality threshold is applied here."
+        },
+        "worst_cell": {
+          "value_nats": 0.1681038497636374,
+          "replication_floor_nats": 1.173667458503524e-09,
+          "excess_over_floor_nats": 0.16810384858996993,
+          "ratio_to_floor": 143229539.63295275,
+          "above_replication_floor": true,
+          "interpretation": "ratio is a reproducibility diagnostic only; read value_nats for magnitude. No materiality threshold is applied here."
+        }
+      },
       "subtraction_proxy_would_have_said": {
         "value_nats": 0.025764244432671026,
         "direct_nats": 0.03566234734577295,
@@ -607,7 +836,7 @@
     }
   },
   "git": {
-    "git_head": "ef47540d6bb399f128fe831de5f7c575d5e41f55",
+    "git_head": "4f9f3d712afac169c059bf24c1cf5d7a7ba5ef48",
     "git_dirty": false
   },
   "gpu": {
@@ -626,9 +855,9 @@
     "transformers": "5.15.1",
     "compressed_tensors": "0.15.0.1",
     "nvcc": "Cuda compilation tools, release 12.9, V12.9.86",
-    "git_head": "ef47540d6bb399f128fe831de5f7c575d5e41f55",
+    "git_head": "4f9f3d712afac169c059bf24c1cf5d7a7ba5ef48",
     "git_dirty": false,
     "git_untracked_files": 1
   },
-  "timestamp": "2026-08-26T00:28:34-0400"
+  "timestamp": "2026-08-26T00:33:39-0400"
 }
