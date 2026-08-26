@@ -114,6 +114,14 @@ def _release_gpu(pgid):
     return {"released": bool(ok), "escalated": killed}
 
 
+class _Terminated(Exception):
+    pass
+
+
+def _raise_on_term(signum, _frame):
+    raise _Terminated(f"parent received signal {signum}")
+
+
 def run_job(job, log_path, allow_dirty=False, require_cool=True, timeout=3600):
     """Parent side: preflight, launch a child engine, harvest observed state, release VRAM."""
     q.require_clean_tree(allow_dirty, stage=f"engine:{job['config_id']}:{job['task']}")
@@ -123,6 +131,12 @@ def run_job(job, log_path, allow_dirty=False, require_cool=True, timeout=3600):
     common.write_json(job_path, job)
 
     t0 = time.time()
+    # the child runs in its own session and never sees a signal sent here, so a bare SIGTERM to
+    # this process leaves an EngineCore holding the whole card. Turning it into an exception is
+    # what lets the finally below run; observed doing exactly that during development.
+    prior = {sig: signal.getsignal(sig) for sig in (signal.SIGTERM, signal.SIGHUP)}
+    for sig in prior:
+        signal.signal(sig, _raise_on_term)
     with open(log_path, "w") as fh:
         proc = subprocess.Popen(
             [sys.executable, os.path.abspath(__file__), "--child", job_path],
@@ -145,6 +159,8 @@ def run_job(job, log_path, allow_dirty=False, require_cool=True, timeout=3600):
                     os.killpg(pgid, signal.SIGKILL)
                 except OSError:
                     pass
+            for sig, handler in prior.items():
+                signal.signal(sig, handler)
             release = _release_gpu(pgid)
 
     log_text = open(log_path, errors="replace").read()

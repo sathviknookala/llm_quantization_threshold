@@ -409,7 +409,7 @@ def main():
         rec = engine_profile(configs=cfgs or ("BF16_REFERENCE", "FP4_PRIMARY"),
                              n_traj=a.n_traj, allow_dirty=a.allow_dirty)
     elif a.gate == "replayability":
-        rec = replayability(n_traj=a.n_traj or None, allow_dirty=a.allow_dirty)
+        rec = replayability(n_traj=None, allow_dirty=a.allow_dirty)
     elif a.gate == "cache-equivalence":
         rec = cache_equivalence(a.root, configs=cfgs or ("BF16_REFERENCE", "FP4_PRIMARY"),
                                 n_traj=a.n_traj, allow_dirty=a.allow_dirty)
@@ -449,7 +449,15 @@ def replayability(out_dir=None, n_traj=None, allow_dirty=False):
     os.makedirs(out_dir, exist_ok=True)
     q.require_clean_tree(allow_dirty, stage="replayability")
     frozen = T.load()
+    # the whole frozen set by default: a subset would be submitted in a smaller group than the
+    # freeze used, and batch composition changes numerics -- that would confound batching with
+    # the launch-to-launch nondeterminism this gate exists to measure
     n = n_traj or frozen["n_trajectories"]
+    if n != frozen["n_trajectories"]:
+        raise SystemExit(
+            f"ABORT: replay over {n} of {frozen['n_trajectories']} trajectories would submit "
+            f"groups of {min(n, q.GENERATION_GROUP_SIZE)} against the freeze's "
+            f"{q.GENERATION_GROUP_SIZE}; the comparison would not isolate launch nondeterminism.")
     prompts = [t["prompt_token_ids"] for t in frozen["trajectories"][:n]]
 
     replay_json = os.path.join(out_dir, "_gen_replay.json")
