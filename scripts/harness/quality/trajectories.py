@@ -58,7 +58,9 @@ def load(path=PATH, expect_n=None):
     rec = json.load(open(path))
     if rec.get("PROVISIONAL"):
         raise SystemExit(f"ABORT: {path} is a provisional gate artifact, not production input")
-    return _validate(rec, expect_n or rec["n_trajectories"])
+    # against the registered constant, not against the file's own claim: a self-consistent
+    # artifact holding the wrong number of trajectories would otherwise validate cleanly
+    return _validate(rec, expect_n or q.N_TRAJECTORIES)
 
 
 def generate(config_id, prompts, out_dir, tag, allow_dirty=False, overrides=None):
@@ -71,12 +73,27 @@ def generate(config_id, prompts, out_dir, tag, allow_dirty=False, overrides=None
         "out_npy": os.path.join(out_dir, f"_unused_{tag}.npy"),
         "engine_overrides": dict(overrides or {}),
     }
+    # generation has no per-group checkpoint, so a timeout discards the whole job; the bound is
+    # deliberately far above the ~5 min this workload needs
     meta = E.run_job(job, os.path.join(out_dir, "logs", f"generate_{tag}.log"),
-                     allow_dirty=allow_dirty)
+                     allow_dirty=allow_dirty, timeout=10800)
     bad = [i for i, n in enumerate(meta["continuation_lengths"]) if n != q.GENERATION_TOKENS]
     if bad:
         raise SystemExit(f"ABORT: continuations {bad[:10]} are not exactly {q.GENERATION_TOKENS} "
                          "tokens; a short trajectory cannot be padded or truncated into one")
+    if len(meta["continuations"]) != len(prompts):
+        raise SystemExit(f"ABORT: asked for {len(prompts)} continuations, got "
+                         f"{len(meta['continuations'])}")
+    # the group size is chosen to stay under the KV wall; this is how that is checked rather
+    # than asserted, since a preempted group's seeded generator is not something we have measured
+    pre = (meta.get("engine_metrics") or {}).get("vllm:num_preemptions")
+    meta["preemptions_observed"] = pre
+    if pre:
+        raise SystemExit(
+            f"ABORT: the engine preempted {pre} time(s) during generation. Groups of "
+            f"{q.GENERATION_GROUP_SIZE} were sized to stay under the KV wall precisely so this "
+            "could not happen; a trajectory generated under preemption is not one this contract "
+            "covers.")
     return meta
 
 

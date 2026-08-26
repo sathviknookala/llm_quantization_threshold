@@ -157,6 +157,18 @@ def run_id(prefix="kl"):
 CHECKPOINT_FILES = (".safetensors", ".json", ".yaml", ".jinja", ".model")
 
 
+def _content_probe(path, size, n=1 << 20):
+    """First and last MiB. A recalibrated checkpoint deployed with preserved timestamps keeps its
+    size and mtime, so those alone cannot key a content hash -- verified reproducible."""
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        h.update(fh.read(n))
+        if size > n:
+            fh.seek(max(0, size - n))
+            h.update(fh.read(n))
+    return h.hexdigest()
+
+
 def _checkpoint_files(path):
     out = []
     for root, _, names in os.walk(path):
@@ -185,7 +197,8 @@ def checkpoint_content_hash(path, cache_path=CACHE_PATH):
     files = _checkpoint_files(path)
     if not files:
         raise SystemExit(f"ABORT: no checkpoint files under {path}")
-    stat_key = common.sha256_of_json([[rel, size, mtime] for rel, _, size, mtime in files])
+    stat_key = common.sha256_of_json(
+        [[rel, size, mtime, _content_probe(full, size)] for rel, full, size, mtime in files])
     cache = {}
     if os.path.exists(cache_path):
         try:
@@ -291,12 +304,18 @@ def guard_manifest(out_dir, artifact, extra=None):
     path = os.path.join(out_dir, "manifest.json")
     h = spec_hash()
     if os.path.exists(path):
-        prior = json.load(open(path)).get("kl_spec_hash")
+        rec = json.load(open(path))
+        prior = rec.get("kl_spec_hash")
         if prior and prior != h:
             raise SystemExit(
                 f"ABORT: KL_SPEC changed ({prior} -> {h}) but {out_dir} holds artifacts from the "
                 "old spec. Move it aside or restore the spec; resume must not mix.")
-        return path, json.load(open(path))
+        for k, want in (extra or {}).items():
+            if rec.get(k) != want:
+                raise SystemExit(
+                    f"ABORT: {path} records {k}={rec.get(k)!r} but this run has {want!r}; "
+                    "resume must not mix. Move the directory aside.")
+        return path, rec
     rec = {"artifact": artifact, "kl_spec_hash": h, "spec": KL_SPEC,
            "started_at": common.now_iso()}
     if extra:

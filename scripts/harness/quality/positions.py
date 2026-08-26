@@ -62,7 +62,11 @@ def build_all(prompt_ids, cont_ids):
 
 
 def assert_nesting(cells):
-    """Contexts within a trajectory are strictly nested; a shift bug breaks this deterministically."""
+    """Contexts within a trajectory are strictly nested; a shift bug breaks this deterministically.
+
+    Not sufficient for validating STORED records: corruption confined past the second-longest
+    context has no longer partner to expose it. `rederive_and_check` is the check for those.
+    """
     ordered = sorted(cells, key=lambda c: c["position_p"])
     for shorter, longer in zip(ordered, ordered[1:]):
         a, b = shorter["context_ids"], longer["context_ids"]

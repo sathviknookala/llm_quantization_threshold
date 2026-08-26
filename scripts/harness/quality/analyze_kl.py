@@ -37,7 +37,13 @@ def verify_cells(cells, traj):
         if not ok:
             raise SystemExit(f"ABORT: trajectory {c['trajectory_index']} position "
                              f"{c['position_p']} fails re-derivation: {problems}")
-        if c.get("context_sha256") and c["context_sha256"] != q.prompt_hash(context):
+        # length and target are necessary but not sufficient: an interior token can be flipped
+        # while both still match, and this hash is the only check that catches it
+        if not c.get("context_sha256"):
+            raise SystemExit(f"ABORT: trajectory {c['trajectory_index']} position "
+                             f"{c['position_p']} carries no context_sha256; interior content "
+                             "would be unverifiable")
+        if c["context_sha256"] != q.prompt_hash(context):
             raise SystemExit(f"ABORT: trajectory {c['trajectory_index']} position "
                              f"{c['position_p']}: stored context hash differs from re-derivation")
         if c["target_token_id"] != target:
@@ -53,7 +59,8 @@ def verify_cells(cells, traj):
 
 
 def pair_grid(ma, mb, n_traj):
-    vals = np.array([K.kl_nats(ma[i], mb[i]) for i in range(ma.shape[0])])
+    vals = np.array([K.kl_nats(ma[i], mb[i], q.GATES["kl_negative_tolerance"])
+                     for i in range(ma.shape[0])])
     return vals.reshape(n_traj, N_POS)
 
 
@@ -83,6 +90,8 @@ def summarise(grid, idx, cells, label):
         "cells": int(flat.size),
         "headline_nats": point,
         "headline_bootstrap": boot,
+        "coverage_caveat": "percentile bootstrap at n=64 on a right-skewed non-negative statistic; "
+                           "95% is nominal, not guaranteed. Read bias and std_error beside it.",
         "trajectory_means_nats": [float(x) for x in traj_means],
         "per_cell": {
             "mean_nats": float(flat.mean()),
@@ -139,15 +148,34 @@ def analyze(root=None, out=None, n_traj=None, floor_path=None, allow_dirty=False
         rec = summarise(grid, idx, ref_cells, label)
         rec["reference_config"], rec["comparison_config"] = a, b
         if floor:
-            f = ((floor.get("per_config") or {}).get(q.QUALITY_CONFIGS[a]["short"]) or {})
-            if f.get("headline_nats") is not None:
-                rec["vs_replication_floor"] = {
+            per = floor.get("per_config") or {}
+            fa = per.get(q.QUALITY_CONFIGS[a]["short"]) or {}
+            fb = per.get(q.QUALITY_CONFIGS[b]["short"]) or {}
+            have = [f for f in (fa, fb) if f.get("headline_nats") is not None]
+            if have:
+                # both sides contribute launch-to-launch noise, so the binding floor is the larger
+                fh = max(f["headline_nats"] for f in have)
+                vs = {
                     "floor_source": os.path.relpath(floor_path, common.REPO),
-                    "floor_config": q.QUALITY_CONFIGS[a]["short"],
-                    "headline": K.floor_comparison(rec["headline_nats"], f["headline_nats"]),
-                    "worst_cell": K.floor_comparison(rec["per_cell"]["max_nats"],
-                                                     f.get("max_nats", 0.0)),
+                    "floor_configs": [q.QUALITY_CONFIGS[c]["short"] for c, f in
+                                      ((a, fa), (b, fb)) if f.get("headline_nats") is not None],
+                    "floor_rule": "max over both sides of the pair",
+                    "headline": K.floor_comparison(rec["headline_nats"], fh),
                 }
+                floor_cells = [f.get("cells") for f in have]
+                if all(c == rec["cells"] for c in floor_cells):
+                    vs["worst_cell"] = K.floor_comparison(
+                        rec["per_cell"]["max_nats"], max(f["max_nats"] for f in have))
+                else:
+                    # max-of-640 exceeds max-of-40 in ~95% of draws under an identical null, so
+                    # comparing maxima across different cell counts measures sample size, not signal
+                    vs["worst_cell"] = None
+                    vs["worst_cell_not_comparable"] = (
+                        f"the floor was measured over {floor_cells} cells and this pair over "
+                        f"{rec['cells']}; a maximum is an extreme-value statistic and the two are "
+                        "not comparable at different sample sizes. Re-run the floor at the same "
+                        "trajectory count to enable this comparison.")
+                rec["vs_replication_floor"] = vs
         pairs[label] = rec
 
     # KL is not additive; the direct FP8||FP4 measurement is reported, and the difference of the
@@ -155,9 +183,16 @@ def analyze(root=None, out=None, n_traj=None, floor_path=None, allow_dirty=False
     if "FP8||FP4" in pairs and "BF16||FP8" in pairs and "BF16||FP4" in pairs:
         direct = pairs["FP8||FP4"]["headline_nats"]
         naive = pairs["BF16||FP4"]["headline_nats"] - pairs["BF16||FP8"]["headline_nats"]
+        # the denominator is a difference of two KLs: no guaranteed sign, no guaranteed magnitude
+        usable = abs(naive) >= 1e-9 and naive > 0
         pairs["FP8||FP4"]["subtraction_proxy_would_have_said"] = {
-            "value_nats": naive, "direct_nats": direct,
-            "ratio_direct_over_proxy": (None if naive == 0 else direct / naive),
+            "value_nats": naive,
+            "direct_nats": direct,
+            "proxy_is_negative": bool(naive < 0),
+            "ratio_direct_over_proxy": (direct / naive) if usable else None,
+            "ratio_omitted_because": None if usable else
+                ("the proxy is negative, which a divergence cannot be" if naive < 0
+                 else "the proxy is within 1e-9 nats of zero and the ratio is unbounded"),
             "note": "reported to document the size of the error the barred proxy makes; "
                     "the proxy is never used as a result",
         }

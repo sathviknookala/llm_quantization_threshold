@@ -130,12 +130,22 @@ def run_job(job, log_path, allow_dirty=False, require_cool=True, timeout=3600):
         # captured while the child is certainly alive: after wait() reaps it the PID may already
         # be recycled, and re-deriving the pgid then could scope teardown to someone else's tree
         pgid = proc.pid
+        rc = None
         try:
-            rc = proc.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            os.killpg(pgid, signal.SIGKILL)
-            rc = -signal.SIGKILL
-    release = _release_gpu(pgid)
+            try:
+                rc = proc.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                os.killpg(pgid, signal.SIGKILL)
+                rc = -signal.SIGKILL
+        finally:
+            # start_new_session means the child never sees the SIGINT that hits this process, so
+            # without the finally a Ctrl-C here orphans an engine holding the whole card
+            if rc is None:
+                try:
+                    os.killpg(pgid, signal.SIGKILL)
+                except OSError:
+                    pass
+            release = _release_gpu(pgid)
 
     log_text = open(log_path, errors="replace").read()
     meta_path = job["out_json"]
@@ -207,6 +217,9 @@ def _child():
                 if [len(c) for c in chunk] != sorted(len(c) for c in chunk):
                     raise SystemExit("ABORT: scoring group is not in ascending length order")
                 outs = llm.generate([{"prompt_token_ids": c} for c in chunk], sp)
+                if len(outs) != len(chunk):
+                    raise SystemExit(f"ABORT: submitted {len(chunk)} contexts, engine returned "
+                                     f"{len(outs)}; unscored rows would stay -inf")
                 for j, o in enumerate(outs):
                     i = start + j
                     # vLLM sorts by request id and ids are assigned in submission order, so this
@@ -255,6 +268,10 @@ def _child():
         for start in range(0, len(prompts), group):
             chunk = prompts[start:start + group]
             outs = llm.generate([{"prompt_token_ids": p} for p in chunk], sp)
+            # zip() would truncate silently, leaving appended continuations unverified
+            if len(outs) != len(chunk):
+                raise SystemExit(f"ABORT: submitted {len(chunk)} prompts, engine returned "
+                                 f"{len(outs)}")
             for o, sent in zip(outs, chunk):
                 # a silent prompt/continuation mispairing here would corrupt the frozen trajectory
                 # artifact permanently, with nothing downstream able to detect it

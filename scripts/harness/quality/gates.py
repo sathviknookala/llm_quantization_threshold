@@ -210,7 +210,8 @@ def _contexts_for(traj):
 
 def _compare(a_mat, b_mat, index, n_positions):
     """Per-cell KL between two engine profiles, aggregated with the trajectory as the unit."""
-    vals = np.array([K.kl_nats(a_mat[i], b_mat[i]) for i in range(a_mat.shape[0])])
+    vals = np.array([K.kl_nats(a_mat[i], b_mat[i], q.GATES["kl_negative_tolerance"])
+                     for i in range(a_mat.shape[0])])
     identical = int(sum(bool(np.array_equal(a_mat[i], b_mat[i])) for i in range(a_mat.shape[0])))
     top1_same = int(sum(int(K.top1(a_mat[i]) == K.top1(b_mat[i])) for i in range(a_mat.shape[0])))
     grid = vals.reshape(-1, n_positions)
@@ -233,12 +234,12 @@ def _compare(a_mat, b_mat, index, n_positions):
     }
 
 
-def engine_profile(out_dir=None, configs=("BF16_REFERENCE", "FP4_PRIMARY"), n_traj=4,
-                   allow_dirty=False):
+def engine_profile(out_dir=None, configs=None, n_traj=4, allow_dirty=False):
     """G9 -- decide enforce_eager and the batching knob by measurement, and measure the floor.
 
     Runs before production trajectories are frozen: generation and scoring must share one profile.
     """
+    configs = tuple(configs or q.LADDER)
     out_dir = out_dir or os.path.join(q.QUALITY_DIR, "gates", "engine_profile")
     os.makedirs(out_dir, exist_ok=True)
     q.require_clean_tree(allow_dirty, stage="engine_profile:summary")
@@ -428,7 +429,12 @@ def main():
     common.write_json(out, rec)
     print(json.dumps({k: v for k, v in rec.items() if k not in ("software",)}, indent=2)[:4000])
     print("WROTE", out)
-    return 0 if rec.get("passed", rec.get("integrity_passed")) else 1
+    if rec.get("verdict_is_informational"):
+        return 0
+    verdict = rec.get("passed")
+    if verdict is None:
+        verdict = rec.get("integrity_passed")
+    return 0 if verdict else 1
 
 
 if __name__ == "__main__":
@@ -450,10 +456,19 @@ def replayability(out_dir=None, n_traj=None, allow_dirty=False):
     prompts = [t["prompt_token_ids"] for t in frozen["trajectories"][:n]]
 
     replay_json = os.path.join(out_dir, "_gen_replay.json")
+    want = {"kl_spec_hash": q.spec_hash(), "engine_profile_name": q.PROFILE_NAME,
+            "trajectory_set_hash": frozen["trajectory_set_hash"], "n_trajectories": n}
     if os.path.exists(replay_json):
         meta = json.load(open(replay_json))
+        got = {k: meta.get(k) for k in want}
+        if got != want:
+            raise SystemExit(
+                f"ABORT: {replay_json} was generated under a different spec, profile or "
+                f"trajectory set.\n  on disk: {got}\n  active : {want}\nMove it aside to rerun.")
     else:
         meta = T.generate(q.REFERENCE_CONFIG, prompts, out_dir, "replay", allow_dirty=allow_dirty)
+        meta.update(want)
+        common.write_json(replay_json, meta)
 
     rows, identical = [], 0
     for i, (t, c) in enumerate(zip(frozen["trajectories"][:n], meta["continuations"])):
@@ -481,6 +496,8 @@ def replayability(out_dir=None, n_traj=None, allow_dirty=False):
         "replay_engine_identity": (meta.get("observed") or {}).get("engine_identity_hash"),
         "identical_trajectories": identical,
         "replayable": replayable,
+        "passed": None,
+        "verdict_is_informational": True,
         "min_matching_prefix_tokens": min(r["matching_prefix_tokens"] for r in rows),
         "per_trajectory": rows,
         "consequence": ("generation is replayable under this profile" if replayable else
@@ -506,7 +523,9 @@ def _score_contexts(config_id, contexts, out_stem, overrides, allow_dirty, conte
                 and (prior.get("config_identity") or {}).get("checkpoint_content_hash")
                 == ident["checkpoint_content_hash"]
                 and prior.get("engine_overrides") == dict(overrides or {})):
-            return np.load(npy), prior
+            mat = np.load(npy)
+            _assert_scored(mat, prior, contexts, npy)
+            return mat, prior
         raise SystemExit(f"ABORT: {npy} was produced under a different spec, context set, "
                          "checkpoint or engine override; move it aside rather than mixing.")
     job = {"config_id": config_id, "task": "score", "contexts": contexts,
@@ -520,7 +539,43 @@ def _score_contexts(config_id, contexts, out_stem, overrides, allow_dirty, conte
     meta["config_identity"] = ident
     meta["engine_overrides"] = dict(overrides or {})
     common.write_json(js, meta)
-    return np.load(npy), meta
+    mat = np.load(npy)
+    _assert_scored(mat, meta, contexts, npy)
+    return mat, meta
+
+
+def _assert_scored(mat, meta, contexts, npy):
+    """The completeness and validity checks collect() and engine_profile() already make.
+
+    A short batch leaves -inf rows that would flow straight into kl_nats and corrupt the very
+    floor every other number is read against.
+    """
+    if mat.shape != (len(contexts), q.VOCAB_SIZE):
+        raise SystemExit(f"ABORT: {npy} has shape {mat.shape}, expected "
+                         f"{(len(contexts), q.VOCAB_SIZE)}")
+    per = meta.get("per_context") or []
+    if len(per) != len(contexts):
+        raise SystemExit(f"ABORT: {npy} validated {len(per)} contexts, expected {len(contexts)}")
+    bad = [c for c in per if not (c["full_vocab"] and c["all_finite"] and c["normalized"])]
+    if bad:
+        raise SystemExit(f"ABORT: {npy} holds {len(bad)} invalid distributions; first: {bad[0]}")
+    off = [c for c in per if c.get("decoded_token_is_none") is not True]
+    if off:
+        raise SystemExit(f"ABORT: {npy}: detokenize was not observed off on {len(off)} contexts")
+
+
+def _fp8_reference_kl(root, n_traj):
+    """BF16||FP8 headline over the same grid -- the scale the two pre-registered fractions are
+    expressed against. Without it the floor and cache gates cannot fail on substance."""
+    from harness.quality import collect_kl as C
+    try:
+        a, _, _ = C.load_matrix("BF16_REFERENCE", root=root, n_traj=n_traj)
+        b, _, _ = C.load_matrix("FP8_PRIMARY", root=root, n_traj=n_traj)
+    except (SystemExit, OSError, ValueError) as exc:
+        return None, f"unavailable: {exc}"
+    vals = np.array([K.kl_nats(a[i], b[i], q.GATES["kl_negative_tolerance"])
+                     for i in range(a.shape[0])])
+    return float(K.headline(vals.reshape(n_traj, len(P.RETAINED_POSITIONS)))), "measured"
 
 
 def _grid_from(root, cfg, n):
@@ -544,6 +599,7 @@ def cache_equivalence(root, out_dir=None, configs=("BF16_REFERENCE", "FP4_PRIMAR
     contexts, index = C.build_grid(traj)
     contexts_hash = common.sha256_of_json(contexts)
 
+    fp8_kl, fp8_why = _fp8_reference_kl(root, n_traj)
     per_cfg, checks = {}, {}
     for cfg in configs:
         short = q.QUALITY_CONFIGS[cfg]["short"]
@@ -563,12 +619,23 @@ def cache_equivalence(root, out_dir=None, configs=("BF16_REFERENCE", "FP4_PRIMAR
         cmp["uncached_prefix_cache_metrics"] = {
             k: v for k, v in (umeta.get("engine_metrics") or {}).items() if "prefix" in k}
         per_cfg[short] = cmp
-        checks[f"{short}_uncached_caching_observed_off"] = True
         checks[f"{short}_cells_complete"] = cmp["cells"] == n_traj * len(P.RETAINED_POSITIONS)
+        if fp8_kl is not None:
+            bound = q.GATES["cache_equivalence_max_frac_of_fp8"] * fp8_kl
+            cmp["pre_registered_bound_nats"] = bound
+            cmp["fraction_of_bf16_fp8_kl"] = (cmp["headline_nats"] / fp8_kl) if fp8_kl else None
+            checks[f"{short}_within_pre_registered_fraction_of_fp8"] = (
+                cmp["headline_nats"] <= bound)
+        else:
+            checks[f"{short}_fp8_reference_available"] = False
     return {
         "gate": "cache_equivalence",
         "purpose": "G3: prefix caching on (the production setting) vs off, same contexts",
-        "kind": "empirical measurement",
+        "kind": "empirical measurement with one pre-registered bound",
+        "bf16_fp8_reference_kl_nats": fp8_kl,
+        "bf16_fp8_reference_status": fp8_why,
+        "pre_registered_fraction": q.GATES["cache_equivalence_max_frac_of_fp8"],
+        "low_sample": bool(n_traj < q.N_TRAJECTORIES),
         "configs": list(configs),
         "n_trajectories": n_traj,
         "contexts_hash": contexts_hash,
@@ -599,6 +666,7 @@ def replication_floor(root, out_dir=None, configs=None, n_traj=4, allow_dirty=Fa
     contexts_hash = common.sha256_of_json(contexts)
     n_pos = len(P.RETAINED_POSITIONS)
 
+    fp8_kl, fp8_why = _fp8_reference_kl(root, n_traj)
     per_cfg, checks = {}, {}
     for cfg in configs:
         short = q.QUALITY_CONFIGS[cfg]["short"]
@@ -616,15 +684,28 @@ def replication_floor(root, out_dir=None, configs=None, n_traj=4, allow_dirty=Fa
         per_cfg[short] = cmp
         checks[f"{short}_independent_launches_same_profile"] = same_engine
         checks[f"{short}_cells_complete"] = cmp["cells"] == n_traj * n_pos
+        if fp8_kl is not None:
+            bound = q.GATES["replication_floor_max_frac_of_fp8"] * fp8_kl
+            cmp["pre_registered_bound_nats"] = bound
+            cmp["fraction_of_bf16_fp8_kl"] = (cmp["headline_nats"] / fp8_kl) if fp8_kl else None
+            checks[f"{short}_floor_within_pre_registered_fraction_of_fp8"] = (
+                cmp["headline_nats"] <= bound)
+        else:
+            checks[f"{short}_fp8_reference_available"] = False
     return {
         "gate": "replication_floor",
         "purpose": "G2: same configuration, same graph_2048 profile, two independent launches",
         "kind": "empirical measurement -- the resolution limit of every KL reported here",
         "engine_profile_name": q.PROFILE_NAME,
+        "bf16_fp8_reference_kl_nats": fp8_kl,
+        "bf16_fp8_reference_status": fp8_why,
+        "pre_registered_fraction": q.GATES["replication_floor_max_frac_of_fp8"],
+        "low_sample": bool(n_traj < q.N_TRAJECTORIES),
         "configs": list(configs),
         "n_trajectories": n_traj,
         "contexts_hash": contexts_hash,
         "per_config": {k: {"headline_nats": v["headline_nats"], "max_nats": v["max_nats"],
+                           "cells": v["cells"], "n_trajectories": n_traj,
                            "mean_nats": v["mean_nats"], "p99_nats": v["p99_nats"],
                            "top1_agreement": v["top1_agreement"],
                            "bit_identical_cells": v["bit_identical_cells"],
@@ -664,18 +745,23 @@ def storage_precision(root, n_traj=4, allow_dirty=False, floor_path=None):
     pairs, worst_rel_p99, worst_rel_max, worst_abs = {}, 0.0, 0.0, 0.0
     for a, b in q.KL_PAIRS:
         label = f"{q.QUALITY_CONFIGS[a]['short']}||{q.QUALITY_CONFIGS[b]['short']}"
-        f32 = np.array([K.kl_nats(mats[a][i], mats[b][i]) for i in range(mats[a].shape[0])])
+        f32 = np.array([K.kl_nats(mats[a][i], mats[b][i], q.GATES["kl_negative_tolerance"])
+                        for i in range(mats[a].shape[0])])
         ha = mats[a].astype(np.float16).astype(np.float32)
         hb = mats[b].astype(np.float16).astype(np.float32)
-        f16 = np.array([K.kl_nats(ha[i], hb[i]) for i in range(ha.shape[0])])
+        f16 = np.array([K.kl_nats(ha[i], hb[i], q.GATES["kl_negative_tolerance"])
+                        for i in range(ha.shape[0])])
         d = f16 - f32
         # AND-exclude: the relative bound is only meaningful where the true KL is above the
         # absolute floor, otherwise a 1e-12 baseline manufactures enormous relative errors
         keep = f32 >= q.GATES["precision_abs_floor_nats"]
         rel = np.abs(d[keep]) / f32[keep] if keep.any() else np.zeros(0)
+        delta_draws = K.bootstrap_headline(d.reshape(n, -1), idx)
         rec = {
             "cells": int(f32.size),
             "cells_above_abs_floor": int(keep.sum()),
+            "headline_delta_bootstrap": K.bootstrap_summary(
+                float(K.headline(d.reshape(n, -1))), delta_draws, ci=tuple(q.BOOTSTRAP["ci"])),
             "abs_floor_nats": q.GATES["precision_abs_floor_nats"],
             "fp32_headline_nats": float(K.headline(f32.reshape(n, -1))),
             "fp16_headline_nats": float(K.headline(f16.reshape(n, -1))),
@@ -685,7 +771,12 @@ def storage_precision(root, n_traj=4, allow_dirty=False, floor_path=None):
             "max_abs_delta_nats": float(np.abs(d).max()),
             "rel_p99": float(np.quantile(rel, 0.99)) if rel.size else None,
             "rel_max": float(rel.max()) if rel.size else None,
-            "underflowed_entries_fp16": int((np.isneginf(ha) & ~np.isneginf(mats[a])).sum()),
+            # fp16 reaches -65504, and a log-softmax entry over this vocab bottoms out near -80,
+            # so nothing underflows to -inf. The real storage risk is mantissa precision, ~3
+            # decimal digits, which is what these two measure.
+            "max_abs_logprob_representation_error": float(np.abs(ha - mats[a]).max()),
+            "entries_changed_by_fp16_frac": float((ha != mats[a]).mean()),
+            "min_logprob_seen": float(mats[a][np.isfinite(mats[a])].min()),
         }
         if floor:
             fl = ((floor.get("per_config") or {}).get(q.QUALITY_CONFIGS[a]["short"]) or {})
@@ -698,7 +789,12 @@ def storage_precision(root, n_traj=4, allow_dirty=False, floor_path=None):
             worst_rel_max = max(worst_rel_max, rec["rel_max"])
         worst_abs = max(worst_abs, rec["max_abs_delta_nats"])
 
+    tested = sum(r["cells_above_abs_floor"] for r in pairs.values())
+    total = sum(r["cells"] for r in pairs.values())
     checks = {
+        # without this, a run whose every cell fell below the absolute floor would leave both
+        # relative bounds at their 0.0 init and "pass" a gate that evaluated nothing
+        "enough_cells_above_abs_floor_to_test": tested >= max(10, total // 10),
         "rel_p99_within_tolerance": worst_rel_p99 <= q.GATES["precision_rel_p99_max"],
         "rel_max_within_tolerance": worst_rel_max <= q.GATES["precision_rel_max"],
     }
@@ -709,6 +805,9 @@ def storage_precision(root, n_traj=4, allow_dirty=False, floor_path=None):
         "thresholds": {k: q.GATES[k] for k in
                        ("precision_rel_p99_max", "precision_rel_max", "precision_abs_floor_nats")},
         "n_trajectories": n,
+        "low_sample": bool(n < q.N_TRAJECTORIES),
+        "cells_above_abs_floor_total": tested,
+        "cells_total": total,
         "pairs": pairs,
         "checks": checks,
         "passed": all(checks.values()),

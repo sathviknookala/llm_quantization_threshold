@@ -142,6 +142,7 @@ def collect(config_id, root=None, allow_dirty=False, n_traj=None,
             shard_trajectories=SHARD_TRAJECTORIES, traj=None, require_cool=True):
     root = run_dir(root)
     short = q.QUALITY_CONFIGS[config_id]["short"]
+    q.require_clean_tree(allow_dirty, stage=f"collect_kl:{config_id}")
     traj = traj if traj is not None else subset(T.load(), n_traj)
     n = traj["n_trajectories"]
     os.makedirs(dist_dir(short, root), exist_ok=True)
@@ -243,17 +244,31 @@ def load_matrix(config_id, root=None, n_traj=None):
     short = q.QUALITY_CONFIGS[config_id]["short"]
     summary = json.load(open(os.path.join(run_dir(root), f"collection_{short}.json")))
     n = n_traj or summary["n_trajectories"]
-    blocks, cells = [], []
-    for s in summary["shards"]:
+    blocks, cells, identities = [], [], set()
+    for s in sorted(summary["shards"], key=lambda x: x["start"]):
         arr = np.load(os.path.join(common.REPO, s["npy"]))
         m = json.load(open(os.path.join(common.REPO, s["json"])))
         if arr.shape[0] != s["stop"] - s["start"]:
             raise SystemExit(f"ABORT: {s['npy']} holds {arr.shape[0]} rows, expected "
                              f"{s['stop'] - s['start']}")
+        identities.add(m.get("engine_identity_hash"))
         blocks.append(arr)
         cells.extend(m["index"])
     mat = np.concatenate(blocks, axis=0)
     P.assert_complete_grid(cells, n)
+    # completeness is a set property; the reshape in analysis depends on the ORDER
+    order = [(c["trajectory_index"], c["position_p"]) for c in cells]
+    if order != P.grid_order(n):
+        raise SystemExit(
+            f"ABORT: {short} shards reassemble out of canonical order; the (trajectory, position) "
+            "reshape in analysis would average the wrong ten rows together")
+    if len(identities) != 1 or None in identities:
+        raise SystemExit(
+            f"ABORT: {short} shards span engine identities {sorted(identities)}; a configuration "
+            "must not be assembled from mixed engines")
+    if identities != {summary.get("engine_identity_hash")}:
+        raise SystemExit(f"ABORT: {short} shards were scored under {sorted(identities)} but "
+                         f"collection_{short}.json claims {summary.get('engine_identity_hash')}")
     if mat.shape != (n * N_POS, q.VOCAB_SIZE):
         raise SystemExit(f"ABORT: assembled matrix has shape {mat.shape}")
     return mat, cells, summary

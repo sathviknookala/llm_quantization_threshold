@@ -9,7 +9,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import numpy as np  # noqa: E402
 
-from harness.quality import kl_math as K, positions as P  # noqa: E402
+from harness.quality import kl_math as K, positions as P, qcommon as q  # noqa: E402
 
 PASS, FAIL = [], []
 
@@ -294,7 +294,8 @@ def test_analysis_verification():
                 out.append({"trajectory_index": t["trajectory_index"],
                             "position_p": cell["position_p"],
                             "context_len": cell["context_len"],
-                            "target_token_id": cell["target_token_id"]})
+                            "target_token_id": cell["target_token_id"],
+                            "context_sha256": q.prompt_hash(cell["context_ids"])})
         return out
 
     good = cells_for(traj)
@@ -322,6 +323,23 @@ def test_analysis_verification():
     unknown[0]["trajectory_index"] = 7
     raises("a cell naming an unknown trajectory is caught",
            lambda: A.verify_cells(unknown, traj), SystemExit)
+
+    # length and target both still match; only the hash can see this
+    interior = [dict(c) for c in good]
+    victim = next(c for c in interior if c["position_p"] == 2048)
+    t0 = traj["trajectories"][0]
+    corrupted = list(t0["prompt_token_ids"]) + list(t0["continuation_token_ids"][:2047])
+    corrupted[1000] += 1
+    check("an interior flip preserves length and target",
+          len(corrupted) == victim["context_len"], True)
+    victim["context_sha256"] = q.prompt_hash(corrupted)
+    raises("an interior-token corruption is caught by the context hash",
+           lambda: A.verify_cells(interior, traj), SystemExit)
+
+    missing_hash = [dict(c) for c in good]
+    del missing_hash[0]["context_sha256"]
+    raises("a cell with no context hash is refused, not silently skipped",
+           lambda: A.verify_cells(missing_hash, traj), SystemExit)
 
 
 def test_collection_contract():
