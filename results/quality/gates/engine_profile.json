@@ -1,0 +1,1202 @@
+{
+  "gate": "engine_profile",
+  "purpose": "G9: decide enforce_eager and max_num_batched_tokens by measurement, and measure the BF16 replication floor in the same pass",
+  "configs": [
+    "BF16_REFERENCE",
+    "FP8_PRIMARY",
+    "FP4_PRIMARY"
+  ],
+  "profiles": {
+    "eager_2048": {
+      "enforce_eager": true,
+      "max_num_batched_tokens": 2048
+    },
+    "graph_2048": {
+      "enforce_eager": false,
+      "max_num_batched_tokens": 2048
+    },
+    "graph_2048_r2": {
+      "enforce_eager": false,
+      "max_num_batched_tokens": 2048
+    },
+    "eager_2048_r2": {
+      "enforce_eager": true,
+      "max_num_batched_tokens": 2048
+    },
+    "graph_8192": {
+      "enforce_eager": false,
+      "max_num_batched_tokens": 8192
+    }
+  },
+  "n_trajectories": 4,
+  "expected_cells_per_comparison": 40,
+  "cells_per_comparison": 40,
+  "contexts_hash": "98ee2e2350aa0f243498cfe3f4b88acc0bc6d9c1bff3142f3a9073b0bf6d2e37",
+  "config_identity": {
+    "BF16_REFERENCE": {
+      "configuration_id": "BF16_REFERENCE",
+      "quantization": "BF16",
+      "model_path": "/home/sathvik/.cache/huggingface/hub/models--NousResearch--Meta-Llama-3.1-8B-Instruct/snapshots/d10aef7999a2b5ba950ab3974312feeedbfe0b77",
+      "checkpoint_content_hash": "ced0573c8e17cd04aa5d33b9d8bb10bce81a061a394cabb7771a16232c874f5b",
+      "tokenizer_identity": {
+        "tokenizer.json": "79e3e522635f3171300913bb421464a87de6222182a0570b9b2ccba2a964b2b4",
+        "tokenizer_config.json": "24e8a6dc2547164b7002e3125f10b415105644fcf02bf9ad8b674c87b1eaaed6",
+        "special_tokens_map.json": "6f38c73729248f6c127296386e3cdde96e254636cc58b4169d3fd32328d9a8ec"
+      },
+      "expected_kernel_pattern": null,
+      "forbidden_kernel_patterns": [
+        "CutlassFP8ScaledMMLinearKernel",
+        "NvFp4LinearBackend",
+        "Marlin"
+      ]
+    },
+    "FP8_PRIMARY": {
+      "configuration_id": "FP8_PRIMARY",
+      "quantization": "FP8",
+      "model_path": "/home/sathvik/llm_quantization_threshold/checkpoints/llama31-8b-instruct-FP8_DYNAMIC",
+      "checkpoint_content_hash": "5c0c3e0aaefadde93e18bfd4af6b7a4608aed80e05aa14ce9ad80b7d1c006e50",
+      "tokenizer_identity": {
+        "tokenizer.json": "6b9e4e7fb171f92fd137b777cc2714bf87d11576700a1dcd7a399e7bbe39537b",
+        "tokenizer_config.json": "941290c40ad93f86d5b8d07bbc08dd59881da5ba683e533885b523c9ba184b94",
+        "special_tokens_map.json": "6f38c73729248f6c127296386e3cdde96e254636cc58b4169d3fd32328d9a8ec"
+      },
+      "expected_kernel_pattern": "CutlassFP8ScaledMMLinearKernel",
+      "forbidden_kernel_patterns": [
+        "Marlin"
+      ]
+    },
+    "FP4_PRIMARY": {
+      "configuration_id": "FP4_PRIMARY",
+      "quantization": "FP4",
+      "model_path": "/home/sathvik/llm_quantization_threshold/checkpoints/llama31-8b-instruct-NVFP4",
+      "checkpoint_content_hash": "8866dad87d09688303026d3d683ea6ded90d3eaf41210ec4d75a7b7ff5da06ec",
+      "tokenizer_identity": {
+        "tokenizer.json": "384a7e7c676f7be2e5d2e8449c508be9b00e5b18c5b3c39ebc626e96b3f4b988",
+        "tokenizer_config.json": "941290c40ad93f86d5b8d07bbc08dd59881da5ba683e533885b523c9ba184b94",
+        "special_tokens_map.json": "6f38c73729248f6c127296386e3cdde96e254636cc58b4169d3fd32328d9a8ec"
+      },
+      "expected_kernel_pattern": "FLASHINFER_CUTLASS",
+      "forbidden_kernel_patterns": [
+        "CT_EMULATIONS",
+        "emulation"
+      ]
+    }
+  },
+  "kl_spec_hash": "4ef13273db16d285",
+  "git": {
+    "git_head": "0728bcd65aa6f8f9e180b9cb8627638f33716077",
+    "git_dirty": false
+  },
+  "provisional_trajectories": {
+    "PROVISIONAL": true,
+    "prompt_set_hash": "2681c604332813f2e893b252bc512efaac15316874d22352917492e5a40b130f",
+    "continuation_sha256": [
+      "dbd6651a80fb319d",
+      "9264a8699efa04c2",
+      "bfd55a104ad1a127",
+      "fce2c262d126432f"
+    ]
+  },
+  "results": {
+    "BF16": {
+      "replication_floor_graph": {
+        "why": "same graph profile, independent launches -- the noise floor under CUDA graphs",
+        "cells": 40,
+        "bit_identical_cells": 0,
+        "top1_agreement": 1.0,
+        "max_nats": 0.0028501882071656683,
+        "mean_nats": 0.00039841922700392456,
+        "median_nats": 8.298287380540244e-05,
+        "p99_nats": 0.002737245714127074,
+        "trajectory_means": [
+          0.0003325365078702963,
+          0.00044132687976059664,
+          0.00022798361917335903,
+          0.0005918299012114463
+        ],
+        "headline_nats": 0.00039841922700392456,
+        "by_position": {
+          "1": {
+            "mean_nats": 0.0008166972560144071,
+            "max_nats": 0.0025605920711692727
+          },
+          "8": {
+            "mean_nats": 0.00025306812641832347,
+            "max_nats": 0.00044762288543316776
+          },
+          "32": {
+            "mean_nats": 0.0007157067967296799,
+            "max_nats": 0.0019182674446770198
+          },
+          "64": {
+            "mean_nats": 0.00012103748767224623,
+            "max_nats": 0.0002870531078659383
+          },
+          "128": {
+            "mean_nats": 0.00021537274692053925,
+            "max_nats": 0.0004907936817589894
+          },
+          "256": {
+            "mean_nats": 0.0006596911381314727,
+            "max_nats": 0.0018737357200202876
+          },
+          "512": {
+            "mean_nats": 0.000486351571885774,
+            "max_nats": 0.001286694224036525
+          },
+          "1024": {
+            "mean_nats": 0.0007132699453717045,
+            "max_nats": 0.0028501882071656683
+          },
+          "1536": {
+            "mean_nats": 2.3171952591002034e-07,
+            "max_nats": 6.06116458380129e-07
+          },
+          "2048": {
+            "mean_nats": 2.7654813691886415e-06,
+            "max_nats": 4.637319022306473e-06
+          }
+        },
+        "worst_cell": {
+          "trajectory_index": 1,
+          "position_p": 1024,
+          "context_len": 1535,
+          "target_token_id": 1646,
+          "kl_nats": 0.0028501882071656683
+        }
+      },
+      "replication_floor_eager": {
+        "why": "same eager profile, independent launches -- the noise floor under eager",
+        "cells": 40,
+        "bit_identical_cells": 10,
+        "top1_agreement": 1.0,
+        "max_nats": 0.0019344980768063733,
+        "mean_nats": 0.000383406616585629,
+        "median_nats": 6.97466040209253e-05,
+        "p99_nats": 0.0019080480244726605,
+        "trajectory_means": [
+          0.0,
+          0.0004628098684859615,
+          0.0006738196856456087,
+          0.00039699691221094593
+        ],
+        "headline_nats": 0.000383406616585629,
+        "by_position": {
+          "1": {
+            "mean_nats": 0.0005163840295378873,
+            "max_nats": 0.0019344980768063733
+          },
+          "8": {
+            "mean_nats": 0.00021840845782844737,
+            "max_nats": 0.0005117549589962588
+          },
+          "32": {
+            "mean_nats": 0.0002898876801595277,
+            "max_nats": 0.0005446901484637117
+          },
+          "64": {
+            "mean_nats": 0.0009684805481149277,
+            "max_nats": 0.0018666774297968537
+          },
+          "128": {
+            "mean_nats": 0.000546671270251846,
+            "max_nats": 0.000991850758874469
+          },
+          "256": {
+            "mean_nats": 0.0005785101040073062,
+            "max_nats": 0.0018498727303655539
+          },
+          "512": {
+            "mean_nats": 0.00042307185094118385,
+            "max_nats": 0.001244748971037976
+          },
+          "1024": {
+            "mean_nats": 0.0002858294345116219,
+            "max_nats": 0.0011026832600280591
+          },
+          "1536": {
+            "mean_nats": 2.95688184983179e-06,
+            "max_nats": 8.547863028273528e-06
+          },
+          "2048": {
+            "mean_nats": 3.8659086537103985e-06,
+            "max_nats": 1.332148020208744e-05
+          }
+        },
+        "worst_cell": {
+          "trajectory_index": 2,
+          "position_p": 1,
+          "context_len": 512,
+          "target_token_id": 311,
+          "kl_nats": 0.0019344980768063733
+        }
+      },
+      "eager_vs_graph": {
+        "why": "enforce_eager flipped; graph capture also reserves VRAM before KV profiling, so the graph profile lands slightly fewer KV blocks -- a side effect vLLM does not let us remove",
+        "cells": 40,
+        "bit_identical_cells": 0,
+        "top1_agreement": 1.0,
+        "max_nats": 0.00289651313665634,
+        "mean_nats": 0.0005811733337066042,
+        "median_nats": 0.00021171339281811537,
+        "p99_nats": 0.002522647545181405,
+        "trajectory_means": [
+          0.000569956142342885,
+          0.0007809209110471998,
+          0.0004265325029344603,
+          0.0005472837785018714
+        ],
+        "headline_nats": 0.0005811733337066042,
+        "by_position": {
+          "1": {
+            "mean_nats": 0.0007469030269001586,
+            "max_nats": 0.0019378834149257384
+          },
+          "8": {
+            "mean_nats": 0.00021872818164333195,
+            "max_nats": 0.00041718201261890006
+          },
+          "32": {
+            "mean_nats": 0.0004783603415263308,
+            "max_nats": 0.0007015170910822411
+          },
+          "64": {
+            "mean_nats": 0.0011687883782614686,
+            "max_nats": 0.0018792270051580684
+          },
+          "128": {
+            "mean_nats": 0.0011207118509130312,
+            "max_nats": 0.00289651313665634
+          },
+          "256": {
+            "mean_nats": 0.0011143981830965197,
+            "max_nats": 0.0018996869797931945
+          },
+          "512": {
+            "mean_nats": 0.0005199447191566736,
+            "max_nats": 0.0017841544903289942
+          },
+          "1024": {
+            "mean_nats": 0.00043627953314270975,
+            "max_nats": 0.0016956698407414297
+          },
+          "1536": {
+            "mean_nats": 2.339697261166308e-06,
+            "max_nats": 5.674372782339686e-06
+          },
+          "2048": {
+            "mean_nats": 5.2794251646512845e-06,
+            "max_nats": 1.4635625504931047e-05
+          }
+        },
+        "worst_cell": {
+          "trajectory_index": 0,
+          "position_p": 128,
+          "context_len": 639,
+          "target_token_id": 872,
+          "kl_nats": 0.00289651313665634
+        },
+        "replication_floor_used_nats": 0.0028501882071656683,
+        "ratio_to_replication_floor": 1.01625328789664,
+        "above_replication_floor": true
+      },
+      "chunked_vs_unchunked": {
+        "why": "serving-compatible 2048 vs the offline default 8192",
+        "cells": 40,
+        "bit_identical_cells": 0,
+        "top1_agreement": 1.0,
+        "max_nats": 0.0028520314513984595,
+        "mean_nats": 0.00042800787356136766,
+        "median_nats": 5.234064378243729e-05,
+        "p99_nats": 0.0027383322990973697,
+        "trajectory_means": [
+          0.00023267687546293453,
+          0.0006884771863701394,
+          0.0003654547503164129,
+          0.00042542268209598365
+        ],
+        "headline_nats": 0.0004280078735613676,
+        "by_position": {
+          "1": {
+            "mean_nats": 0.0011578275033018123,
+            "max_nats": 0.002560495163446948
+          },
+          "8": {
+            "mean_nats": 0.00020566308321073385,
+            "max_nats": 0.0003789178336706929
+          },
+          "32": {
+            "mean_nats": 0.000308434742561384,
+            "max_nats": 0.0005648946133907075
+          },
+          "64": {
+            "mean_nats": 9.401132695139808e-05,
+            "max_nats": 0.00024613717087355695
+          },
+          "128": {
+            "mean_nats": 0.00021082604541243694,
+            "max_nats": 0.0005527333194091675
+          },
+          "256": {
+            "mean_nats": 0.000837773990904878,
+            "max_nats": 0.0014695317306595707
+          },
+          "512": {
+            "mean_nats": 0.0007485762308080175,
+            "max_nats": 0.0017243980337156208
+          },
+          "1024": {
+            "mean_nats": 0.0007136003012149868,
+            "max_nats": 0.0028520314513984595
+          },
+          "1536": {
+            "mean_nats": 6.185951876202929e-07,
+            "max_nats": 2.1700787474658375e-06
+          },
+          "2048": {
+            "mean_nats": 2.7469160604085335e-06,
+            "max_nats": 4.7378235602066046e-06
+          }
+        },
+        "worst_cell": {
+          "trajectory_index": 1,
+          "position_p": 1024,
+          "context_len": 1535,
+          "target_token_id": 1646,
+          "kl_nats": 0.0028520314513984595
+        },
+        "replication_floor_used_nats": 0.0028501882071656683,
+        "ratio_to_replication_floor": 1.000646709655228,
+        "above_replication_floor": true
+      }
+    },
+    "FP8": {
+      "replication_floor_graph": {
+        "why": "same graph profile, independent launches -- the noise floor under CUDA graphs",
+        "cells": 40,
+        "bit_identical_cells": 37,
+        "top1_agreement": 1.0,
+        "max_nats": 3.9196048709431093e-10,
+        "mean_nats": 1.1404301874411689e-11,
+        "median_nats": 0.0,
+        "p99_nats": 2.542704608096998e-10,
+        "trajectory_means": [
+          0.0,
+          0.0,
+          3.890913764659065e-12,
+          4.1726293732987695e-11
+        ],
+        "headline_nats": 1.140430187441169e-11,
+        "by_position": {
+          "1": {
+            "mean_nats": 9.799012177357773e-11,
+            "max_nats": 3.9196048709431093e-10
+          },
+          "8": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "32": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "64": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "128": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "256": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "512": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "1024": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "1536": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "2048": {
+            "mean_nats": 1.6052896970539168e-11,
+            "max_nats": 3.8909137646590655e-11
+          }
+        },
+        "worst_cell": {
+          "trajectory_index": 3,
+          "position_p": 1,
+          "context_len": 512,
+          "target_token_id": 12373,
+          "kl_nats": 3.9196048709431093e-10
+        }
+      },
+      "replication_floor_eager": {
+        "why": "same eager profile, independent launches -- the noise floor under eager",
+        "cells": 40,
+        "bit_identical_cells": 37,
+        "top1_agreement": 1.0,
+        "max_nats": 0.00011052267488386725,
+        "mean_nats": 2.7651258898958587e-06,
+        "median_nats": 0.0,
+        "p99_nats": 6.745013914078623e-05,
+        "trajectory_means": [
+          0.0,
+          8.027554263402945e-09,
+          1.1052476005320032e-05,
+          0.0
+        ],
+        "headline_nats": 2.7651258898958587e-06,
+        "by_position": {
+          "1": {
+            "mean_nats": 5.2129233326768e-10,
+            "max_nats": 2.08516933307072e-09
+          },
+          "8": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "32": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "64": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "128": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "256": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "512": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "1024": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "1536": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "2048": {
+            "mean_nats": 2.765073760662532e-05,
+            "max_nats": 0.00011052267488386725
+          }
+        },
+        "worst_cell": {
+          "trajectory_index": 2,
+          "position_p": 2048,
+          "context_len": 2559,
+          "target_token_id": 76260,
+          "kl_nats": 0.00011052267488386725
+        }
+      },
+      "eager_vs_graph": {
+        "why": "enforce_eager flipped; graph capture also reserves VRAM before KV profiling, so the graph profile lands slightly fewer KV blocks -- a side effect vLLM does not let us remove",
+        "cells": 40,
+        "bit_identical_cells": 0,
+        "top1_agreement": 0.975,
+        "max_nats": 0.015821631922971677,
+        "mean_nats": 0.004031553136413134,
+        "median_nats": 0.002895367047036801,
+        "p99_nats": 0.014346589414342895,
+        "trajectory_means": [
+          0.002699510308663513,
+          0.005418517450959152,
+          0.003369035042142264,
+          0.004639149743887607
+        ],
+        "headline_nats": 0.004031553136413134,
+        "by_position": {
+          "1": {
+            "mean_nats": 0.004855549341092026,
+            "max_nats": 0.007593783862211005
+          },
+          "8": {
+            "mean_nats": 0.002645499283438216,
+            "max_nats": 0.005541424944996497
+          },
+          "32": {
+            "mean_nats": 0.005530216324173432,
+            "max_nats": 0.011297703394237949
+          },
+          "64": {
+            "mean_nats": 0.009458852606746532,
+            "max_nats": 0.015821631922971677
+          },
+          "128": {
+            "mean_nats": 0.00586886552433701,
+            "max_nats": 0.011503716886045276
+          },
+          "256": {
+            "mean_nats": 0.006703814232177658,
+            "max_nats": 0.012039471644436342
+          },
+          "512": {
+            "mean_nats": 0.002519757587516289,
+            "max_nats": 0.0078001251683035636
+          },
+          "1024": {
+            "mean_nats": 0.0026774856572697216,
+            "max_nats": 0.010518252064673635
+          },
+          "1536": {
+            "mean_nats": 2.327365075313907e-05,
+            "max_nats": 5.6873621556869934e-05
+          },
+          "2048": {
+            "mean_nats": 3.2217156627322636e-05,
+            "max_nats": 6.712775315380296e-05
+          }
+        },
+        "worst_cell": {
+          "trajectory_index": 1,
+          "position_p": 64,
+          "context_len": 575,
+          "target_token_id": 1226,
+          "kl_nats": 0.015821631922971677
+        },
+        "replication_floor_used_nats": 0.00011052267488386725,
+        "ratio_to_replication_floor": 143.15281402297228,
+        "above_replication_floor": true
+      },
+      "chunked_vs_unchunked": {
+        "why": "serving-compatible 2048 vs the offline default 8192",
+        "cells": 40,
+        "bit_identical_cells": 35,
+        "top1_agreement": 1.0,
+        "max_nats": 6.14831276021594e-09,
+        "mean_nats": 1.6288853168436646e-10,
+        "median_nats": 0.0,
+        "p99_nats": 3.8254566830423346e-09,
+        "trajectory_means": [
+          2.0288329897601594e-11,
+          6.148312821483754e-10,
+          1.6434514691488932e-11,
+          0.0
+        ],
+        "headline_nats": 1.6288853168436646e-10,
+        "by_position": {
+          "1": {
+            "mean_nats": 1.6262323609561782e-09,
+            "max_nats": 6.14831276021594e-09
+          },
+          "8": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "32": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "64": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "128": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "256": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "512": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "1024": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "1536": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "2048": {
+            "mean_nats": 2.6529558874863375e-12,
+            "max_nats": 1.0611762282131743e-11
+          }
+        },
+        "worst_cell": {
+          "trajectory_index": 1,
+          "position_p": 1,
+          "context_len": 512,
+          "target_token_id": 757,
+          "kl_nats": 6.14831276021594e-09
+        },
+        "replication_floor_used_nats": 3.9196048709431093e-10,
+        "ratio_to_replication_floor": 15.686052453385622,
+        "above_replication_floor": true
+      }
+    },
+    "FP4": {
+      "replication_floor_graph": {
+        "why": "same graph profile, independent launches -- the noise floor under CUDA graphs",
+        "cells": 40,
+        "bit_identical_cells": 38,
+        "top1_agreement": 1.0,
+        "max_nats": 1.9456270193692586e-09,
+        "mean_nats": 7.798236194681957e-11,
+        "median_nats": 0.0,
+        "p99_nats": 1.6445627906316216e-09,
+        "trajectory_means": [
+          0.0,
+          1.173667458503524e-10,
+          0.0,
+          1.9456270193692587e-10
+        ],
+        "headline_nats": 7.798236194681957e-11,
+        "by_position": {
+          "1": {
+            "mean_nats": 7.798236194681957e-10,
+            "max_nats": 1.9456270193692586e-09
+          },
+          "8": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "32": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "64": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "128": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "256": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "512": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "1024": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "1536": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "2048": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          }
+        },
+        "worst_cell": {
+          "trajectory_index": 3,
+          "position_p": 1,
+          "context_len": 512,
+          "target_token_id": 12373,
+          "kl_nats": 1.9456270193692586e-09
+        }
+      },
+      "replication_floor_eager": {
+        "why": "same eager profile, independent launches -- the noise floor under eager",
+        "cells": 40,
+        "bit_identical_cells": 35,
+        "top1_agreement": 1.0,
+        "max_nats": 0.00018504818638014273,
+        "mean_nats": 4.632387514024967e-06,
+        "median_nats": 0.0,
+        "p99_nats": 0.00011297311305678402,
+        "trajectory_means": [
+          0.0,
+          2.404819415440832e-08,
+          1.850485398586194e-05,
+          6.478760835217353e-10
+        ],
+        "headline_nats": 4.632387514024967e-06,
+        "by_position": {
+          "1": {
+            "mean_nats": 1.7520292543367905e-09,
+            "max_nats": 6.478760835217353e-09
+          },
+          "8": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "32": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "64": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "128": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "256": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "512": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "1024": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "1536": {
+            "mean_nats": 0.0,
+            "max_nats": 0.0
+          },
+          "2048": {
+            "mean_nats": 4.632212311099534e-05,
+            "max_nats": 0.00018504818638014273
+          }
+        },
+        "worst_cell": {
+          "trajectory_index": 2,
+          "position_p": 2048,
+          "context_len": 2559,
+          "target_token_id": 76260,
+          "kl_nats": 0.00018504818638014273
+        }
+      },
+      "eager_vs_graph": {
+        "why": "enforce_eager flipped; graph capture also reserves VRAM before KV profiling, so the graph profile lands slightly fewer KV blocks -- a side effect vLLM does not let us remove",
+        "cells": 40,
+        "bit_identical_cells": 0,
+        "top1_agreement": 0.9,
+        "max_nats": 0.2947804328005596,
+        "mean_nats": 0.03738883258515635,
+        "median_nats": 0.017682368924149823,
+        "p99_nats": 0.23414519680164766,
+        "trajectory_means": [
+          0.0207259003763383,
+          0.053486531296509675,
+          0.028658813654808678,
+          0.04668408501296872
+        ],
+        "headline_nats": 0.037388832585156344,
+        "by_position": {
+          "1": {
+            "mean_nats": 0.025789519524637563,
+            "max_nats": 0.05845318499171075
+          },
+          "8": {
+            "mean_nats": 0.020657689000890718,
+            "max_nats": 0.0403191513575746
+          },
+          "32": {
+            "mean_nats": 0.04260675061014903,
+            "max_nats": 0.09090045483525921
+          },
+          "64": {
+            "mean_nats": 0.03964959500185054,
+            "max_nats": 0.0935720990342246
+          },
+          "128": {
+            "mean_nats": 0.057221409755940755,
+            "max_nats": 0.12184826726269246
+          },
+          "256": {
+            "mean_nats": 0.06493171822856607,
+            "max_nats": 0.13930546870078564
+          },
+          "512": {
+            "mean_nats": 0.08939709251251635,
+            "max_nats": 0.2947804328005596
+          },
+          "1024": {
+            "mean_nats": 0.03287626820306303,
+            "max_nats": 0.1311125851605012
+          },
+          "1536": {
+            "mean_nats": 0.000626792557030397,
+            "max_nats": 0.001374058860729468
+          },
+          "2048": {
+            "mean_nats": 0.00013149045691898396,
+            "max_nats": 0.00035558551574684807
+          }
+        },
+        "worst_cell": {
+          "trajectory_index": 1,
+          "position_p": 512,
+          "context_len": 1023,
+          "target_token_id": 12035,
+          "kl_nats": 0.2947804328005596
+        },
+        "replication_floor_used_nats": 0.00018504818638014273,
+        "ratio_to_replication_floor": 1592.992822934211,
+        "above_replication_floor": true
+      },
+      "chunked_vs_unchunked": {
+        "why": "serving-compatible 2048 vs the offline default 8192",
+        "cells": 40,
+        "bit_identical_cells": 0,
+        "top1_agreement": 0.85,
+        "max_nats": 0.10126257918120421,
+        "mean_nats": 0.021526342854747332,
+        "median_nats": 0.012150579550893917,
+        "p99_nats": 0.09957934216429415,
+        "trajectory_means": [
+          0.009092651756076427,
+          0.023084447961795936,
+          0.026792257181660707,
+          0.02713601451945627
+        ],
+        "headline_nats": 0.021526342854747332,
+        "by_position": {
+          "1": {
+            "mean_nats": 0.011959069078722726,
+            "max_nats": 0.016889829554203813
+          },
+          "8": {
+            "mean_nats": 0.024826691663908957,
+            "max_nats": 0.05598681401738466
+          },
+          "32": {
+            "mean_nats": 0.028211772203852403,
+            "max_nats": 0.055153618867532235
+          },
+          "64": {
+            "mean_nats": 0.024200190495050126,
+            "max_nats": 0.05593243288174287
+          },
+          "128": {
+            "mean_nats": 0.03316630105067038,
+            "max_nats": 0.06684085661772524
+          },
+          "256": {
+            "mean_nats": 0.03929640308989758,
+            "max_nats": 0.10126257918120421
+          },
+          "512": {
+            "mean_nats": 0.030650215667046364,
+            "max_nats": 0.09694658683015277
+          },
+          "1024": {
+            "mean_nats": 0.022319468299636217,
+            "max_nats": 0.08889835422010534
+          },
+          "1536": {
+            "mean_nats": 0.00046053202172554903,
+            "max_nats": 0.0015393539851432957
+          },
+          "2048": {
+            "mean_nats": 0.00017278497696304447,
+            "max_nats": 0.0005009227491822298
+          }
+        },
+        "worst_cell": {
+          "trajectory_index": 3,
+          "position_p": 256,
+          "context_len": 767,
+          "target_token_id": 320,
+          "kl_nats": 0.10126257918120421
+        },
+        "replication_floor_used_nats": 1.9456270193692586e-09,
+        "ratio_to_replication_floor": 52046244.30741712,
+        "above_replication_floor": true
+      }
+    }
+  },
+  "observed_engine_identity": {
+    "BF16_REFERENCE:eager_2048": {
+      "engine_identity_hash": "4188de3230790a5f",
+      "kv_cache_tokens": 44864,
+      "graph_capture_observed": false,
+      "resolved": {
+        "enforce_eager": true,
+        "max_num_batched_tokens": 2048,
+        "enable_prefix_caching": true,
+        "num_gpu_blocks": 2804
+      },
+      "generate_seconds": 6.1
+    },
+    "BF16_REFERENCE:graph_2048": {
+      "engine_identity_hash": "ca16377ea4206028",
+      "kv_cache_tokens": 44688,
+      "graph_capture_observed": true,
+      "resolved": {
+        "enforce_eager": false,
+        "max_num_batched_tokens": 2048,
+        "enable_prefix_caching": true,
+        "num_gpu_blocks": 2793
+      },
+      "generate_seconds": 5.77
+    },
+    "BF16_REFERENCE:graph_2048_r2": {
+      "engine_identity_hash": "ca16377ea4206028",
+      "kv_cache_tokens": 44688,
+      "graph_capture_observed": true,
+      "resolved": {
+        "enforce_eager": false,
+        "max_num_batched_tokens": 2048,
+        "enable_prefix_caching": true,
+        "num_gpu_blocks": 2793
+      },
+      "generate_seconds": 5.63
+    },
+    "BF16_REFERENCE:eager_2048_r2": {
+      "engine_identity_hash": "4188de3230790a5f",
+      "kv_cache_tokens": 44864,
+      "graph_capture_observed": false,
+      "resolved": {
+        "enforce_eager": true,
+        "max_num_batched_tokens": 2048,
+        "enable_prefix_caching": true,
+        "num_gpu_blocks": 2804
+      },
+      "generate_seconds": 5.87
+    },
+    "BF16_REFERENCE:graph_8192": {
+      "engine_identity_hash": "1c0d5b807ee1da07",
+      "kv_cache_tokens": 41728,
+      "graph_capture_observed": true,
+      "resolved": {
+        "enforce_eager": false,
+        "max_num_batched_tokens": 8192,
+        "enable_prefix_caching": true,
+        "num_gpu_blocks": 2608
+      },
+      "generate_seconds": 6.2
+    },
+    "FP8_PRIMARY:eager_2048": {
+      "engine_identity_hash": "21547da89ade6ebe",
+      "kv_cache_tokens": 98064,
+      "graph_capture_observed": false,
+      "resolved": {
+        "enforce_eager": true,
+        "max_num_batched_tokens": 2048,
+        "enable_prefix_caching": true,
+        "num_gpu_blocks": 6129
+      },
+      "generate_seconds": 6.06
+    },
+    "FP8_PRIMARY:graph_2048": {
+      "engine_identity_hash": "176a222edae755ff",
+      "kv_cache_tokens": 97888,
+      "graph_capture_observed": true,
+      "resolved": {
+        "enforce_eager": false,
+        "max_num_batched_tokens": 2048,
+        "enable_prefix_caching": true,
+        "num_gpu_blocks": 6118
+      },
+      "generate_seconds": 5.87
+    },
+    "FP8_PRIMARY:graph_2048_r2": {
+      "engine_identity_hash": "176a222edae755ff",
+      "kv_cache_tokens": 97888,
+      "graph_capture_observed": true,
+      "resolved": {
+        "enforce_eager": false,
+        "max_num_batched_tokens": 2048,
+        "enable_prefix_caching": true,
+        "num_gpu_blocks": 6118
+      },
+      "generate_seconds": 5.85
+    },
+    "FP8_PRIMARY:eager_2048_r2": {
+      "engine_identity_hash": "21547da89ade6ebe",
+      "kv_cache_tokens": 98064,
+      "graph_capture_observed": false,
+      "resolved": {
+        "enforce_eager": true,
+        "max_num_batched_tokens": 2048,
+        "enable_prefix_caching": true,
+        "num_gpu_blocks": 6129
+      },
+      "generate_seconds": 6.15
+    },
+    "FP8_PRIMARY:graph_8192": {
+      "engine_identity_hash": "78bdd8f5d6f7b81d",
+      "kv_cache_tokens": 95888,
+      "graph_capture_observed": true,
+      "resolved": {
+        "enforce_eager": false,
+        "max_num_batched_tokens": 8192,
+        "enable_prefix_caching": true,
+        "num_gpu_blocks": 5993
+      },
+      "generate_seconds": 5.95
+    },
+    "FP4_PRIMARY:eager_2048": {
+      "engine_identity_hash": "40e9da15618d1fd4",
+      "kv_cache_tokens": 121120,
+      "graph_capture_observed": false,
+      "resolved": {
+        "enforce_eager": true,
+        "max_num_batched_tokens": 2048,
+        "enable_prefix_caching": true,
+        "num_gpu_blocks": 7570
+      },
+      "generate_seconds": 5.86
+    },
+    "FP4_PRIMARY:graph_2048": {
+      "engine_identity_hash": "434ad8fac783fb7f",
+      "kv_cache_tokens": 120944,
+      "graph_capture_observed": true,
+      "resolved": {
+        "enforce_eager": false,
+        "max_num_batched_tokens": 2048,
+        "enable_prefix_caching": true,
+        "num_gpu_blocks": 7559
+      },
+      "generate_seconds": 5.67
+    },
+    "FP4_PRIMARY:graph_2048_r2": {
+      "engine_identity_hash": "434ad8fac783fb7f",
+      "kv_cache_tokens": 120944,
+      "graph_capture_observed": true,
+      "resolved": {
+        "enforce_eager": false,
+        "max_num_batched_tokens": 2048,
+        "enable_prefix_caching": true,
+        "num_gpu_blocks": 7559
+      },
+      "generate_seconds": 5.69
+    },
+    "FP4_PRIMARY:eager_2048_r2": {
+      "engine_identity_hash": "40e9da15618d1fd4",
+      "kv_cache_tokens": 121120,
+      "graph_capture_observed": false,
+      "resolved": {
+        "enforce_eager": true,
+        "max_num_batched_tokens": 2048,
+        "enable_prefix_caching": true,
+        "num_gpu_blocks": 7570
+      },
+      "generate_seconds": 5.94
+    },
+    "FP4_PRIMARY:graph_8192": {
+      "engine_identity_hash": "0105985b4b01f1b1",
+      "kv_cache_tokens": 119360,
+      "graph_capture_observed": true,
+      "resolved": {
+        "enforce_eager": false,
+        "max_num_batched_tokens": 8192,
+        "enable_prefix_caching": true,
+        "num_gpu_blocks": 7460
+      },
+      "generate_seconds": 5.78
+    }
+  },
+  "checks": {
+    "BF16_no_preemption": true,
+    "BF16_detokenize_observed_off": true,
+    "BF16_cell_count_complete": true,
+    "BF16_all_cells_valid": true,
+    "BF16_dispatch_ok": true,
+    "BF16_eager_flag_observed": true,
+    "BF16_batching_observed": true,
+    "BF16_prefix_caching_observed": true,
+    "FP8_no_preemption": true,
+    "FP8_detokenize_observed_off": true,
+    "FP8_cell_count_complete": true,
+    "FP8_all_cells_valid": true,
+    "FP8_dispatch_ok": true,
+    "FP8_eager_flag_observed": true,
+    "FP8_batching_observed": true,
+    "FP8_prefix_caching_observed": true,
+    "FP4_no_preemption": true,
+    "FP4_detokenize_observed_off": true,
+    "FP4_cell_count_complete": true,
+    "FP4_all_cells_valid": true,
+    "FP4_dispatch_ok": true,
+    "FP4_eager_flag_observed": true,
+    "FP4_batching_observed": true,
+    "FP4_prefix_caching_observed": true
+  },
+  "integrity_passed": true,
+  "profile_equivalence": {
+    "BF16": {
+      "eager_vs_graph": {
+        "above_replication_floor": true,
+        "headline_nats": 0.0005811733337066042,
+        "max_nats": 0.00289651313665634,
+        "top1_agreement": 1.0
+      },
+      "chunked_vs_unchunked": {
+        "above_replication_floor": true,
+        "headline_nats": 0.0004280078735613676,
+        "max_nats": 0.0028520314513984595,
+        "top1_agreement": 1.0
+      }
+    },
+    "FP8": {
+      "eager_vs_graph": {
+        "above_replication_floor": true,
+        "headline_nats": 0.004031553136413134,
+        "max_nats": 0.015821631922971677,
+        "top1_agreement": 0.975
+      },
+      "chunked_vs_unchunked": {
+        "above_replication_floor": true,
+        "headline_nats": 1.6288853168436646e-10,
+        "max_nats": 6.14831276021594e-09,
+        "top1_agreement": 1.0
+      }
+    },
+    "FP4": {
+      "eager_vs_graph": {
+        "above_replication_floor": true,
+        "headline_nats": 0.037388832585156344,
+        "max_nats": 0.2947804328005596,
+        "top1_agreement": 0.9
+      },
+      "chunked_vs_unchunked": {
+        "above_replication_floor": true,
+        "headline_nats": 0.021526342854747332,
+        "max_nats": 0.10126257918120421,
+        "top1_agreement": 0.85
+      }
+    }
+  },
+  "profile_decision_required": true,
+  "profile_differences_exceeding_floor": [
+    "BF16:chunked_vs_unchunked",
+    "BF16:eager_vs_graph",
+    "FP4:chunked_vs_unchunked",
+    "FP4:eager_vs_graph",
+    "FP8:chunked_vs_unchunked",
+    "FP8:eager_vs_graph"
+  ],
+  "freeze_release": "trajectory freezing requires an explicit reviewed profile decision; this gate measures, it does not authorise",
+  "gpu": {
+    "name": "NVIDIA RTX PRO 4000 Blackwell",
+    "uuid": "GPU-fdc11a18-6edb-7e2f-82b2-6bd0b9ed714d",
+    "driver_version": "575.64.03",
+    "memory_total_mib": "24467",
+    "power_limit_w": "145.00"
+  },
+  "software": {
+    "python": "3.12.13",
+    "kernel": "6.8.0-65-generic",
+    "torch": "2.10.0+cu128",
+    "torch_cuda": "12.8",
+    "vllm": "0.19.1",
+    "transformers": "5.15.1",
+    "compressed_tensors": "0.15.0.1",
+    "nvcc": "Cuda compilation tools, release 12.9, V12.9.86",
+    "git_head": "0728bcd65aa6f8f9e180b9cb8627638f33716077",
+    "git_dirty": false,
+    "git_untracked_files": 2
+  },
+  "timestamp": "2026-08-25T23:38:29-0400"
+}
