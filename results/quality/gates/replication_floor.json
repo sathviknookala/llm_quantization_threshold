@@ -1,0 +1,431 @@
+{
+  "gate": "replication_floor",
+  "purpose": "G2: same configuration, same graph_2048 profile, two independent launches",
+  "kind": "empirical measurement -- the resolution limit of every KL reported here",
+  "engine_profile_name": "graph_2048",
+  "bf16_fp8_reference_kl_nats": 0.0036897120485158315,
+  "bf16_fp8_reference_status": "measured",
+  "pre_registered_fraction": 0.01,
+  "low_sample": true,
+  "configs": [
+    "BF16_REFERENCE",
+    "FP8_PRIMARY",
+    "FP4_PRIMARY"
+  ],
+  "n_trajectories": 4,
+  "contexts_hash": "7d6d7045df86176d33f8844b06957fc2a6a417429aaee6e9fca3bfff9c3049f7",
+  "per_config": {
+    "BF16": {
+      "headline_nats": 0.0002983571074837001,
+      "max_nats": 0.0030084606348134094,
+      "cells": 40,
+      "n_trajectories": 4,
+      "mean_nats": 0.0002983571074837001,
+      "p99_nats": 0.0025321479624843494,
+      "top1_agreement": 1.0,
+      "bit_identical_cells": 0,
+      "by_position": {
+        "1": {
+          "mean_nats": 0.0008745230012527156,
+          "max_nats": 0.0030084606348134094
+        },
+        "8": {
+          "mean_nats": 0.00017377500003103706,
+          "max_nats": 0.00030827326167821015
+        },
+        "32": {
+          "mean_nats": 0.0005933856810530571,
+          "max_nats": 0.0016049419792560843
+        },
+        "64": {
+          "mean_nats": 0.0006871274545202394,
+          "max_nats": 0.0015793085402875978
+        },
+        "128": {
+          "mean_nats": 5.211794249388757e-05,
+          "max_nats": 0.00017650902356180156
+        },
+        "256": {
+          "mean_nats": 8.21973321493313e-05,
+          "max_nats": 0.00032640326276087465
+        },
+        "512": {
+          "mean_nats": 5.119779763849686e-05,
+          "max_nats": 0.00017934860550054054
+        },
+        "1024": {
+          "mean_nats": 7.955390154474525e-06,
+          "max_nats": 1.6210584667888277e-05
+        },
+        "1536": {
+          "mean_nats": 0.00045064596914737927,
+          "max_nats": 0.001787146090379924
+        },
+        "2048": {
+          "mean_nats": 1.064550639638253e-05,
+          "max_nats": 3.355339033027874e-05
+        }
+      }
+    },
+    "FP8": {
+      "headline_nats": 1.508752246979599e-11,
+      "max_nats": 3.9196048709431093e-10,
+      "cells": 40,
+      "n_trajectories": 4,
+      "mean_nats": 1.508752246979599e-11,
+      "p99_nats": 3.0319050442433636e-10,
+      "top1_agreement": 1.0,
+      "bit_identical_cells": 36,
+      "by_position": {
+        "1": {
+          "mean_nats": 1.3907640850230007e-10,
+          "max_nats": 3.9196048709431093e-10
+        },
+        "8": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "32": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "64": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "128": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "256": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "512": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "1024": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "1536": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "2048": {
+          "mean_nats": 1.1798816195659837e-11,
+          "max_nats": 2.9923589799922364e-11
+        }
+      }
+    },
+    "FP4": {
+      "headline_nats": 3.9093883143190764e-11,
+      "max_nats": 1.173667458503524e-09,
+      "cells": 40,
+      "n_trajectories": 4,
+      "mean_nats": 3.909388314319076e-11,
+      "p99_nats": 7.883537832535095e-10,
+      "top1_agreement": 1.0,
+      "bit_identical_cells": 34,
+      "by_position": {
+        "1": {
+          "mean_nats": 3.398377835786762e-10,
+          "max_nats": 1.173667458503524e-09
+        },
+        "8": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "32": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "64": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "128": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "256": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "512": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "1024": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "1536": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "2048": {
+          "mean_nats": 5.110104785323138e-11,
+          "max_nats": 1.0812118853467998e-10
+        }
+      }
+    }
+  },
+  "results": {
+    "BF16": {
+      "cells": 40,
+      "bit_identical_cells": 0,
+      "top1_agreement": 1.0,
+      "max_nats": 0.0030084606348134094,
+      "mean_nats": 0.0002983571074837001,
+      "median_nats": 1.5568738243762028e-05,
+      "p99_nats": 0.0025321479624843494,
+      "trajectory_means": [
+        8.222109380911905e-05,
+        0.0002800406172806974,
+        0.0002600136505781311,
+        0.0005711530682668529
+      ],
+      "headline_nats": 0.0002983571074837001,
+      "by_position": {
+        "1": {
+          "mean_nats": 0.0008745230012527156,
+          "max_nats": 0.0030084606348134094
+        },
+        "8": {
+          "mean_nats": 0.00017377500003103706,
+          "max_nats": 0.00030827326167821015
+        },
+        "32": {
+          "mean_nats": 0.0005933856810530571,
+          "max_nats": 0.0016049419792560843
+        },
+        "64": {
+          "mean_nats": 0.0006871274545202394,
+          "max_nats": 0.0015793085402875978
+        },
+        "128": {
+          "mean_nats": 5.211794249388757e-05,
+          "max_nats": 0.00017650902356180156
+        },
+        "256": {
+          "mean_nats": 8.21973321493313e-05,
+          "max_nats": 0.00032640326276087465
+        },
+        "512": {
+          "mean_nats": 5.119779763849686e-05,
+          "max_nats": 0.00017934860550054054
+        },
+        "1024": {
+          "mean_nats": 7.955390154474525e-06,
+          "max_nats": 1.6210584667888277e-05
+        },
+        "1536": {
+          "mean_nats": 0.00045064596914737927,
+          "max_nats": 0.001787146090379924
+        },
+        "2048": {
+          "mean_nats": 1.064550639638253e-05,
+          "max_nats": 3.355339033027874e-05
+        }
+      },
+      "worst_cell": {
+        "trajectory_index": 3,
+        "prompt_index": 3,
+        "position_p": 1,
+        "context_len": 512,
+        "target_token_id": 12373,
+        "context_sha256": "29908dcf3c0c1f167044abc4d19e048f81a0d13f0adf721cb36387bd2f89e432",
+        "kl_nats": 0.0030084606348134094
+      },
+      "engine_identity_a": "ca16377ea4206028",
+      "engine_identity_b": "ca16377ea4206028",
+      "same_observed_engine_identity": true,
+      "pre_registered_bound_nats": 3.689712048515832e-05,
+      "fraction_of_bf16_fp8_kl": 0.08086189479304023
+    },
+    "FP8": {
+      "cells": 40,
+      "bit_identical_cells": 36,
+      "top1_agreement": 1.0,
+      "max_nats": 3.9196048709431093e-10,
+      "mean_nats": 1.508752246979599e-11,
+      "median_nats": 0.0,
+      "p99_nats": 3.0319050442433636e-10,
+      "trajectory_means": [
+        0.0,
+        0.0,
+        1.9426873671481167e-11,
+        4.092321620770279e-11
+      ],
+      "headline_nats": 1.508752246979599e-11,
+      "by_position": {
+        "1": {
+          "mean_nats": 1.3907640850230007e-10,
+          "max_nats": 3.9196048709431093e-10
+        },
+        "8": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "32": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "64": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "128": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "256": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "512": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "1024": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "1536": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "2048": {
+          "mean_nats": 1.1798816195659837e-11,
+          "max_nats": 2.9923589799922364e-11
+        }
+      },
+      "worst_cell": {
+        "trajectory_index": 3,
+        "prompt_index": 3,
+        "position_p": 1,
+        "context_len": 512,
+        "target_token_id": 12373,
+        "context_sha256": "29908dcf3c0c1f167044abc4d19e048f81a0d13f0adf721cb36387bd2f89e432",
+        "kl_nats": 3.9196048709431093e-10
+      },
+      "engine_identity_a": "176a222edae755ff",
+      "engine_identity_b": "176a222edae755ff",
+      "same_observed_engine_identity": true,
+      "pre_registered_bound_nats": 3.689712048515832e-05,
+      "fraction_of_bf16_fp8_kl": 4.089078570742362e-09
+    },
+    "FP4": {
+      "cells": 40,
+      "bit_identical_cells": 34,
+      "top1_agreement": 1.0,
+      "max_nats": 1.173667458503524e-09,
+      "mean_nats": 3.909388314319076e-11,
+      "median_nats": 0.0,
+      "p99_nats": 7.883537832535095e-10,
+      "trajectory_means": [
+        2.938048643458607e-11,
+        1.1736880059627807e-10,
+        2.3047423232696733e-12,
+        7.321503218629232e-12
+      ],
+      "headline_nats": 3.9093883143190764e-11,
+      "by_position": {
+        "1": {
+          "mean_nats": 3.398377835786762e-10,
+          "max_nats": 1.173667458503524e-09
+        },
+        "8": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "32": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "64": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "128": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "256": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "512": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "1024": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "1536": {
+          "mean_nats": 0.0,
+          "max_nats": 0.0
+        },
+        "2048": {
+          "mean_nats": 5.110104785323138e-11,
+          "max_nats": 1.0812118853467998e-10
+        }
+      },
+      "worst_cell": {
+        "trajectory_index": 1,
+        "prompt_index": 1,
+        "position_p": 1,
+        "context_len": 512,
+        "target_token_id": 757,
+        "context_sha256": "cc422abcbc6389eabc4ed4a51db892fda6cf7384ef755924df29ac8665f96cc4",
+        "kl_nats": 1.173667458503524e-09
+      },
+      "engine_identity_a": "434ad8fac783fb7f",
+      "engine_identity_b": "434ad8fac783fb7f",
+      "same_observed_engine_identity": true,
+      "pre_registered_bound_nats": 3.689712048515832e-05,
+      "fraction_of_bf16_fp8_kl": 1.059537509408521e-08
+    }
+  },
+  "checks": {
+    "BF16_independent_launches_same_profile": true,
+    "BF16_cells_complete": true,
+    "BF16_floor_within_pre_registered_fraction_of_fp8": false,
+    "FP8_independent_launches_same_profile": true,
+    "FP8_cells_complete": true,
+    "FP8_floor_within_pre_registered_fraction_of_fp8": true,
+    "FP4_independent_launches_same_profile": true,
+    "FP4_cells_complete": true,
+    "FP4_floor_within_pre_registered_fraction_of_fp8": true
+  },
+  "integrity_passed": false,
+  "kl_spec_hash": "5565ff73dbe5e36a",
+  "git": {
+    "git_head": "9cba839cedd092fd3b290fdf25534202e2d0bda8",
+    "git_dirty": false
+  },
+  "gpu": {
+    "name": "NVIDIA RTX PRO 4000 Blackwell",
+    "uuid": "GPU-fdc11a18-6edb-7e2f-82b2-6bd0b9ed714d",
+    "driver_version": "575.64.03",
+    "memory_total_mib": "24467",
+    "power_limit_w": "145.00"
+  },
+  "software": {
+    "python": "3.12.13",
+    "kernel": "6.8.0-65-generic",
+    "torch": "2.10.0+cu128",
+    "torch_cuda": "12.8",
+    "vllm": "0.19.1",
+    "transformers": "5.15.1",
+    "compressed_tensors": "0.15.0.1",
+    "nvcc": "Cuda compilation tools, release 12.9, V12.9.86",
+    "git_head": "9cba839cedd092fd3b290fdf25534202e2d0bda8",
+    "git_dirty": false,
+    "git_untracked_files": 2
+  },
+  "timestamp": "2026-08-26T00:30:33-0400"
+}
