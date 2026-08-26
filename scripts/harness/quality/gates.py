@@ -437,9 +437,6 @@ def main():
     return 0 if verdict else 1
 
 
-if __name__ == "__main__":
-    sys.exit(main())
-
 
 def replayability(out_dir=None, n_traj=None, allow_dirty=False):
     """Is seeded BF16 generation reproducible across independent launches?
@@ -817,3 +814,6 @@ def storage_precision(root, n_traj=4, allow_dirty=False, floor_path=None):
         "software": common.software_identity(),
         "timestamp": common.now_iso(),
     }
+
+if __name__ == "__main__":
+    sys.exit(main())
