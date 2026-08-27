@@ -382,6 +382,47 @@ This is a distinct quantity from the pre-sweep correctness gate's self-check, wh
 orderings within a single launch and returned exactly 0.0 — a bit-identity result under one batch
 shape that says nothing about the batching this rig actually uses.
 
+**Measured at production scale 2026-08-26** (`results/quality/gates/replication_floor_production.json`):
+three independent BF16 launches over the frozen 64 trajectories, all 640 retained positions, six
+ordered pairs, one engine identity and one checkpoint throughout.
+
+```text
+headline floor      2.084e-04 nats     range [1.896e-04, 2.285e-04], spread 1.21x
+worst cell (640)    6.425e-03 nats     range [4.601e-03, 7.486e-03]
+bit-identical       28-39% of cells    KL is asymmetric by under 1% between directions
+```
+
+The floor is **not uniform across the trajectory**, and this is the structure that matters when
+reading a per-position curve:
+
+```text
+p        context   floor nats
+1            512    3.777e-04
+8            519    3.554e-04
+32           543    3.366e-04
+64           575    2.545e-04
+128          639    2.615e-04
+256          767    1.942e-04
+512         1023    1.994e-04
+1024        1535    3.409e-05
+1536        2047    4.070e-05
+2048        2559    3.010e-05
+```
+
+Short contexts are an order of magnitude noisier than long ones. Per-cell medians run three orders
+below the means, so the floor is carried by a small number of unstable cells rather than by uniform
+jitter; the bit-identical fraction is roughly constant across positions, so what varies with context
+length is the size of the disagreements, not their frequency.
+
+**The earlier n=4 estimate of 2.984e-04 was high by 1.43x** and lies outside the range spanned by the
+six production pairs. Restricting these same launches to the smoke's first four trajectories
+reproduces its instability — 9.06e-05 to 3.43e-04, a 3.8x spread — so the discrepancy is small-sample
+noise, not a pathological launch pair. Quote the production figure; the smoke figure is superseded.
+
+Note that the worst-cell floor grew from 3.01e-03 over 40 cells to 6.43e-03 over 640 under the same
+underlying noise, a 2.13x increase from grid size alone. This is the measured form of the reason a
+worst-cell comparison is refused across mismatched grid sizes.
+
 ## 2. Perplexity
 
 Evaluate fixed held-out LM corpora with identical preprocessing and tokenization.

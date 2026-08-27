@@ -219,6 +219,18 @@ difference between scoring with prefix caching on versus off, and the difference
 CUDA-graph execution. Where a measured effect is not large relative to these, the study says so
 instead of reporting the effect.
 
+**Measured at production scale, the floor is 2.084e-04 nats** (three independent BF16 launches, 640
+cells, six ordered pairs). Against the smoke's n=4 BF16→FP8 estimate of 3.690e-03 that is **5.6% of
+the signal, against a pre-registered bound of 1%** — the bound fails at production scale too, by a
+factor of 5.6 rather than the 8.1 the smaller sample suggested. BF16→FP4 sits at 0.7% and passes.
+
+The per-position picture is worse than the headline for the FP8 comparison specifically. Using the
+n=4 FP8 curve — itself provisional — the floor is 27%, 26%, 95% and 148% of the measured signal at
+p=256, 1024, 2048 and 512 respectively. At those positions a BF16→FP8 difference is at or below what
+two identical BF16 launches produce, and the headline is carried by the positions where the signal is
+large (p=1, 64, 1536). Whether that pattern survives at n=64 is not yet known; it is the first thing
+to check when the production FP8 collection exists.
+
 **A floor ratio is not a magnitude.** Under CUDA graphs FP8 and FP4 replicate to ~1e-11 nats, so a
 difference of a few nanonats reads as many multiples of the floor while being numerically nothing.
 Every comparison here reports the absolute nats first and the ratio as a reproducibility diagnostic;
