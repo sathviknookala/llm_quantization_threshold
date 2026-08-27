@@ -161,10 +161,12 @@ by 2.15e-02 and 6 of 40. BF16 sits at its own floor under both. See `LIMITATIONS
 
 ```text
               headline nats     95% CI                    floor      signal/floor
-BF16||FP8        3.690e-03      [1.748e-03, 6.016e-03]    2.98e-04        12.4x
-BF16||FP4        2.945e-02      [2.315e-02, 3.576e-02]    2.98e-04        98.7x
+BF16||FP8        3.690e-03      [1.748e-03, 6.016e-03]    2.08e-04        17.7x
+BF16||FP4        2.945e-02      [2.315e-02, 3.576e-02]    2.08e-04       141.3x
 FP8||FP4         3.566e-02      [2.627e-02, 4.506e-02]    3.91e-11       9.1e+08x
 ```
+
+Floors are the **production-scale** BF16 figure (3 launches, 640 cells); the KL values are still n=4.
 
 The barred subtraction proxy would have put FP8->FP4 at 2.576e-02, low by a factor of 1.38.
 
@@ -174,14 +176,20 @@ The barred subtraction proxy would have put FP8->FP4 at 2.576e-02, low by a fact
 G7  numerics vs the historical EPS formula      PASS
 G9  engine profile                              MEASURED, profile locked
     replayability                               NOT REPLAYABLE (51/64) -- informational
-G2  replication floor                           FAIL on BF16 (8.1% of FP8 signal vs 1% bound)
+G2  replication floor (n=4)                     FAIL on BF16 (8.1% of FP8 signal vs 1% bound)
+G2' replication floor, 3 launches x 640 cells   FAIL on BF16 (5.6%); floor 2.084e-04
 G3  cache equivalence                           FAIL on BF16 (4.74%), below BF16's own floor
 G4  fp16 vs fp32 storage                        FAIL -- fp32 stays
 ```
 
 Two pre-registered bounds fail, both on BF16 and both traceable to one cause: **BF16 is the
-non-reproducible configuration.** It reproduces 0 of 40 cells across launches while FP8 and FP4
-reproduce 36 and 34. Thresholds were not relaxed after seeing the results.
+non-reproducible configuration.** Thresholds were not relaxed after seeing the results.
+
+The earlier "BF16 reproduces 0 of 40 cells" figure was pair-specific small-sample noise and is
+**superseded**: at production scale BF16 reproduces 28-39% of 640 cells across launches, and one of
+the six pairs reproduces 20 of the same 40 cells the smoke scored 0 on. What is robust is that the
+floor is worst at short contexts (3.78e-04 at p=1, 3.01e-05 at p=2048) and is carried by a small
+number of unstable cells rather than uniform jitter.
 
 ## Last session
 
@@ -209,11 +217,13 @@ KL path.** Five persistent reviewers inspected the implementation before any GPU
 
 ## Known issues / unresolved premises
 
-- **The BF16 replication floor fails its pre-registered bound**, at 8.1% of the BF16→FP8 KL against
-  1%. The FP8 comparison sits only 12.4x above its noise floor. This is the binding constraint on the
-  whole quality axis and it is a property of the *reference*, not of the quantized paths: BF16
-  reproduces 0 of 40 cells across launches, FP8 and FP4 reproduce 36 and 34. Decide before P13
-  whether to accept it as a stated resolution limit or to average repeated BF16 launches.
+- **The BF16 replication floor fails its pre-registered bound at production scale**: 2.084e-04 nats
+  from 3 launches over 640 cells, i.e. **5.6%** of the n=4 BF16→FP8 KL against a 1% bound, leaving
+  that comparison 17.7x above noise. BF16→FP4 passes at 0.7%. Worse per position: on the provisional
+  FP8 curve the floor is 95% and 148% of the signal at p=2048 and p=512. This remains the binding
+  constraint on the quality axis and is a property of the *reference*. Decide before P13 whether to
+  accept it as a stated resolution limit, restrict FP8 claims to the positions that clear it, or
+  re-register a design that averages repeated BF16 launches.
 - **Seeded generation is not replayable** — 51 of 64, earliest divergence at token 3. Reproduction
   goes through the tracked `trajectories.json` and its hash, never by rerunning generation.
 - **Every quality figure so far is n=4 and is not a result.** The smoke exists to validate the rig.
