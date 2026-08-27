@@ -1,0 +1,223 @@
+{
+  "artifact": "KL collection",
+  "config_id": "BF16_REFERENCE",
+  "quantization": "BF16",
+  "n_trajectories": 64,
+  "positions": [
+    1,
+    8,
+    32,
+    64,
+    128,
+    256,
+    512,
+    1024,
+    1536,
+    2048
+  ],
+  "cells": 640,
+  "provenance": {
+    "config_id": "BF16_REFERENCE",
+    "kl_spec_hash": "5565ff73dbe5e36a",
+    "trajectory_set_hash": "1dd71faeb242c7c1be0011491fb51942fb662dfeb2ba2d2d5c2cb428f7a041ad",
+    "subset_n": 64,
+    "prompt_subset_hash": "f8a89d3aeaac5dd77e0d33d4105af852918dc6389ee309dd042be67c236dc871",
+    "contexts_hash": "e666fc81fea35e06bbb6e969827ae5b70d22d4ccb7cb07b5aecd1cbd3c235497",
+    "checkpoint_content_hash": "ced0573c8e17cd04aa5d33b9d8bb10bce81a061a394cabb7771a16232c874f5b",
+    "tokenizer_identity": {
+      "tokenizer.json": "79e3e522635f3171300913bb421464a87de6222182a0570b9b2ccba2a964b2b4",
+      "tokenizer_config.json": "24e8a6dc2547164b7002e3125f10b415105644fcf02bf9ad8b674c87b1eaaed6",
+      "special_tokens_map.json": "6f38c73729248f6c127296386e3cdde96e254636cc58b4169d3fd32328d9a8ec"
+    },
+    "engine_profile_name": "graph_2048",
+    "storage_dtype": "float32",
+    "retained_positions": [
+      1,
+      8,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      1536,
+      2048
+    ]
+  },
+  "config_identity": {
+    "configuration_id": "BF16_REFERENCE",
+    "quantization": "BF16",
+    "model_path": "/home/sathvik/.cache/huggingface/hub/models--NousResearch--Meta-Llama-3.1-8B-Instruct/snapshots/d10aef7999a2b5ba950ab3974312feeedbfe0b77",
+    "checkpoint_content_hash": "ced0573c8e17cd04aa5d33b9d8bb10bce81a061a394cabb7771a16232c874f5b",
+    "tokenizer_identity": {
+      "tokenizer.json": "79e3e522635f3171300913bb421464a87de6222182a0570b9b2ccba2a964b2b4",
+      "tokenizer_config.json": "24e8a6dc2547164b7002e3125f10b415105644fcf02bf9ad8b674c87b1eaaed6",
+      "special_tokens_map.json": "6f38c73729248f6c127296386e3cdde96e254636cc58b4169d3fd32328d9a8ec"
+    },
+    "expected_kernel_pattern": null,
+    "forbidden_kernel_patterns": [
+      "CutlassFP8ScaledMMLinearKernel",
+      "NvFp4LinearBackend",
+      "Marlin"
+    ]
+  },
+  "engine_identity_hash": "ca16377ea4206028",
+  "shards": [
+    {
+      "shard": 0,
+      "start": 0,
+      "stop": 80,
+      "npy": "results/quality/floor64/launch3/dist/BF16/shard_000.npy",
+      "json": "results/quality/floor64/launch3/shards/BF16/shard_000.json",
+      "reused": false
+    },
+    {
+      "shard": 1,
+      "start": 80,
+      "stop": 160,
+      "npy": "results/quality/floor64/launch3/dist/BF16/shard_001.npy",
+      "json": "results/quality/floor64/launch3/shards/BF16/shard_001.json",
+      "reused": false
+    },
+    {
+      "shard": 2,
+      "start": 160,
+      "stop": 240,
+      "npy": "results/quality/floor64/launch3/dist/BF16/shard_002.npy",
+      "json": "results/quality/floor64/launch3/shards/BF16/shard_002.json",
+      "reused": false
+    },
+    {
+      "shard": 3,
+      "start": 240,
+      "stop": 320,
+      "npy": "results/quality/floor64/launch3/dist/BF16/shard_003.npy",
+      "json": "results/quality/floor64/launch3/shards/BF16/shard_003.json",
+      "reused": false
+    },
+    {
+      "shard": 4,
+      "start": 320,
+      "stop": 400,
+      "npy": "results/quality/floor64/launch3/dist/BF16/shard_004.npy",
+      "json": "results/quality/floor64/launch3/shards/BF16/shard_004.json",
+      "reused": false
+    },
+    {
+      "shard": 5,
+      "start": 400,
+      "stop": 480,
+      "npy": "results/quality/floor64/launch3/dist/BF16/shard_005.npy",
+      "json": "results/quality/floor64/launch3/shards/BF16/shard_005.json",
+      "reused": false
+    },
+    {
+      "shard": 6,
+      "start": 480,
+      "stop": 560,
+      "npy": "results/quality/floor64/launch3/dist/BF16/shard_006.npy",
+      "json": "results/quality/floor64/launch3/shards/BF16/shard_006.json",
+      "reused": false
+    },
+    {
+      "shard": 7,
+      "start": 560,
+      "stop": 640,
+      "npy": "results/quality/floor64/launch3/dist/BF16/shard_007.npy",
+      "json": "results/quality/floor64/launch3/shards/BF16/shard_007.json",
+      "reused": false
+    }
+  ],
+  "shard_reuse": {
+    "0": "absent",
+    "1": "absent",
+    "2": "absent",
+    "3": "absent",
+    "4": "absent",
+    "5": "absent",
+    "6": "absent",
+    "7": "absent"
+  },
+  "launched": true,
+  "seconds": 84.51,
+  "wall_seconds": 103.22,
+  "engine_metrics": {
+    "vllm:prefix_cache_queries": 686016,
+    "vllm:prefix_cache_hits": 515072,
+    "vllm:external_prefix_cache_queries": 0,
+    "vllm:external_prefix_cache_hits": 0,
+    "vllm:num_preemptions": 0,
+    "vllm:prompt_tokens": 686016,
+    "vllm:prompt_tokens_by_source": 0,
+    "vllm:prompt_tokens_cached": 515072,
+    "vllm:prompt_tokens_recomputed": 0,
+    "vllm:request_prompt_tokens": {
+      "count": 640,
+      "sum": 686016.0
+    }
+  },
+  "observed": {
+    "resolved_config": {
+      "enforce_eager": false,
+      "max_num_batched_tokens": 2048,
+      "enable_prefix_caching": true,
+      "max_model_len": 32768,
+      "num_gpu_blocks": 2793,
+      "block_size": 16,
+      "kv_cache_dtype": "auto",
+      "max_logprobs": 128256,
+      "dtype": "torch.bfloat16",
+      "seed": 0,
+      "requested": {
+        "model": "/home/sathvik/.cache/huggingface/hub/models--NousResearch--Meta-Llama-3.1-8B-Instruct/snapshots/d10aef7999a2b5ba950ab3974312feeedbfe0b77",
+        "max_model_len": 32768,
+        "gpu_memory_utilization": 0.9,
+        "max_num_seqs": 256,
+        "kv_cache_dtype": "auto",
+        "max_logprobs": 128256,
+        "enable_prefix_caching": true,
+        "max_num_batched_tokens": 2048,
+        "enforce_eager": false,
+        "seed": 0,
+        "dtype": "auto",
+        "disable_log_stats": false
+      }
+    },
+    "kv_cache_tokens": 44688,
+    "graph_capture_observed": true,
+    "kernel_lines": [],
+    "normalized_kernel_lines": [],
+    "dispatch_verdict": {
+      "expected_pattern": null,
+      "expected_present": null,
+      "forbidden_present": [],
+      "ok": true
+    },
+    "engine_identity_hash": "ca16377ea4206028"
+  },
+  "git": {
+    "git_head": "530ea88f1ef9730da50cd8df60ffa1a85c102c98",
+    "git_dirty": false
+  },
+  "gpu": {
+    "name": "NVIDIA RTX PRO 4000 Blackwell",
+    "uuid": "GPU-fdc11a18-6edb-7e2f-82b2-6bd0b9ed714d",
+    "driver_version": "575.64.03",
+    "memory_total_mib": "24467",
+    "power_limit_w": "145.00"
+  },
+  "software": {
+    "python": "3.12.13",
+    "kernel": "6.8.0-65-generic",
+    "torch": "2.10.0+cu128",
+    "torch_cuda": "12.8",
+    "vllm": "0.19.1",
+    "transformers": "5.15.1",
+    "compressed_tensors": "0.15.0.1",
+    "nvcc": "Cuda compilation tools, release 12.9, V12.9.86",
+    "git_head": "530ea88f1ef9730da50cd8df60ffa1a85c102c98",
+    "git_dirty": false,
+    "git_untracked_files": 2
+  },
+  "timestamp": "2026-08-26T23:28:40-0400"
+}
