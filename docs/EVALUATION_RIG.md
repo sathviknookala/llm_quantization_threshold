@@ -353,7 +353,7 @@ nothing. `above_replication_floor` says a difference is reproducible, not that i
 post-hoc materiality threshold is applied to KL values; the raw numbers are preserved and the
 thresholds that exist are correctness trip-wires with pre-registered bounds.
 
-### Persisted distribution precision — GATED 2026-08-25
+### Persisted distribution precision — LOCKED 2026-08-26 (G4)
 
 Full-vocabulary distributions are persisted as **fp32 by default**, and KL is computed in **float64**
 from log-normalised values (`logp = lp - logsumexp(lp)`), with no epsilon floor inside the logarithm.
@@ -365,11 +365,59 @@ distributions, KL is recomputed with both operands rounded to the candidate repr
 candidate is adopted only if per-cell relative error stays within its pre-registered bound above an
 absolute-nats floor.
 
-**The gate has not been run.** No fp32 distribution array exists anywhere in this repository yet —
-every persisted logprob array to date is fp16 — so there is currently nothing to compare against and
-no measured fp16-versus-fp32 figure may be quoted. fp32 is the default on the grounds that it costs
-under a gigabyte and removes the question, not on the grounds of a measurement. Whether fp16 would
-pass is an open expectation until the gate runs on collected fp32 data.
+**The gate ran on real fp32 data and fp16 failed it**
+(`results/quality/gates/storage_precision.json`, 2026-08-26). Both sides are derived from the *same*
+fp32 arrays, so storage is the only variable; comparing separately generated fp16 and fp32 runs
+would have confounded it with the launch-to-launch floor.
+
+```text
+                fp32 headline   fp16 headline   rel p99    rel max
+BF16||FP8         3.689712e-03    3.689496e-03   1.33e-02   1.50e-02
+BF16||FP4         2.945396e-02    2.944403e-02   6.25e-03   6.57e-03
+FP8||FP4          3.566235e-02    3.565167e-02   5.66e-03   6.47e-03
+
+pre-registered    rel p99 <= 1e-03            rel max <= 1e-02
+```
+
+Both bounds fail, the p99 by more than an order of magnitude. **fp32 stays**, and it is now the
+storage decision on the evidence rather than on the grounds that it is cheap. The thresholds were not
+relaxed after seeing the result.
+
+The failure is in the tail, not the mean: the headline moves by only ~1e-05 nats, which is why the
+gate is written on per-cell relative error rather than on an aggregate. The mechanism is mantissa
+precision — fp16 carries roughly three decimal digits, and 99.989% of stored entries change under the
+round-trip, by up to 1.56e-02 nats each. It is **not** underflow: log-softmax entries over this vocab
+bottom out near -40, nowhere near fp16's -65504, so nothing ever underflows to `-inf`. An earlier
+counter that purported to measure fp16 underflow was dead code and has been replaced by the
+representation-error figures above.
+
+The relative bounds are evaluated only on cells whose true KL is at or above an absolute floor of
+1e-04 nats (96 of 120 pair-cells here), and the gate additionally refuses to report a pass unless
+enough cells clear that floor to have tested anything.
+
+### Prefix-cache equivalence — MEASURED 2026-08-26 (G3)
+
+Prefix caching is enabled here and disabled on the serving axis — the deliberate H7 exception, taken
+because the ten nested prefixes of a trajectory share 76.1% of their tokens and recomputing them is
+pure waste. What that exception costs numerically is measured, not assumed
+(`results/quality/gates/cache_equivalence.json`): the production cached collection scored against a
+second launch with `enable_prefix_caching=False`, over the same contexts.
+
+```text
+        cached vs uncached   top-1      bit-identical   frac of BF16||FP8 KL
+BF16          1.749e-04      40 / 40        17 / 40            4.74%
+FP4           3.671e-11      40 / 40        34 / 40            ~0%
+```
+
+Caching-off is verified from the engine's own counters — zero prefix-cache queries recorded, not
+merely requested — and reuse on the cached side is likewise observed rather than assumed: 32,192 hits
+of 42,876 queries against the 76.1% ceiling.
+
+BF16 fails the pre-registered bound of 1% of the BF16→FP8 KL. **But the effect is smaller than BF16's
+own replication floor** of 2.084e-04, and both comparisons are dominated by the same single unstable
+cell, so what the gate is detecting is BF16 launch nondeterminism rather than a caching artifact. The
+threshold stands as registered and the failure is reported rather than explained away; the
+attribution is stated as an interpretation, not folded into the verdict.
 
 ### Replication floor — LOCKED 2026-08-25
 

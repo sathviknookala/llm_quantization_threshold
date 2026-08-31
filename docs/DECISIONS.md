@@ -764,8 +764,9 @@ operational detail lives in `EVALUATION_RIG.md` A.1; this entry records the deci
   trajectory are correlated repeated measurements on one context.
 - **Persisted-logprob precision is a gate, not an assumption.** fp32 by default; KL in float64 with
   log-normalisation and no epsilon floor. The earlier fp16 practice in the qualification prototypes
-  was never justified numerically. The gate itself has not been run — no fp32 array exists yet — so
-  no fp16-versus-fp32 figure may be quoted until it does.
+  was never justified numerically. *Resolved 2026-08-26: the gate ran and fp16 failed both bounds
+  (p99 relative error 1.33e-02 against 1e-03). fp32 is retained on the evidence. See
+  `EVALUATION_RIG.md`, "Persisted distribution precision".*
 - **Engine controls that can change execution are pinned and recorded from observed state**, not
   from requested flags, because vLLM is documented here to deviate silently from what was requested
   (H10). `enforce_eager` and chunked-versus-unchunked prefill are decided by a gate that measures
@@ -802,6 +803,42 @@ Three consequences were locked with it:
   replicate to ~1e-11 nats, so a few nanonats reads as a large multiple of the floor. Absolute nats
   are reported first; `above_replication_floor` means reproducible, not material. No post-hoc
   materiality threshold is introduced.
+
+**Amended 2026-08-26 — the quality rig is built, smoke-validated and preflighted; P13 is not
+authorised.** What the phases returned, each backed by a tracked artifact:
+
+- **P7, trajectories frozen.** 64 BF16 continuations of exactly 2,048 token IDs,
+  `trajectory_set_hash` `1dd71faeb242c7c1`, generated in groups of 16 to stay under the measured KV
+  wall, zero preemptions. Immutable from here.
+- **Generation is not replayable.** A second launch under an identical engine identity, seed, profile
+  and grouping reproduced 51 of 64; earliest divergence at token 3. Reproduction therefore goes
+  through the tracked artifact and its hash, never by rerunning generation. The design already
+  assumed this and does not depend on the answer.
+- **P10 smoke, 4 x 10 x 3.** KV capacities reproduced the serving sweep exactly for all three
+  configurations, and all three engine identity hashes matched their G9 counterparts.
+- **G3 cache equivalence and G4 storage precision both ran**; see `EVALUATION_RIG.md` for the
+  numbers and the dispositions.
+- **P12 preflight, 35/35.** Structural checks over the full 640-cell grid plus fourteen resume and
+  provenance guards each exercised until it actually aborted, and an engine probe confirming all
+  three engines still come up byte-identical to the smoke.
+
+**The BF16 replication floor is the one open premise blocking P13.** Measured at production scale —
+three independent BF16 launches, 640 cells, six ordered pairs — it is **2.084e-04 nats**, which is
+5.6% of the provisional BF16→FP8 KL against a pre-registered bound of 1%. The bound fails. The
+earlier n=4 figure of 2.984e-04 is superseded as a high draw from a noisy small sample.
+
+This is a property of the **reference**, not of the quantized paths: FP8 and FP4 replicate to ~1e-11
+under CUDA graphs. It binds the FP8 comparison specifically, which sits 17.7x above noise while
+BF16→FP4 sits at 141x. Per position it is sharper still — on the provisional FP8 curve the floor is
+95% and 148% of signal at p=2048 and p=512, so the FP8 headline is carried by the positions where
+signal is large rather than being uniformly resolvable.
+
+Three dispositions are open and none has been taken: accept the floor as a stated resolution limit;
+restrict FP8 claims to the positions that clear it; or re-register a design that averages repeated
+BF16 launches. The third would change the pre-registered reference and needs its own registration —
+an averaged reference computes to 6.99e-05 and is recorded in the artifact as **not adopted**,
+because choosing a reference after seeing which one passes is exactly what pre-registration exists to
+prevent.
 
 **Historical prototypes, superseded.** `scripts/logits_probe.py` (synthetic contexts, one position)
 and `scripts/compute_kl.py` (single-position qualification artifact layout, epsilon floor inside the

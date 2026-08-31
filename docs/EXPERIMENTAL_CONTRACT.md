@@ -751,6 +751,23 @@ A failed empirical gate — replication floor, cache equivalence, precision, eng
 equivalence — is a **measurement about the rig**, and is reported as such. It invalidates a quality
 result only where the contract above says it does; it is not silently absorbed into the number.
 
+**Three of them have failed, and the results stand as measured** (2026-08-26). The BF16 replication
+floor is 5.6% of the provisional BF16→FP8 KL against a 1% bound; cache-on-versus-off is 4.74% on
+BF16, itself below that floor; and fp16 storage misses its per-cell relative bounds by an order of
+magnitude, so fp32 is retained. No threshold was relaxed after the fact, and no result was averaged
+or re-referenced to convert a failure into a pass. Each failure travels with the number it bounds.
+
+Two rules follow from what those gates measured, and both are binding on how results are read:
+
+- **A worst-cell value may only be compared against a floor measured over the same grid size.** A
+  maximum is an extreme-value statistic: the BF16 worst-cell floor grew 2.13x, from 3.01e-03 over 40
+  cells to 6.43e-03 over 640, under identical underlying noise. Comparing maxima across different
+  cell counts measures sample size. The analysis path refuses this comparison rather than reporting
+  it with a caveat.
+- **A ratio to the floor is a reproducibility diagnostic, never a magnitude.** Under CUDA graphs FP8
+  and FP4 replicate to ~1e-11 nats, so a few nanonats reads as many multiples of the floor while
+  being numerically nothing. Absolute nats are reported first.
+
 ## Measurement hazards found during model qualification (2026-08-22)
 
 These were observed on this exact stack while qualifying Llama 3.1 8B Instruct. Each is a way to
