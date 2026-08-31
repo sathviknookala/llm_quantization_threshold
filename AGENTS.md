@@ -30,8 +30,9 @@ the harness outlives the pilot.
 `scripts/harness/quality/` is the quality arm, KL first — `positions.py` (retained-position
 contract), `kl_math.py` (float64 KL, trajectory bootstrap), `qcommon.py` (identity, provenance,
 `KL_SPEC`), `qengine.py` (engine lifecycle, observed identity), `trajectories.py` (the frozen BF16
-continuations), `collect_kl.py`, `analyze_kl.py`, `gates.py`, `qselftest.py`. It imports `common.py`
-and `server.py` and edits neither: the serving contract is frozen. `scripts/logits_probe.py`, `scripts/compute_kl.py` and
+continuations), `collect_kl.py`, `analyze_kl.py`, `gates.py`, `preflight.py` (P12), `floor_study.py`
+(the production-scale replication floor), `qselftest.py`. It imports `common.py` and
+`server.py` and edits neither: the serving contract is frozen. `scripts/logits_probe.py`, `scripts/compute_kl.py` and
 `scripts/harness/correctness_gate.py` are **historical qualification/prototype paths**, kept
 byte-unchanged so `results/qualification/` and `results/pilot/` stay reproducible. They are not the
 quality runner and their KL numbers are not quality results.
@@ -143,8 +144,10 @@ the number, never as a bandwidth or weight-residency benefit.
    P8-P9  collect_kl.py / analyze_kl.py                        DONE 2026-08-26
    P10    real smoke, 4 traj x 10 pos x 3 configs              DONE 2026-08-26
    P11    replication floor + fp16/fp32 storage gate           DONE 2026-08-26
-   P12    full preflight, 35/35                               DONE 2026-08-26
+   P12    full preflight, 35/35                                DONE 2026-08-26
+   G2'    production BF16 floor, 3 launches x 640 cells        DONE 2026-08-26
    P13    64-trajectory production KL run                      <- next, NOT authorised
+          BLOCKED on the replication-floor disposition, not on the rig
    PPL and downstream tasks still need D14/D15
 6. marginal tradeoff: quality loss vs sustainable concurrency
 ```
@@ -193,27 +196,30 @@ number of unstable cells rather than uniform jitter.
 
 ## Last session
 
-**Session 6 — locked the engine profile, froze the trajectories, built and smoke-validated the whole
-KL path.** Five persistent reviewers inspected the implementation before any GPU time.
+**Session 7 — froze the trajectories, ran the whole quality path end to end at smoke scale,
+preflighted P13, and measured the BF16 replication floor at production scale.** Five reviewers
+inspected the implementation before any GPU time.
 
-- **`graph_2048` locked** on G9's evidence, and the eager/chunking sensitivity recorded as a result
-  rather than a configuration footnote.
-- **Four blockers closed before running.** `run_job` released VRAM outside its `try`, so a killed
-  parent orphaned an engine — the incident already in this file, reintroduced; the helper feeding the
-  floor and cache gates lacked its siblings' completeness checks, so a short batch would have left
-  `-inf` rows in the very floor everything is read against; two pre-registered thresholds were hashed
-  into `KL_SPEC` and never evaluated, leaving both gates unable to fail on substance; and the
-  checkpoint hash cache keyed on size+mtime, which a timestamp-preserving deploy leaves untouched
-  (reproduced returning a stale digest).
-- **A worst-cell floor comparison spanning different grid sizes was refused.** A maximum is an
-  extreme-value statistic: under a null with no signal, max-of-640 beats max-of-40 in 95% of draws.
+- **Four blockers closed before running.** `run_job` released VRAM outside its `try`; the helper
+  feeding the floor and cache gates lacked its siblings' completeness checks, so a short batch would
+  have left `-inf` rows in the floor everything is read against; two pre-registered thresholds were
+  hashed into `KL_SPEC` and never evaluated, leaving both gates unable to fail on substance; and the
+  checkpoint hash cache keyed on size+mtime, reproduced returning a stale digest.
+- **A worst-cell floor comparison across mismatched grids was refused** on extreme-value grounds,
+  and the refusal was later confirmed empirically — the same noise gives a 2.13x larger maximum over
+  640 cells than over 40.
 - **Two defects found by running, not reading.** The replayability gate defaulted to 4 trajectories,
-  which would have submitted groups of 4 against the freeze's 16 and confounded batching with launch
-  noise. And SIGTERM to a parent blocked in `wait()` orphaned an EngineCore holding 22 GiB — the
-  earlier `finally` only rescued SIGINT.
-- **P7 frozen**: 64 trajectories, 2048 tokens each, zero preemptions, `trajectory_set_hash`
-  `1dd71faeb242c7c1`, engine identity matching G9's BF16 `graph_2048` launch exactly.
-- Prefix-cache reuse **measured**: 32,192 hits of 42,876 queries, against a 76.1% ceiling.
+  which would have confounded batching with launch noise; and SIGTERM to a parent blocked in `wait()`
+  orphaned an EngineCore holding 22 GiB — the earlier `finally` only rescued SIGINT.
+- **P7 frozen**, `trajectory_set_hash` `1dd71faeb242c7c1`, zero preemptions, engine identity matching
+  G9's BF16 `graph_2048` launch exactly.
+- **Generation is not replayable** — 51 of 64, earliest divergence at token 3, under an identical
+  engine identity. Recorded as a result; the design never depended on it.
+- **P10/P11**: smoke reproduced the sweep's KV capacities for all three configurations; G3 and G4 ran
+  and both returned failures that stand.
+- **P12 preflight 35/35**, including fourteen provenance guards each exercised until it aborted.
+- **G2' production floor**: 2.084e-04 nats over three launches and six ordered pairs, superseding the
+  n=4 estimate as a high draw.
 
 ## Known issues / unresolved premises
 
