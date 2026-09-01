@@ -38,17 +38,21 @@ def collect(n_launches, root=None, allow_dirty=False):
     out = []
     for i in range(1, n_launches + 1):
         rec = C.collect(CONFIG, root=launch_root(i, root), allow_dirty=allow_dirty)
+        obs = rec.get("observed") or {}
         out.append({"launch": i,
                     "engine_identity_hash": rec["engine_identity_hash"],
-                    "kv_cache_tokens": rec["observed"]["kv_cache_tokens"],
+                    "kv_cache_tokens": obs.get("kv_cache_tokens"),
                     "cells": rec["cells"],
                     "seconds": rec["seconds"],
                     "wall_seconds": rec["wall_seconds"],
+                    # on a fully reused launch these are the previous launch's cumulative
+                    # counters; printed and returned only, never written to the artifact
                     "prefix_cache": {k: v for k, v in (rec.get("engine_metrics") or {}).items()
                                      if "prefix_cache" in k and "external" not in k},
+                    "provenance_source": rec.get("provenance_source"),
                     "root": os.path.relpath(launch_root(i, root), common.REPO)})
         print(f"launch {i}: engine={rec['engine_identity_hash']} "
-              f"kv={rec['observed']['kv_cache_tokens']} cells={rec['cells']} "
+              f"kv={obs.get('kv_cache_tokens')} cells={rec['cells']} "
               f"scoring={rec['seconds']}s", flush=True)
     return out
 

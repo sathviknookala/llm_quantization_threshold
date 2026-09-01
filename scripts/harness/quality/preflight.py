@@ -40,7 +40,7 @@ def structural():
     contexts, index = C.build_grid(traj)
     out.append(_rec("full_grid_rederived", len(contexts) == n * N_POS,
                     {"cells": len(contexts), "expected": n * N_POS,
-                     "every_cell_rederive_checked": True}))
+                     "contract_enforced_by_build_all": True}))
 
     order = [(c["trajectory_index"], c["position_p"]) for c in index]
     out.append(_rec("canonical_order", order == P.grid_order(n),
@@ -110,6 +110,11 @@ def _expect_reject(name, fn, out, want_substring=None):
 
 def rejection_tests(traj, index):
     """Exercise every resume/provenance guard against real artifacts until it aborts."""
+    # the freeze test below refuses only because the artifact is there; absent it, freeze() would
+    # launch an engine and mint a new production trajectory set
+    if not os.path.exists(T.PATH):
+        raise SystemExit(f"ABORT: {T.PATH} is absent; the freeze rejection test would generate and "
+                         "freeze a new production trajectory set instead of testing a refusal")
     out = []
     sandbox = os.path.join(PREFLIGHT_DIR, "sandbox")
     shutil.rmtree(sandbox, ignore_errors=True)
@@ -187,6 +192,11 @@ def rejection_tests(traj, index):
     out.append(_rec("verify_cells_accepts_faithful_grid",
                     A.verify_cells(good_cells, view) == rows, {"cells": rows}))
 
+    badlen = [dict(c) for c in good_cells]
+    badlen[0]["context_len"] += 1
+    _expect_reject("verify_cells_refuses_context_len_mismatch",
+                   lambda: A.verify_cells(badlen, view), out, "context_len")
+
     swapped = [dict(c) for c in good_cells]
     swapped[1]["position_p"], swapped[2]["position_p"] = (swapped[2]["position_p"],
                                                           swapped[1]["position_p"])
@@ -211,7 +221,9 @@ def rejection_tests(traj, index):
     _expect_reject("verify_cells_detects_tampered_trajectory",
                    lambda: A.verify_cells(good_cells, tampered), out)
 
-    _expect_reject("freeze_refuses_to_overwrite", lambda: T.freeze(), out, "already exists")
+    # path= explicitly: freeze's default is bound at import and would not follow T.PATH
+    _expect_reject("freeze_refuses_to_overwrite", lambda: T.freeze(path=T.PATH), out,
+                   "already exists")
 
     bad_manifest_dir = os.path.join(sandbox, "mguard")
     q.guard_manifest(bad_manifest_dir, "test", extra={"trajectory_set_hash": "aaa"})
@@ -276,16 +288,23 @@ def main():
     checks, traj, contexts, index, ident = structural()
     checks += rejection_tests(traj, index)
 
-    reference = {}
+    reference, unusable = {}, {}
     smoke_root = os.path.join(q.QUALITY_DIR, "smoke")
     for cfg in q.LADDER:
         short = q.QUALITY_CONFIGS[cfg]["short"]
         path = os.path.join(smoke_root, f"collection_{short}.json")
-        if os.path.exists(path):
-            d = json.load(open(path))
-            reference[short] = {"engine_identity_hash": d["engine_identity_hash"],
-                                "kv_cache_tokens": d["observed"]["kv_cache_tokens"],
-                                "seconds_per_context": d["seconds"] / d["cells"]}
+        if not os.path.exists(path):
+            unusable[short] = "no collection summary"
+            continue
+        d = json.load(open(path))
+        # a collection written before the resume-provenance fix, or one that launched nothing,
+        # can carry nulls here; dividing by them raises and dropping one silently under-projects
+        if d.get("seconds") is None or not d.get("observed"):
+            unusable[short] = "collection summary carries a null seconds or observed"
+            continue
+        reference[short] = {"engine_identity_hash": d["engine_identity_hash"],
+                            "kv_cache_tokens": d["observed"]["kv_cache_tokens"],
+                            "seconds_per_context": d["seconds"] / d["cells"]}
 
     observed = {}
     if not a.skip_engine:
@@ -300,6 +319,10 @@ def main():
         "seconds_per_context_measured": {k: round(v["seconds_per_context"], 4)
                                          for k, v in reference.items()},
         "projected_scoring_minutes_total": round(sum(per_ctx) * cells / 60.0, 1),
+        # the total sums one term per config with a usable reference, so a missing config
+        # under-projects by its share rather than failing anything
+        "projection_incomplete": len(reference) != len(q.LADDER),
+        "configs_without_usable_reference": unusable,
         "projected_bytes_gib": round(cells * q.VOCAB_SIZE * 4 * len(q.LADDER) / 2**30, 2),
         "shards_per_config": len(C.shard_plan(q.N_TRAJECTORIES, "BF16", root=PRODUCTION_ROOT)),
     }

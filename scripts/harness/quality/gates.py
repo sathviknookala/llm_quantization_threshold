@@ -744,7 +744,8 @@ def storage_precision(root, n_traj=4, allow_dirty=False, floor_path=None):
         if str(mat.dtype) != "float32":
             raise SystemExit(f"ABORT: {cfg} is stored as {mat.dtype}; G4 needs the fp32 arrays")
         mats[cfg] = mat
-    floor = json.load(open(floor_path)) if floor_path and os.path.exists(floor_path) else None
+    floor_per_config, floor_desc = (q.load_floor(floor_path, traj["trajectory_set_hash"])
+                                    if floor_path else (None, None))
 
     idx = K.bootstrap_indices(n, q.BOOTSTRAP["draws"], q.BOOTSTRAP["seed"])
     pairs, worst_rel_p99, worst_rel_max, worst_abs = {}, 0.0, 0.0, 0.0
@@ -783,8 +784,8 @@ def storage_precision(root, n_traj=4, allow_dirty=False, floor_path=None):
             "entries_changed_by_fp16_frac": float((ha != mats[a]).mean()),
             "min_logprob_seen": float(mats[a][np.isfinite(mats[a])].min()),
         }
-        if floor:
-            fl = ((floor.get("per_config") or {}).get(q.QUALITY_CONFIGS[a]["short"]) or {})
+        if floor_per_config:
+            fl = floor_per_config.get(q.QUALITY_CONFIGS[a]["short"]) or {}
             if fl.get("headline_nats") is not None:
                 rec["headline_delta_vs_floor"] = K.floor_comparison(
                     abs(rec["headline_delta_nats"]), fl["headline_nats"])
@@ -813,6 +814,7 @@ def storage_precision(root, n_traj=4, allow_dirty=False, floor_path=None):
         "low_sample": bool(n < q.N_TRAJECTORIES),
         "cells_above_abs_floor_total": tested,
         "cells_total": total,
+        "replication_floor_source": floor_desc,
         "pairs": pairs,
         "checks": checks,
         "passed": all(checks.values()),

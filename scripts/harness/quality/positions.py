@@ -85,6 +85,11 @@ def rederive_and_check(prompt_ids, cont_ids, position_p, context_len_seen, targe
     """Independent re-derivation, for checking a stored record against the contract.
 
     Catches a position-label scramble, which a same-cell self-consistency check cannot see.
+
+    The trap: no artifact here stores context token IDs, only `context_sha256`, so on the current
+    schema `context_ids_seen` cannot be supplied non-vacuously -- a caller holding a freshly built
+    cell passes its own derivation back in. Both former callers did exactly that and were inert;
+    they now compare stored fields directly. Kept for a schema that does store the token IDs.
     """
     context, target = build_context(prompt_ids, cont_ids, position_p)
     problems = []

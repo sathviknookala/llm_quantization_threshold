@@ -298,8 +298,13 @@ def read_jsonl(path):
     return out
 
 
-def guard_manifest(out_dir, artifact, extra=None):
-    """Resume must not mix runs built under different contracts."""
+def guard_manifest(out_dir, artifact, extra=None, adopt_if_absent=frozenset()):
+    """Resume must not mix runs built under different contracts.
+
+    A key named in `adopt_if_absent` that the manifest does not carry is adopted into the returned
+    record in memory. The file is never rewritten: the four root manifests are git-tracked, and a
+    write here lands between `collect()`'s clean-tree check and `run_job`'s, aborting resume.
+    """
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, "manifest.json")
     h = spec_hash()
@@ -310,18 +315,109 @@ def guard_manifest(out_dir, artifact, extra=None):
             raise SystemExit(
                 f"ABORT: KL_SPEC changed ({prior} -> {h}) but {out_dir} holds artifacts from the "
                 "old spec. Move it aside or restore the spec; resume must not mix.")
+        adopted = []
         for k, want in (extra or {}).items():
-            if rec.get(k) != want:
+            if k not in rec and k in adopt_if_absent:
+                rec[k] = want
+                adopted.append(k)
+            elif rec.get(k) != want:
                 raise SystemExit(
                     f"ABORT: {path} records {k}={rec.get(k)!r} but this run has {want!r}; "
                     "resume must not mix. Move the directory aside.")
+        rec["manifest_keys_adopted"] = sorted(adopted)
         return path, rec
     rec = {"artifact": artifact, "kl_spec_hash": h, "spec": KL_SPEC,
            "started_at": common.now_iso()}
     if extra:
         rec.update(extra)
     common.write_json(path, rec)
+    # set after the write: the stored manifest schema stays as it was
+    rec["manifest_keys_adopted"] = []
     return path, rec
+
+
+PRODUCTION_FLOOR_ARTIFACT = "production-scale BF16 replication floor"
+
+
+def _floor_provenance(rec, path, trajectory_set_hash):
+    got = rec.get("kl_spec_hash")
+    if got != spec_hash():
+        raise SystemExit(
+            f"ABORT: floor {path} was written under KL_SPEC {got}, the current spec is "
+            f"{spec_hash()}; a floor measured under another contract is not a floor for this one")
+    checked = {"kl_spec_hash": got}
+    # present-key-only: the n=4 G2 artifact carries neither, and absence is not a mismatch
+    prof = rec.get("engine_profile_name")
+    if prof is not None:
+        if prof != PROFILE_NAME:
+            raise SystemExit(f"ABORT: floor {path} was measured under engine profile {prof!r}, "
+                             f"not {PROFILE_NAME!r}")
+        checked["engine_profile_name"] = prof
+    tsh = rec.get("trajectory_set_hash")
+    if tsh is not None and trajectory_set_hash is not None:
+        if tsh != trajectory_set_hash:
+            raise SystemExit(f"ABORT: floor {path} was measured against trajectory set "
+                             f"{tsh[:16]}, not {trajectory_set_hash[:16]}")
+        checked["trajectory_set_hash"] = tsh
+    return {
+        "floor_path": os.path.relpath(path, common.REPO),
+        "floor_trajectory_set_hash": tsh,
+        "provenance_checked": checked,
+        "trajectory_set_hash_verified": "trajectory_set_hash" in checked,
+    }
+
+
+def load_floor(path, trajectory_set_hash=None):
+    """Both replication-floor schemas as one `per_config` map, or a refusal.
+
+    An unreadable or unrecognised floor used to read back as `None`, which dropped every floor
+    comparison without failing anything -- how the production floor came to be passed and ignored.
+    """
+    if not os.path.exists(path):
+        raise SystemExit(f"ABORT: floor file {path} does not exist; a floor that cannot be read "
+                         "must not be silently skipped")
+    rec = json.load(open(path))
+    desc = _floor_provenance(rec, path, trajectory_set_hash)
+    if "per_config" in rec:
+        per = rec["per_config"] or {}
+        if not per:
+            raise SystemExit(f"ABORT: floor {path} carries an empty per_config map")
+        desc.update({
+            "floor_schema": "per_config",
+            "floor_artifact": rec.get("artifact") or rec.get("gate"),
+            "floor_configs": sorted(per),
+            "floor_n_trajectories": rec.get("n_trajectories"),
+            "aggregation": "as written by the gate that produced it",
+        })
+        return per, desc
+    if (rec.get("artifact") == PRODUCTION_FLOOR_ARTIFACT
+            or all(k in rec for k in ("headline", "worst_cell", "config"))):
+        short = QUALITY_CONFIGS[rec["config"]]["short"]
+        per = {short: {
+            "headline_nats": rec["headline"]["mean_nats"],
+            # the MEAN over the six ordered pairs, the convention EVALUATION_RIG.md already
+            # fixes; `worst_cell.max_nats` is a max over six dependent pair-maxima and would
+            # inflate the floor 1.17x against a headline that is itself a mean over those pairs
+            "max_nats": rec["worst_cell"]["mean_nats"],
+            "cells": rec["worst_cell"]["cells_per_pair"],
+            "n_trajectories": rec["n_trajectories"],
+        }}
+        desc.update({
+            "floor_schema": PRODUCTION_FLOOR_ARTIFACT,
+            "floor_artifact": rec.get("artifact"),
+            "floor_configs": [short],
+            "floor_n_trajectories": rec["n_trajectories"],
+            "floor_pairs": rec.get("ordered_pairs"),
+            "floor_launches": rec.get("n_launches"),
+            "aggregation": "mean over ordered pairs, for both the headline and the worst cell",
+            "headline_range_nats": [rec["headline"]["min_nats"], rec["headline"]["max_nats"]],
+            "worst_cell_range_nats": [rec["worst_cell"]["min_nats"],
+                                      rec["worst_cell"]["max_nats"]],
+        })
+        return per, desc
+    raise SystemExit(
+        f"ABORT: {path} is neither replication-floor shape: no `per_config` map (the G2 gate "
+        f"shape) and no `headline`/`worst_cell`/`config` block (the {PRODUCTION_FLOOR_ARTIFACT})")
 
 
 def load_prompts(n=N_TRAJECTORIES, workload=CORPUS_WORKLOAD):

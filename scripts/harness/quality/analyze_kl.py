@@ -6,7 +6,6 @@ an incomplete grid.
 """
 
 import argparse
-import json
 import os
 import sys
 
@@ -29,14 +28,12 @@ def verify_cells(cells, traj):
         if t is None:
             raise SystemExit(f"ABORT: stored cell names trajectory {c['trajectory_index']}, which "
                              "is not in the frozen set")
-        cell = P.build_context(t["prompt_token_ids"], t["continuation_token_ids"], c["position_p"])
-        context, target = cell
-        ok, problems = P.rederive_and_check(
-            t["prompt_token_ids"], t["continuation_token_ids"], c["position_p"],
-            c["context_len"], c["target_token_id"], context)
-        if not ok:
+        context, target = P.build_context(
+            t["prompt_token_ids"], t["continuation_token_ids"], c["position_p"])
+        if c["context_len"] != len(context):
             raise SystemExit(f"ABORT: trajectory {c['trajectory_index']} position "
-                             f"{c['position_p']} fails re-derivation: {problems}")
+                             f"{c['position_p']}: stored context_len {c['context_len']} differs "
+                             f"from re-derivation {len(context)}")
         # length and target are necessary but not sufficient: an interior token can be flipped
         # while both still match, and this hash is the only check that catches it
         if not c.get("context_sha256"):
@@ -137,7 +134,8 @@ def analyze(root=None, out=None, n_traj=None, floor_path=None, allow_dirty=False
                              "would not be scored on the same contexts")
 
     idx = K.bootstrap_indices(n, q.BOOTSTRAP["draws"], q.BOOTSTRAP["seed"])
-    floor = json.load(open(floor_path)) if floor_path and os.path.exists(floor_path) else None
+    floor_per_config, floor_desc = (q.load_floor(floor_path, traj["trajectory_set_hash"])
+                                    if floor_path else (None, None))
 
     pairs = {}
     for a, b in q.KL_PAIRS:
@@ -147,10 +145,9 @@ def analyze(root=None, out=None, n_traj=None, floor_path=None, allow_dirty=False
         grid = pair_grid(mats[a], mats[b], n)
         rec = summarise(grid, idx, ref_cells, label)
         rec["reference_config"], rec["comparison_config"] = a, b
-        if floor:
-            per = floor.get("per_config") or {}
-            fa = per.get(q.QUALITY_CONFIGS[a]["short"]) or {}
-            fb = per.get(q.QUALITY_CONFIGS[b]["short"]) or {}
+        if floor_per_config:
+            fa = floor_per_config.get(q.QUALITY_CONFIGS[a]["short"]) or {}
+            fb = floor_per_config.get(q.QUALITY_CONFIGS[b]["short"]) or {}
             have = [f for f in (fa, fb) if f.get("headline_nats") is not None]
             if have:
                 # both sides contribute launch-to-launch noise, so the binding floor is the larger
@@ -176,6 +173,15 @@ def analyze(root=None, out=None, n_traj=None, floor_path=None, allow_dirty=False
                         "not comparable at different sample sizes. Re-run the floor at the same "
                         "trajectory count to enable this comparison.")
                 rec["vs_replication_floor"] = vs
+            else:
+                # a floor covering neither side must leave a record: an absent key reads as an
+                # unremarkable omission, which is the same silence this whole path had
+                rec["vs_replication_floor"] = None
+                rec["replication_floor_unavailable_for"] = [
+                    q.QUALITY_CONFIGS[c]["short"] for c in (a, b)]
+                rec["replication_floor_unavailable_because"] = (
+                    f"{floor_desc['floor_path']} covers {floor_desc['floor_configs']} only; "
+                    "backfilling from a floor of different provenance would mix designs")
         pairs[label] = rec
 
     # KL is not additive; the direct FP8||FP4 measurement is reported, and the difference of the
@@ -211,7 +217,9 @@ def analyze(root=None, out=None, n_traj=None, floor_path=None, allow_dirty=False
         "engine_identity": {c: summaries[c]["engine_identity_hash"] for c in ladder},
         "checkpoint_content_hash": {
             c: summaries[c]["provenance"]["checkpoint_content_hash"] for c in ladder},
-        "replication_floor": (floor or {}).get("per_config"),
+        "replication_floor": floor_per_config,
+        "replication_floor_source": floor_desc,
+        "replication_floor_omitted": floor_path is None,
         "pairs": pairs,
         "git": q.git_state(),
         "gpu": common.gpu_identity(),

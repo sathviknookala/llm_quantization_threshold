@@ -71,9 +71,13 @@ def observed_identity(log_text, resolved, config_id):
     cache, so a requested-flag hash is not an identity.
     """
     kv = KV_RE.search(log_text)
-    kernel_lines = sorted({ln.strip() for ln in log_text.splitlines()
-                           if any(p in ln for p in server.KERNEL_PATTERNS)})[:20]
-    normalized_kernel_lines = sorted({_strip_log_prefix(ln) for ln in kernel_lines})
+    matching = [ln.strip() for ln in log_text.splitlines()
+                if any(p in ln for p in server.KERNEL_PATTERNS)]
+    # normalise before truncating: the raw prefix carries a pid and a timestamp, so a [:20] window
+    # taken over prefix-sorted lines picks different subsets for two identical engines
+    normalized_kernel_lines = sorted({_strip_log_prefix(ln) for ln in matching})[:20]
+    # prefix-ordered and stored verbatim into every shard record; nothing hashes it
+    kernel_lines = sorted(set(matching))[:20]
     obs = {
         "resolved_config": resolved,
         "kv_cache_tokens": int(kv.group(1).replace(",", "")) if kv else None,
@@ -82,7 +86,9 @@ def observed_identity(log_text, resolved, config_id):
         "normalized_kernel_lines": normalized_kernel_lines,
     }
     cfg = q.QUALITY_CONFIGS[config_id]
-    blob = " | ".join(kernel_lines)
+    # every matching line, not the truncated 20, so a forbidden pattern cannot hide past position
+    # 20; unnormalised because _strip_log_prefix would eat a leading "[Marlin] ..." token
+    blob = " | ".join(sorted(set(matching)))
     want = cfg["expected_kernel_pattern"]
     bad = [p for p in cfg["forbidden_kernel_patterns"] if p in blob]
     obs["dispatch_verdict"] = {

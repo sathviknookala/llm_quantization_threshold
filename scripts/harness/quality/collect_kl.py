@@ -49,21 +49,17 @@ def subset(traj, n):
 
 
 def build_grid(traj):
-    """Contexts in canonical (trajectory, ascending position) order, re-derived and checked.
+    """Contexts in canonical (trajectory, ascending position) order, built under the contract.
 
-    `rederive_and_check` runs here on the production path, not only in analysis: a context that
-    fails the contract must never reach the GPU, let alone a stored artifact.
+    Nothing here is a stored record to be re-checked. `build_all` raises `PositionContractError` on
+    a bad length or position and asserts nesting; `T.load()` already re-hashed the trajectory input;
+    `assert_complete_grid` and the canonical-order comparison below close out the grid.
+    `context_sha256` is emitted so the stored record IS checkable later, by `verify_cells`.
     """
     contexts, index = [], []
     for t in traj["trajectories"]:
         cells = P.build_all(t["prompt_token_ids"], t["continuation_token_ids"])
         for cell in cells:
-            ok, problems = P.rederive_and_check(
-                t["prompt_token_ids"], t["continuation_token_ids"], cell["position_p"],
-                cell["context_len"], cell["target_token_id"], cell["context_ids"])
-            if not ok:
-                raise SystemExit(f"ABORT: trajectory {t['trajectory_index']} position "
-                                 f"{cell['position_p']} fails re-derivation: {problems}")
             contexts.append(cell["context_ids"])
             index.append({"trajectory_index": t["trajectory_index"],
                           "prompt_index": t["prompt_index"],
@@ -138,6 +134,44 @@ def _shard_reusable(sh, prov, expect_rows):
     return True, "reused"
 
 
+def resume_provenance(meta, final, plan):
+    """Where each provenance field of a collection summary came from.
+
+    A resume that reuses every shard launches no engine, so `meta` is None and the launch-side
+    fields would otherwise be written as nulls into a tracked artifact -- erasing the engine
+    identity the collection was actually produced under.
+    """
+    src = {}
+    if meta:
+        observed, src["observed"] = meta["observed"], "launch"
+        # per-launch cumulative counters: on a mixed run they describe only the launch that ran
+        metrics, src["engine_metrics"] = meta.get("engine_metrics"), "launch"
+        wall, src["wall_seconds"] = meta.get("wall_seconds"), "launch"
+    else:
+        observed = next((m["observed"] for m in final if m.get("observed")), None)
+        if observed is None:
+            raise SystemExit(
+                "ABORT: no engine launched and no reused shard records an `observed` block; the "
+                "engine identity this collection was produced under cannot be established")
+        src["observed"] = "shards"
+        metrics, src["engine_metrics"] = None, "unavailable"
+        for sh, m in zip(plan, final):
+            if m.get("engine_metrics") is not None:
+                metrics, src["engine_metrics"] = m["engine_metrics"], "shards"
+                src["engine_metrics_shard"] = sh["shard"]
+                break
+        # a parent-side property of a launch with no per-shard analogue
+        wall, src["wall_seconds"] = None, "unavailable"
+    if metrics is None and src["engine_metrics"] == "launch":
+        src["engine_metrics"] = "unavailable"
+    per_shard = [m.get("seconds") for m in final]
+    complete = all(s is not None for s in per_shard)
+    seconds = round(sum(per_shard), 2) if complete else None
+    src["seconds"] = "shards" if complete else "unavailable"
+    return {"observed": observed, "engine_metrics": metrics, "wall_seconds": wall,
+            "seconds": seconds, "provenance_source": src}
+
+
 def collect(config_id, root=None, allow_dirty=False, n_traj=None,
             shard_trajectories=SHARD_TRAJECTORIES, traj=None, require_cool=True):
     root = run_dir(root)
@@ -147,8 +181,14 @@ def collect(config_id, root=None, allow_dirty=False, n_traj=None,
     n = traj["n_trajectories"]
     os.makedirs(dist_dir(short, root), exist_ok=True)
     os.makedirs(shard_dir(short, root), exist_ok=True)
-    q.guard_manifest(root, "KL collection",
-                     extra={"trajectory_set_hash": traj["trajectory_set_hash"]})
+    # subset_n is soft ONLY for the five roots written before it existed -- results/quality/smoke/,
+    # floor64/launch1|2|3/ and gates/engine_profile/ -- which a hard pin would strand. Admit another
+    # key only if pinning it would strand an already-committed artifact; never because it is merely
+    # new. Back to frozenset() once those five roots are migrated or retired.
+    _, manifest = q.guard_manifest(
+        root, "KL collection",
+        extra={"trajectory_set_hash": traj["trajectory_set_hash"], "subset_n": n},
+        adopt_if_absent={"subset_n"})
 
     contexts, index = build_grid(traj)
     contexts_hash = common.sha256_of_json(contexts)
@@ -198,6 +238,7 @@ def collect(config_id, root=None, allow_dirty=False, n_traj=None,
         final.append(m)
     if len(identities) != 1 or None in identities:
         raise SystemExit(f"ABORT: shards span engine identities {sorted(identities)}")
+    prov_src = resume_provenance(meta, final, plan)
 
     cells = [c for m in final for c in m["index"]]
     P.assert_complete_grid(cells, n)
@@ -225,11 +266,19 @@ def collect(config_id, root=None, allow_dirty=False, n_traj=None,
                     "json": os.path.relpath(s["json"], common.REPO),
                     "reused": reasons[s["shard"]] == "reused"} for s in plan],
         "shard_reuse": reasons,
+        # [] means nothing was adopted; the pre-2026-09 records omit the key entirely
+        "manifest_keys_adopted": manifest["manifest_keys_adopted"],
         "launched": bool(todo),
-        "seconds": (meta or {}).get("generate_seconds"),
-        "wall_seconds": (meta or {}).get("wall_seconds"),
-        "engine_metrics": (meta or {}).get("engine_metrics"),
-        "observed": (meta or {}).get("observed"),
+        "shards_scored_this_run": len(todo),
+        "shards_reused": len(plan) - len(todo),
+        "seconds": prov_src["seconds"],
+        "seconds_definition": "sum of per-shard scoring seconds over the whole plan, reused "
+                              "shards included; equals the launch's generate_seconds when every "
+                              "shard was scored in one launch",
+        "wall_seconds": prov_src["wall_seconds"],
+        "engine_metrics": prov_src["engine_metrics"],
+        "observed": prov_src["observed"],
+        "provenance_source": prov_src["provenance_source"],
         "git": q.git_state(),
         "gpu": common.gpu_identity(),
         "software": common.software_identity(),
