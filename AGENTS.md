@@ -148,6 +148,7 @@ the number, never as a bandwidth or weight-residency benefit.
    P11    replication floor + fp16/fp32 storage gate           DONE 2026-08-26
    P12    full preflight, 35/35                                DONE 2026-08-26
    G2'    production BF16 floor, 3 launches x 640 cells        DONE 2026-08-26
+   review harness audit, 7 defects closed                     DONE 2026-09-01
    P13    64-trajectory production KL run                      <- next, NOT authorised
           BLOCKED on the replication-floor disposition, not on the rig
    PPL and downstream tasks still need D14/D15
@@ -198,30 +199,29 @@ number of unstable cells rather than uniform jitter.
 
 ## Last session
 
-**Session 7 — froze the trajectories, ran the whole quality path end to end at smoke scale,
-preflighted P13, and measured the BF16 replication floor at production scale.** Five reviewers
-inspected the implementation before any GPU time.
+**Session 8 — built and pre-registered the SLO-ceiling replication rig, then reviewed the whole
+quality arm and closed seven defects in it.** No GPU cells were run in either half.
 
-- **Four blockers closed before running.** `run_job` released VRAM outside its `try`; the helper
-  feeding the floor and cache gates lacked its siblings' completeness checks, so a short batch would
-  have left `-inf` rows in the floor everything is read against; two pre-registered thresholds were
-  hashed into `KL_SPEC` and never evaluated, leaving both gates unable to fail on substance; and the
-  checkpoint hash cache keyed on size+mtime, reproduced returning a stale digest.
-- **A worst-cell floor comparison across mismatched grids was refused** on extreme-value grounds,
-  and the refusal was later confirmed empirically — the same noise gives a 2.13x larger maximum over
-  640 cells than over 40.
-- **Two defects found by running, not reading.** The replayability gate defaulted to 4 trajectories,
-  which would have confounded batching with launch noise; and SIGTERM to a parent blocked in `wait()`
-  orphaned an EngineCore holding 22 GiB — the earlier `finally` only rescued SIGINT.
-- **P7 frozen**, `trajectory_set_hash` `1dd71faeb242c7c1`, zero preemptions, engine identity matching
-  G9's BF16 `graph_2048` launch exactly.
-- **Generation is not replayable** — 51 of 64, earliest divergence at token 3, under an identical
-  engine identity. Recorded as a result; the design never depended on it.
-- **P10/P11**: smoke reproduced the sweep's KV capacities for all three configurations; G3 and G4 ran
-  and both returned failures that stand.
-- **P12 preflight 35/35**, including fourteen provenance guards each exercised until it aborted.
-- **G2' production floor**: 2.084e-04 nats over three launches and six ordered pairs, superseding the
-  n=4 estimate as a high draw.
+- **Ceiling replication pre-registered and built** (`3656170`). The headline 21/57/70 is n=1 while
+  every ladder point around it is n=3, and the margins are thin — 0.34 ms (FP8) and 0.43 ms (FP4)
+  against a ~0.1 ms matched-cell spread. A confirmatory triplet at K-1/K/K+1 for repetitions 2 and 3
+  rather than a re-run of the bisection: the search's answer is fixed by the verdicts at K and K+1,
+  so re-running it would only re-probe interior points.
+- **Two defects found while building it.** `guard_spec()` restamped `started_at` on every
+  invocation, so any resume or additive phase silently rewrote when the artifact's earliest cell was
+  collected; and `SWEEP_SPEC` held live references to `common.WORKLOADS` and `common.SERVER_CONTROLS`,
+  so anything mutating those moved `sweep_config_hash` out from under the artifact. Snapshotted at
+  import; the hash is unchanged.
+- **Seven quality-harness defects closed** (`02d96f0`), two of them live blockers on P13: the floor
+  comparison was silently skipped for the authoritative artifact, and a no-launch resume erased
+  engine provenance from a tracked summary. See the commit for the full account.
+- **Every plan was reviewed before implementation and each reviewer changed the outcome.** One
+  caught a constant that contradicted `EVALUATION_RIG.md` and would have inflated the floor 1.17x;
+  one proved by experiment that removing a vacuous check would have silently dropped the only guard
+  unique to it; one rejected a `guard_manifest` design that would have dirtied a tracked file between
+  two `require_clean_tree` calls, breaking the partial-resume path it was meant to preserve.
+- **Verification moved 115 -> 181 quality selftest checks**, 29 -> 30 preflight, 28 -> 49 harness
+  selftest. Both frozen hashes unchanged; nothing under `results/` modified.
 
 ## Known issues / unresolved premises
 
@@ -250,6 +250,24 @@ inspected the implementation before any GPU time.
   blocked by the `chat_template` deviation.
 - **Checkpoint provenance has one open deviation** (shorter `chat_template`), and **FP4 calibration
   sensitivity is untested** — one draw, 128 ultrachat samples, seed 0.
+- **Three dispatch-verification gaps, found by the harness audit and deliberately not fixed.**
+  `server.py:137,142` carries the same truncate-before-normalise pattern that was fixed in
+  `qengine.observed_identity` — it sits on the frozen serving path and was left alone. FP4's
+  forbidden list contains `"emulation"`, which is not in `server.KERNEL_PATTERNS`, so that pattern is
+  unenforceable. And BF16 logs contain no matching kernel lines at all, so the reference
+  configuration's `dispatch_verdict.ok` is satisfied by silence. None blocks P13; all three should be
+  settled before the serving numbers are written up.
+- **`results/quality/preflight.json` is one key and one check stale** — `every_cell_rederive_checked`
+  is superseded by `contract_enforced_by_build_all`, and the count moves 35 -> 36 with engine.
+  Regenerating it costs three GPU launches. **`results/quality/gates/engine_profile/manifest.json`
+  predates the current spec** (`4ef13273db16d285`) and aborts on the KL_SPEC guard before any other
+  check.
+- **Any re-run of `collect()` dirties the tree**: `collection_<short>.json` is tracked and carries a
+  fresh `timestamp`, so `floor_study.py` without `--analyze-only` aborts at launch 2's
+  `require_clean_tree`. Pre-existing and separate from the resume-provenance fix.
+- **`results/quality/smoke/kl_summary.json` still carries the n=4-floor ratios** (12.37x / 98.72x)
+  while the hub quotes the production-floor ones (17.7x / 141.3x). Regenerating it is now possible
+  and would change a committed number, so it needs its own decision.
 - **The GPU is power-limited at 145 W**, so every number is measured under a power ceiling.
 
 At the end of a session, overwrite `Current focus`, `Last session`, and `Known issues / unresolved premises` in place. Git history is the changelog; this file should remain a current-state hub.
