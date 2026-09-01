@@ -13,7 +13,10 @@ import time
 from aiohttp import web
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from harness import analyze_ceiling as ac  # noqa: E402
 from harness import common, driver  # noqa: E402
+from harness import orchestration as orch  # noqa: E402
+from harness import run_sweep as rs  # noqa: E402
 
 
 class StubEngine:
@@ -87,9 +90,16 @@ class StubServer:
         self.port = port
         self.base = "http://127.0.0.1:%d" % port
         self._alive = True
+        self.startup = {"kv_cache_tokens": 44688, "dispatch_verdict": {"ok": True}}
 
     def alive(self):
         return self._alive
+
+    def wait_drained(self, timeout=600):
+        return True
+
+    def stop(self, *a, **kw):
+        self._alive = False
 
     def metrics(self):
         import requests
@@ -143,6 +153,121 @@ def run_case(name, n_out, conc, rate, plan=None, stalled_after=None, **cc_kw):
             eng.stalled = True
         threading.Thread(target=stall, daemon=True).start()
     return driver.run_cell(srv, prompts, cc, tag=name)
+
+
+def synth_cells(cfg, k, per_rep):
+    """(rep -> {C: meets_slo or None}) into cell records the analyzer will accept."""
+    out = []
+    for rep, verdicts in per_rep.items():
+        for C, slo in verdicts.items():
+            if slo is None:
+                continue
+            out.append({"workload": "DECODE_PRIMARY", "configuration_id": cfg, "concurrency": C,
+                        "repetition": rep, "job": "SWEEP_CEILING_REP", "status": "OK",
+                        "meets_slo": slo, "tpot_ms_p95": 49.0 if slo else 51.0})
+    return out
+
+
+def ceiling_criterion_cases():
+    k, triplet = 57, [56, 57, 58]
+
+    def score(v):
+        at = {C: {"status": "OK", "meets_slo": v[C]} for C in triplet if v.get(C) is not None}
+        return ac.score_repetition(k, triplet, at)
+
+    check("t9.confirmed", score({56: True, 57: True, 58: False}), ("CONFIRMED", 57))
+    check("t9.moved_down", score({56: True, 57: False, 58: False}), ("MOVED_DOWN", 56))
+    check("t9.unresolved_above", score({56: True, 57: True, 58: True}),
+          ("UNRESOLVED_ABOVE", None))
+    check("t9.unresolved_below", score({56: False, 57: False, 58: False}),
+          ("UNRESOLVED_BELOW", None))
+    check("t9.non_monotone", score({56: False, 57: True, 58: False}), ("NON_MONOTONE", None))
+    check("t9.incomplete_missing_k", score({56: True, 58: False}), ("INCOMPLETE", None))
+    # rep 1 never measured FP4 C=69; K and K+1 alone must still place the ceiling
+    check("t9.k_minus_1_optional_when_k_passes", score({57: True, 58: False}), ("CONFIRMED", 57))
+    check("t9.k_minus_1_required_when_k_fails", score({57: False, 58: False}),
+          ("INCOMPLETE", None))
+
+    cfg = "FP8_PRIMARY"
+    conf = {r: {56: True, 57: True, 58: False} for r in (1, 2, 3)}
+    check("t9.overall_confirmed",
+          ac.analyze(synth_cells(cfg, k, conf))["configurations"][cfg]["status"], "CONFIRMED")
+    unstable = dict(conf); unstable[3] = {56: True, 57: False, 58: False}
+    check("t9.overall_unstable",
+          ac.analyze(synth_cells(cfg, k, unstable))["configurations"][cfg]["status"], "UNSTABLE")
+    moved = {r: {56: True, 57: False, 58: False} for r in (1, 2, 3)}
+    check("t9.overall_moved",
+          ac.analyze(synth_cells(cfg, k, moved))["configurations"][cfg]["status"], "MOVED")
+    partial = {1: conf[1], 2: conf[2]}
+    check("t9.overall_not_yet",
+          ac.analyze(synth_cells(cfg, k, partial))["configurations"][cfg]["status"],
+          "NOT_YET_REPLICATED")
+
+
+def ceiling_group_case():
+    """The group must emit the whole triplet -- including the point that breaches the SLO."""
+    import shutil
+    import tempfile
+
+    cfg, port = "BF16_REFERENCE", 9899
+    # aggregate ~50 tok/s makes TPOT ~ C*20 ms, so C=1,2 meet the 50 ms SLO and C=3 does not
+    eng = StubEngine(50.0, 12)
+    serve(eng, port)
+    srv = StubServer(eng, port)
+
+    tmp = tempfile.mkdtemp(prefix="ceilingtest_")
+    saved_decode = common.WORKLOADS["DECODE_PRIMARY"]
+    saved_k = dict(rs.CEILING_REP)
+    saved_launch = rs.launch
+    saved_dir = rs.OUT_DIR
+    launches = []
+    try:
+        common.WORKLOADS["DECODE_PRIMARY"] = {"input_tokens": 8, "output_tokens": 12}
+        rs.CEILING_REP[cfg] = 2
+        rs.set_out_dir(tmp)
+        rs.launch = lambda *a, **kw: (launches.append(a) or srv)
+
+        prompts = [{"index": i, "token_ids": list(range(8)), "prefix_hash": "h%d" % i}
+                   for i in range(64)]
+        manifest = {"corpus_version": "stub", "prompt_set_hash": "stub"}
+        env = {"gpu": {}, "software": {"vllm": "stub"}}
+        kw = dict(min_requests_factor=4, window_floor_s=3.0, warmup_wall_cap_s=30.0,
+                  gate_timeout_s=30.0, hard_cap_s=90.0, warmup_lifetimes=2, min_periods=4,
+                  margin=1.5, abort_tpot_ms=None)
+
+        rs.replicate_ceiling_group(cfg, 2, env, manifest, prompts, [], None, cell_kw=kw)
+        rows = orch.read_cells(rs.CELLS)
+        check("t10.triplet_emitted", [r["concurrency"] for r in rows], [1, 2, 3])
+        check("t10.job_label", sorted({r["job"] for r in rows}), ["SWEEP_CEILING_REP"])
+        check("t10.repetition", sorted({r["repetition"] for r in rows}), [2])
+        check("t10.one_launch", len(launches), 1)
+        check("t10.breaching_point_kept",
+              [r["meets_slo"] for r in rows], [True, True, False])
+        check("t10.ceiling_recorded", sorted({r["ceiling_under_test"] for r in rows}), [2])
+
+        # resume: a second call must not re-run a cell already in the artifact
+        rs.replicate_ceiling_group(cfg, 2, env, manifest, prompts, [], None, cell_kw=kw)
+        check("t10.resume_is_idempotent", len(orch.read_cells(rs.CELLS)), 3)
+        check("t10.resume_no_relaunch", len(launches), 1)
+
+        # a failed launch must leave three explicit placeholders, not three absent cells
+        def boom(*a, **kw):
+            raise rs.LaunchError("stub launch failure")
+        rs.launch = boom
+        rs.replicate_ceiling_group(cfg, 3, env, manifest, prompts, [], None, cell_kw=kw)
+        r3 = [r for r in orch.read_cells(rs.CELLS) if r["repetition"] == 3]
+        check("t10.launch_failure_placeholders",
+              sorted(r["status"] for r in r3), ["LAUNCH_FAILED"] * 3)
+    finally:
+        common.WORKLOADS["DECODE_PRIMARY"] = saved_decode
+        rs.CEILING_REP.clear()
+        rs.CEILING_REP.update(saved_k)
+        rs.launch = saved_launch
+        rs.set_out_dir(saved_dir)
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    # the frozen serving spec must survive a selftest that mutates WORKLOADS
+    check("t10.spec_hash_unperturbed", rs.spec_hash(), "df0f0f124d987a5c")
 
 
 def main():
@@ -208,6 +333,12 @@ def main():
     check("t7.unknown_defaults_defect", driver.outcome_class("SOMETHING_NEW"), "defect")
     check("t7.skip_is_infeasible", driver.outcome_class("SKIPPED_PAST_SLO"), "infeasible")
     check("t7.steady_not_reached", driver.outcome_class("STEADY_STATE_NOT_REACHED"), "infeasible")
+
+    print("\n== T9 ceiling-replication criterion ==")
+    ceiling_criterion_cases()
+
+    print("\n== T10 ceiling-replication group against the stub engine ==")
+    ceiling_group_case()
 
     bad = [n for n, ok, _, _ in RESULTS if not ok]
     print("\n%d/%d checks passed" % (len(RESULTS) - len(bad), len(RESULTS)))

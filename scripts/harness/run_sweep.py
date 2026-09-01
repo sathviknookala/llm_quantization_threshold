@@ -8,6 +8,7 @@ either a measurement or an explicit infeasibility.
 
 import argparse
 import atexit
+import copy
 import json
 import os
 import signal
@@ -55,6 +56,19 @@ PREFILL_CELL = dict(
 KV_EXPECTED = {"BF16_REFERENCE": 44688, "FP8_PRIMARY": 97888, "FP4_PRIMARY": 120944}
 KV_TOLERANCE = {"BF16_REFERENCE": 0.01, "FP8_PRIMARY": 0.01, "FP4_PRIMARY": 0.05}
 
+# The repetition-1 SLO ceilings the replication pass re-measures. Deliberately outside SWEEP_SPEC:
+# the measurement contract is unchanged, so these cells must carry the same sweep_config_hash as
+# the cells they are compared against.
+CEILING_REP = {"BF16_REFERENCE": 21, "FP8_PRIMARY": 57, "FP4_PRIMARY": 70}
+CEILING_OFFSETS = (-1, 0, 1)
+CEILING_REPS = (2, 3)
+
+
+def ceiling_triplet(config_id):
+    k = CEILING_REP[config_id]
+    return [k + d for d in CEILING_OFFSETS]
+
+
 SWEEP_SPEC = {
     "schema_version": 3,
     "decode_ladder": DECODE_LADDER,
@@ -62,8 +76,10 @@ SWEEP_SPEC = {
     "latin": LATIN,
     "decode_cell": DECODE_CELL,
     "prefill_cell": PREFILL_CELL,
-    "workloads": common.WORKLOADS,
-    "server_controls": common.SERVER_CONTROLS,
+    # snapshots, not references: the spec is frozen at import, and a live reference let anything
+    # that mutated common.WORKLOADS move sweep_config_hash out from under the artifact
+    "workloads": copy.deepcopy(common.WORKLOADS),
+    "server_controls": copy.deepcopy(common.SERVER_CONTROLS),
     "slo_tpot_ms": common.SLO_TPOT_MS,
     "kv_expected": KV_EXPECTED,
     "kv_tolerance": KV_TOLERANCE,
@@ -340,6 +356,84 @@ def refine_slo_group(config_id, env, manifest, prompts, cells, args):
                 _LIVE.remove(srv)
 
 
+def replicate_ceiling_group(config_id, rep, env, manifest, prompts, cells, args,
+                            cell_kw=None):
+    """Re-measure the repetition-1 SLO ceiling as a confirmatory triplet.
+
+    SWEEP_REFINE_SLO produced 21 / 57 / 70 at repetition 1 only, with 0.34 ms of headroom at the
+    FP8 ceiling against a ~0.1 ms matched-cell spread. The bisection's answer is fully determined
+    by the verdicts at K and K+1, so re-running the search would only re-probe interior points;
+    the triplet K-1, K, K+1 costs less and resolves the ceiling locally if it moved by one.
+    """
+    job = "SWEEP_CEILING_REP"
+    workload = "DECODE_PRIMARY"
+    triplet = ceiling_triplet(config_id)
+    skip = orch.done_keys(CELLS)
+    todo = [C for C in triplet if (job, config_id, workload, C, rep) not in skip]
+    if not todo:
+        print(f"skip ceiling {config_id} rep{rep}: all cells present", flush=True)
+        return
+    print(f"ceiling {config_id} rep{rep}: triplet {triplet} (K={CEILING_REP[config_id]})",
+          flush=True)
+    srv = None
+    try:
+        srv = launch(config_id, rep, workload, phase="ceiling")
+    except (LaunchError, RuntimeError) as exc:
+        print(f"LAUNCH FAILED ceiling {config_id} rep{rep}: {exc}", flush=True)
+        for C in todo:
+            orch.write_placeholder(CELLS, job, config_id, manifest, env, workload, C, rep,
+                                   "LAUNCH_FAILED", {"launch_error": str(exc)[:300]})
+        if srv is not None:
+            srv.stop()
+            if srv in _LIVE:
+                _LIVE.remove(srv)
+        return
+    try:
+        for C in triplet:
+            if (job, config_id, workload, C, rep) in orch.done_keys(CELLS):
+                continue
+            if not srv.wait_drained():
+                print(f"  drain timeout before C={C}; restarting engine", flush=True)
+                srv.stop()
+                if srv in _LIVE:
+                    _LIVE.remove(srv)
+                try:
+                    srv = launch(config_id, rep, workload, phase="ceiling", warm_ok=True)
+                except (LaunchError, RuntimeError) as exc:
+                    orch.write_placeholder(CELLS, job, config_id, manifest, env, workload, C, rep,
+                                           "LAUNCH_FAILED", {"launch_error": str(exc)[:300]})
+                    return
+            # no SKIPPED_PAST_SLO here: C=K+1 is expected to breach and is the half of the
+            # evidence that places the ceiling, so the skip rule would delete the result
+            rec = orch.run_one(CELLS, job, srv, config_id, prompts, manifest, env, workload, C,
+                               rep, cell_kw or cell_kwargs(workload),
+                               extra={"sweep_config_hash": spec_hash(),
+                                      "ceiling_under_test": CEILING_REP[config_id],
+                                      "ceiling_triplet": triplet,
+                                      "engine_kv_cache_tokens": srv.startup.get("kv_cache_tokens")})
+            cells.append(rec)
+    finally:
+        if srv is not None:
+            srv.stop()
+            if srv in _LIVE:
+                _LIVE.remove(srv)
+
+
+def ceiling_dry_run(reps, configs):
+    """The phase is verifiable without spending an engine launch."""
+    n = 0
+    print(f"sweep_config_hash = {spec_hash()}  (cells carry this unchanged)\n")
+    for rep in reps:
+        for cfg in LATIN[(rep - 1) % 3]:
+            if configs and cfg not in configs:
+                continue
+            triplet = ceiling_triplet(cfg)
+            print(f"  rep{rep} {cfg:16} launch 1  C={triplet}  K={CEILING_REP[cfg]}")
+            n += len(triplet)
+    print(f"\n  {n} cells, {n // 3} launches, job=SWEEP_CEILING_REP -> {CELLS}")
+    print("  dry run: nothing launched, no cell written")
+
+
 def projected_seconds(C, tput, n_out):
     period = n_out * C / float(tput)
     return 6.5 * period + 110.0
@@ -376,28 +470,36 @@ def plan_only():
 def guard_spec():
     os.makedirs(OUT_DIR, exist_ok=True)
     h = spec_hash()
+    started = None
     if os.path.exists(MANIFEST):
-        prior = json.load(open(MANIFEST)).get("sweep_config_hash")
+        prior_manifest = json.load(open(MANIFEST))
+        prior = prior_manifest.get("sweep_config_hash")
         if prior and prior != h:
             raise SystemExit(
                 f"ABORT: SWEEP_SPEC changed ({prior} -> {h}) but {CELLS} holds cells from the "
                 f"old spec. Move results/sweep aside or restore the spec; resume must not mix.")
+        # every invocation used to restamp this, so a resume or an additive phase silently
+        # rewrote when the artifact's earliest cell was collected
+        started = prior_manifest.get("started_at")
     common.write_json(MANIFEST, {
         "artifact": "D11 serving sweep",
         "sweep_config_hash": h,
         "spec": SWEEP_SPEC,
-        "started_at": common.now_iso(),
+        "started_at": started or common.now_iso(),
+        "last_invoked_at": common.now_iso(),
     })
     return h
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--job", default="all", choices=["decode", "prefill", "refine", "refine-slo", "all"])
-    ap.add_argument("--reps", default="1,2,3")
+    ap.add_argument("--job", default="all",
+                    choices=["decode", "prefill", "refine", "refine-slo", "ceiling", "all"])
+    ap.add_argument("--reps", default="")
     ap.add_argument("--configs", default="")
     ap.add_argument("--ladder", default="")
     ap.add_argument("--plan-only", action="store_true")
+    ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--out-dir", default="")
     args = ap.parse_args()
 
@@ -407,10 +509,20 @@ def main():
     if args.out_dir:
         set_out_dir(args.out_dir)
 
+    configs = [c for c in args.configs.split(",") if c.strip()] or None
+    if args.reps:
+        reps = [int(x) for x in args.reps.split(",") if x.strip()]
+    else:
+        reps = list(CEILING_REPS) if args.job == "ceiling" else [1, 2, 3]
+
+    if args.dry_run:
+        if args.job != "ceiling":
+            raise SystemExit("--dry-run is only implemented for --job ceiling")
+        ceiling_dry_run(reps, configs)
+        return
+
     h = guard_spec()
     print(f"sweep_config_hash = {h}", flush=True)
-    reps = [int(x) for x in args.reps.split(",") if x.strip()]
-    configs = [c for c in args.configs.split(",") if c.strip()] or None
     ladder = ([int(x) for x in args.ladder.split(",")] if args.ladder else None)
     env = orch.env_identity()
 
@@ -452,6 +564,17 @@ def main():
             if configs and cfg not in configs:
                 continue
             refine_slo_group(cfg, env, manifest, prompts, orch.read_cells(CELLS), args)
+
+    # deliberately not part of "all": an additive phase over a completed artifact is run on
+    # purpose, never as a side effect of re-invoking the sweep
+    if args.job == "ceiling":
+        prompts, manifest = orch.load_prompts("DECODE_PRIMARY")
+        for rep in reps:
+            for cfg in LATIN[(rep - 1) % 3]:
+                if configs and cfg not in configs:
+                    continue
+                replicate_ceiling_group(cfg, rep, env, manifest, prompts,
+                                        orch.read_cells(CELLS), args)
 
     print("sweep phase complete", flush=True)
 

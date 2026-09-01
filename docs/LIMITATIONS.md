@@ -84,8 +84,12 @@ stated plainly:
 - **The result is a concurrency-dependent boundary for one shape**, not a workload-dependent map.
 - **The headline ceilings are unreplicated.** The 21 / 57 / 70 max-in-SLO figures come from a
   repetition-1 bisection (n=1). The n=3 ladder points bracketing them agree to <=0.22%, so the risk
-  is low, but these numbers have not been repeated and must be labelled n=1 wherever quoted.
-  Replicating the three bisections costs about nine cells.
+  is low, but these numbers have not been repeated and must be labelled n=1 wherever quoted. The
+  decisive margins are thin — C=K clears the 50 ms bound by 0.34 ms for FP8 and 0.43 ms for FP4
+  against a ~0.1 ms matched-cell spread, i.e. three to four noise widths (BF16 has 2.41 ms). The
+  replication is pre-registered as the **ceiling replication pass** in `EXPERIMENTAL_CONTRACT.md`
+  and costs 18 cells over six launches — a triplet at K-1, K, K+1 per configuration at repetitions 2
+  and 3, about 4 h. The rig is built and self-tested; **no cells have been run.**
 - **`PREFILL_PROBE`'s BF16 arm stops at C=4.** The 50 ms TPOT SLO is a decode criterion and should
   not have governed a 32-output-token shape; it fired at C=2 for BF16, so C=8 was skipped. The point
   may be KV-infeasible anyway (65,792 tokens needed against 44,688), but it is absent for a

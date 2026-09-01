@@ -217,6 +217,80 @@ job label (`SWEEP_REFINE`) so the pre-registered D11 set stays clean and the ref
 additive rather than a retroactive re-spacing. Refinement points lie below the SLO-violation point,
 so they do not interact with the skip rule.
 
+### Ceiling replication pass — pre-registered 2026-08-31, additive
+
+**Added 2026-08-31, before any cell was run.** The headline metric — maximum concurrency sustained
+within the SLO — came out of the `SWEEP_REFINE_SLO` bisection at repetition 1 only, while every
+ladder point around it is n=3. The margins are thin enough that the label matters:
+
+```text
+config   K    tpot P95 at K   margin    tpot P95 at K+1   margin
+BF16     21       47.59 ms   +2.41 ms          50.74 ms   -0.74 ms
+FP8      57       49.66 ms   +0.34 ms          50.78 ms   -0.78 ms
+FP4      70       49.57 ms   +0.43 ms          50.64 ms   -0.64 ms
+```
+
+Matched-cell TPOT P95 spread across the existing repetitions is about 0.1 ms (`results/sweep/cells.jsonl`;
+FP8 C=48 reads 40.01 / 39.95 / 39.91, FP4 C=64 reads 44.44 / 44.42 / 44.38), so FP8 and FP4 sit
+three to four noise widths from flipping and BF16 about twenty-four.
+
+**A confirmatory triplet, not a re-run of the search.** The bisection's answer is determined
+entirely by the SLO verdicts at K and K+1; re-running it would re-probe interior points
+(BF16 20; FP8 56, 60; FP4 68, 72, 80) that say nothing about the boundary. The phase measures
+
+```text
+BF16_REFERENCE   20, 21, 22
+FP8_PRIMARY      56, 57, 58
+FP4_PRIMARY      69, 70, 71        C=69 is new; repetition 1 bisected 68 -> 70
+```
+
+at **repetitions 2 and 3**, bringing the headline to the ladder's n=3. Nine cells per repetition,
+eighteen in total. One engine launch per (configuration, repetition) — H10 holds that KV capacity is
+not reproducible across launches, so launch is a variance source the replication must include rather
+than amortise across configurations. Configuration order follows the existing Latin square; cells
+ascend within a launch. Job label `SWEEP_CEILING_REP`.
+
+**`SWEEP_SPEC` is unchanged and the cells carry `sweep_config_hash = df0f0f124d987a5c`.** The
+measurement contract — workload, cell budgets, server controls, SLO — is identical to the cells
+these are compared against; only the job label and the concurrency points are new. The skip rule is
+deliberately not applied: C=K+1 is *expected* to breach the SLO and is half the evidence that places
+the ceiling, so `SKIPPED_PAST_SLO` would delete the result.
+
+**Criterion.** Per repetition, the observed ceiling `K_r` is the largest C in the triplet meeting
+the SLO, admissible only from cells with status `OK` and a non-null `meets_slo`, and only if the
+triplet's verdicts are monotone. No cell is excluded after the fact; non-OK cells are reported as
+defects or infeasibilities.
+
+```text
+per repetition
+  CONFIRMED          K meets the SLO, K+1 does not
+  MOVED_DOWN         K fails, K-1 meets the SLO -- the ceiling is K-1 in this repetition
+  UNRESOLVED_ABOVE   K+1 meets the SLO; the ceiling is above the triplet
+  UNRESOLVED_BELOW   K and K-1 both fail; the ceiling is below the triplet
+  NON_MONOTONE       more than one pass->fail transition
+  INCOMPLETE         K, or the point needed to place the ceiling, was not measured
+
+overall
+  CONFIRMED          every repetition returns K            report K at n=3
+  MOVED              every repetition agrees on K' != K    K' supersedes K
+  UNSTABLE           repetitions disagree                  report the observed range and drop
+                                                           the point estimate
+  NOT_YET_REPLICATED fewer than three usable triplets
+```
+
+`UNRESOLVED_ABOVE` records and stops rather than extending the probe set: widening the search after
+seeing the data is the retroactive re-spacing the additive-phase discipline exists to prevent. A
+wider bracket would have to be pre-registered as its own phase.
+
+Recorded but not gating: TPOT P95 and its margin to 50 ms at every point, matched-cell spread
+against repetition 1, per-launch `kv_cache_tokens` (H10), and `num_preemptions_delta`.
+
+**Reproduction.** `python3 scripts/harness/run_sweep.py --job ceiling` (add `--dry-run` to print the
+eighteen cells without launching an engine); `python3 scripts/harness/analyze_ceiling.py --write`
+applies the criterion above and writes `results/sweep/ceiling_replication.json`. The phase is
+deliberately excluded from `--job all` so an additive pass over a completed artifact is never a side
+effect of re-invoking the sweep.
+
 ### Saturation criterion
 
 Saturation is defined by an explicit SLO, not by inspection of a throughput curve:

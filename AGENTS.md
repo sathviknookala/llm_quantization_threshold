@@ -23,8 +23,9 @@ This file is the always-loaded hub. Keep detailed methodology and measured state
 **Code layout.** `scripts/harness/` is the shared measurement harness — `common.py` (identity,
 telemetry, statistics), `driver.py` (one timed cell), `server.py` (vLLM lifecycle),
 `orchestration.py` (cell identity, resume, launch preflight). `run_pilot.py` and `run_sweep.py` are
-runners over it; `analyze.py` turns pilot cells into the pilot verdict; `selftest.py` exercises the
-cell state machine against a stub engine with no GPU. Renamed from `scripts/pilot/` on 2026-08-24 —
+runners over it; `analyze.py` turns pilot cells into the pilot verdict; `analyze_ceiling.py`
+adjudicates the SLO-ceiling replication against its pre-registered criterion; `selftest.py` exercises
+the cell state machine and the ceiling phase against a stub engine with no GPU. Renamed from `scripts/pilot/` on 2026-08-24 —
 the harness outlives the pilot.
 
 `scripts/harness/quality/` is the quality arm, KL first — `positions.py` (retained-position
@@ -138,6 +139,7 @@ the number, never as a bandwidth or weight-residency benefit.
 
 ```text
 0-4. serving sweep + refinement                                DONE 2026-08-25
+4b. ceiling replication, rig built + pre-registered            READY 2026-08-31, NOT RUN
 5. quality run
    P0-P6  contract, numerics, engine lifecycle, G7, G9         DONE 2026-08-25
    P7     64 BF16 trajectories frozen                          DONE 2026-08-26
@@ -233,8 +235,12 @@ inspected the implementation before any GPU time.
 - **Seeded generation is not replayable** — 51 of 64, earliest divergence at token 3. Reproduction
   goes through the tracked `trajectories.json` and its hash, never by rerunning generation.
 - **Every quality figure so far is n=4 and is not a result.** The smoke exists to validate the rig.
-- **The refined serving ceilings are still n=1** (21 / 57 / 70). Replicating the three bisections is
-  ~9 cells and is the first thing to do before quoting them.
+- **The refined serving ceilings are still n=1** (21 / 57 / 70) and the margins are thin: C=K clears
+  the 50 ms bound by 0.34 ms (FP8) and 0.43 ms (FP4) against a ~0.1 ms matched-cell spread, three to
+  four noise widths; BF16 has 2.41 ms. The **ceiling replication pass** is pre-registered in
+  `EXPERIMENTAL_CONTRACT.md` and the rig is built, self-tested and dry-run — 18 cells, 6 launches,
+  ~4 h, triplets at K-1/K/K+1 for repetitions 2 and 3, job `SWEEP_CEILING_REP`, run with
+  `run_sweep.py --job ceiling` and adjudicated by `analyze_ceiling.py`. **No cells have been run.**
 - **`PREFILL_PROBE` inherited the decode SLO** and lost BF16's C=8 point; it needs a TTFT-based
   criterion before it is re-run.
 - **The below-wall throughput gap is unattributed**, and that is a settled position.
