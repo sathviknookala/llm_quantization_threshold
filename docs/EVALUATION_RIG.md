@@ -693,6 +693,45 @@ Use paired examples whenever possible. Quantify uncertainty on aggregate KL, per
 
 Calibration-dependent methods should separate calibration-draw variation from evaluation-sample uncertainty where the experiment supports doing so.
 
+### Reference run-to-run variation — the quality analogue, PROPOSED 2026-09-12, not adopted
+
+The serving clause below says not to treat thousands of requests inside one benchmark process as
+thousands of independent hardware experiments when the dominant noise is at the run level. The
+quality axis has the same hazard on the **reference** side and has had no clause for it: an
+independent BF16 launch produces a different reference distribution, and the locked analysis
+conditions on whichever launch happened to run.
+
+The proposed treatment — `scripts/harness/quality/launch_variance.py`, registered as a fourth
+disposition in `DECISIONS.md` D13 and **not adopted** — is:
+
+```text
+Y_{r,t} = mu + A_r + S_t + E_{rt}      Y = mean over the ten retained positions
+  A_r   BF16 SCORING launch            the nuisance component
+  S_t   trajectory                     the locked resampling unit, unchanged
+  E_rt  launch x trajectory            confounded with the three-way term; NOT replicate error
+```
+
+Four rules travel with it, each forced by a measured property of the data:
+
+- **The floor is never subtracted from a reported KL.** It is a spread, not a bias, and `KL(B||Q)`
+  and `KL(B||B')` are different functionals of the same perturbation — first order and second order
+  respectively. Magnitudes are compared side by side; nothing is differenced.
+- **Position is a FIXED factor.** Ten pre-registered strided levels, not a sample. Its within-cell
+  spread is not an error term. Averaging within trajectory first is therefore correct, and
+  per-position variance components are not estimable — raw KL cells have kurtosis ~45, an effective
+  df near 5% of nominal.
+- **A variance component with 2–3 df is reported as a one-sided upper bound**, with the untruncated
+  moment estimate beside it. `max(0, ·)` would report `0.0` about 63% of the time under a null and
+  read as "no launch effect".
+- **A pairwise floor is a U-statistic over launches, not R(R-1) levels.** Its uncertainty comes
+  from a delete-one-launch jackknife; the naive over-pairs SE understates it 3.2x.
+
+The pre-registered bootstrap is untouched — draws, seed, unit and shared index matrix all stand —
+but note that a bootstrap over *launch-averaged* trajectory means estimates
+`(sigma2_S + sigma2_E/R)/T` while the committed single-launch intervals estimate
+`(sigma2_S + sigma2_E)/T`. **These are different estimands and no comparability between them is
+claimed.**
+
 ## Serving
 
 Estimate run-to-run variation from repeated benchmark runs under the locked contract. Do not treat thousands of requests inside one benchmark process as thousands of independent hardware experiments if the dominant noise occurs at the run level.

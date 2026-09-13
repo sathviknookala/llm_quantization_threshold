@@ -815,7 +815,11 @@ Extended 2026-08-25 for the KL rig. A run is also invalid if:
 - dispatch verification does not reproduce the configuration's expected kernel, or a forbidden
   fallback pattern appears;
 - distributions collected under different observed engine identities are pooled within one
-  configuration;
+  configuration — note that `engine_identity_hash` is a **configuration** identity, hashing only
+  deterministic properties, so it cannot distinguish two launches and matching it is not evidence
+  that they are independent. Repeated launches of one engine identity may be combined at the
+  **KL-value** level, as a repeated-measure factor, and never at the **distribution** level:
+  pooling the logit matrices builds a reference no launch produced (see `DECISIONS.md` D13);
 - the persisted storage dtype differs from the one the run contracted for;
 - the working tree was dirty and the override was not explicitly requested and recorded;
 - the returned distribution is not the full vocabulary, is not finite, or does not normalise within

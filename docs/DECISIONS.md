@@ -840,6 +840,80 @@ an averaged reference computes to 6.99e-05 and is recorded in the artifact as **
 because choosing a reference after seeing which one passes is exactly what pre-registration exists to
 prevent.
 
+### A fourth disposition, PROPOSED and not adopted — BF16 launch identity as a nuisance variance component (2026-09-12)
+
+**Status:** OPEN. Built, reviewed and measured on existing artifacts;
+`scripts/harness/quality/launch_variance.py`, `results/quality/launch_variance.json`. **Nothing in
+the P13 analysis contract changes until this is adopted, and it has not been.**
+
+The three dispositions above all treat the floor as a fixed property to accept, route around, or
+average away. This one treats **which BF16 launch ran** as a repeated-measure factor and propagates
+it into the uncertainty, leaving the reported KL unsubtracted. The estimand is
+`E_r[KL(B_r || Q)]` — the divergence a randomly drawn BF16 launch of the locked `graph_2048` profile
+exhibits.
+
+**It is disposition 1 with the limit quantified, not disposition 3 in disguise.** The barred
+averaged reference pools the *logit matrices* into a distribution no launch produced; KL is convex
+in its first argument, so by Jensen that pool is *provably smaller* than the launch-averaged KL, and
+it measures 0.335x the floor — which is why it would rescue G2'. This averages *KL values* against
+real launches, constructs no new distribution, and moves G2' **the wrong way for anyone shopping for
+a pass**: the floor's share of the BF16→FP8 signal goes **5.65% → 6.00%** (R=3), worse. BF16→FP4
+goes 0.708% → 0.692% and still passes. No failure becomes a pass.
+
+**It cannot fix G2', and that is a structural fact rather than a sample-size one.** In the Fisher
+metric the floor `KL(B_a||B_b)` is *second order* in the launch perturbation while `KL(B_r||Q)` is
+*first order* in it. Averaging R launches shrinks the first-order nuisance by `sqrt(R)` and leaves
+the second-order floor untouched. No value of R moves the G2' ratio toward a pass.
+
+**What is measured, and at what scale.** The BF16↔BF16 arm is production scale (64 trajectories, 640
+cells, 3 launches). The BF16→FP8/FP4 arm is **n=4 trajectories and is not a result** — FP8 and FP4
+full-vocabulary distributions exist only on the P10 smoke's four trajectories, and producing more is
+P13. The deliverable is the estimator, its tests, and its behaviour on real artifacts.
+
+**What review changed.** Two reviewers, and both changed the design materially:
+
+- The launch effect is **not separable** from the launch×trajectory interaction at this scale —
+  `F = 1.48` (FP8) and `2.03` (FP4) on (2,6) df. The spread of per-launch headlines,
+  `sqrt(sigma2_A + sigma2_E/T)`, is **not** `sigma_A`; quoting it as such overstated the launch
+  effect by 1.8x. Corrected.
+- A truncated `max(0, ·)` variance component would report exactly `0.0` about 63% of the time under
+  a null launch effect — and already did at 5 of 10 positions (FP8) and 7 of 10 (FP4). The point
+  estimate is now reported untruncated beside a **one-sided 95% upper bound**, which is the only
+  honest summary at 2 df.
+- The floor's own uncertainty was understated **3.2x** by treating six ordered pairs from three
+  launches as six independent levels. They are a U-statistic over launches carrying `R-1 = 2` df. A
+  delete-one-launch jackknife puts the production floor at **2.084e-04 with a 95% interval of
+  [1.16e-04, 3.01e-04]** — so "5.6% of the FP8 signal" is really a range, and the superseded n=4
+  figure of 2.984e-04 sits **inside** it.
+- Per-position variance components are **not estimable**: raw KL cells have kurtosis ~45, giving an
+  effective df around 5% of nominal. They are no longer reported. Position is a *fixed* factor —
+  ten pre-registered strided levels — so averaging within trajectory first is correct and loses
+  nothing.
+- A dominance count was dropped: it is identically the sign test on the contrast it claimed not to
+  compute, it is 4/4 wherever defined, and its null is not a proposition anyone holds.
+
+**The materially better formulation, and the thing to pre-register before P13.** The first-order
+argument predicts `SD_launch = sigma_proj * sqrt(2 * signal)`. Measured, `sigma_proj` is
+**2.05e-03 (FP8) and 2.11e-03 (FP4)** — agreeing to 3% across configurations whose signals differ by
+8.6x. Pooling that single coupling constant across configurations and positions buys degrees of
+freedom that no per-configuration estimate at R=3 can. It also yields a falsifiable prediction —
+launch CV ≈5% for FP8 and ≈1.8% for FP4 at production scale — which, registered before P13, turns
+P13 into a test of the nuisance model rather than a first look at it.
+
+**A reporting consequence that is not optional.** For **FP4 the launch SD (5.18e-04) exceeds the
+floor (2.08e-04) by 2.5x**, while for FP8 it is below it. The floor ratio and the launch nuisance
+are different diagnostics and their ordering *flips* between the two configurations, so "BF16→FP4
+sits 141x above the floor" understates the launch nuisance there by a factor of ~2.5.
+
+**Before adoption, three things must be settled.** (1) Whether the estimate is admitted at all
+beside the locked headline — `EVALUATION_RIG.md` A.1 keeps the single-reference 64-trajectory mean
+as the point estimate, and the artifact is named so it can never be mistaken for it. (2) Whether
+BF16 launches are added at P13, and how many: the projection says launch identity would carry ~10%
+(FP8) and ~15% (FP4) of the headline variance at `R=1`, falling to ~3–6% at `R=3`. (3) Whether the
+P10 smoke's BF16 launch may be pooled as a fourth realization — **it is excluded by default**, since
+its 40-context grid is perfectly confounded with launch identity for that one level, and it lands at
+rank 4 of 4 on FP8 and rank 1 of 4 on FP4.
+
 **Historical prototypes, superseded.** `scripts/logits_probe.py` (synthetic contexts, one position)
 and `scripts/compute_kl.py` (single-position qualification artifact layout, epsilon floor inside the
 logarithm) produced the feasibility evidence cited above and are retained byte-unchanged so that

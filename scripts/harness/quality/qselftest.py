@@ -642,14 +642,14 @@ REAL_MANIFEST_ROOTS = ("smoke", "floor64/launch1", "floor64/launch2", "floor64/l
                        "gates/engine_profile")
 
 
-def _raises_msg(name, fn, sub):
+def _raises_msg(name, fn, sub, exc=SystemExit):
     try:
         fn()
-    except SystemExit as e:
+    except exc as e:
         return check(f"{name} [{sub}]", sub in str(e), True)
     except Exception as e:  # noqa: BLE001
-        return check(name, f"raised {type(e).__name__}", "SystemExit")
-    return check(name, "no raise", "SystemExit")
+        return check(name, f"raised {type(e).__name__}", exc.__name__)
+    return check(name, "no raise", exc.__name__)
 
 
 def _fingerprint(path):
@@ -797,18 +797,380 @@ def test_collect_manifest_plumbing(tmp):
           run(fresh_root)["manifest_keys_adopted"], [])
 
 
+def _lv_panel(R, T, sd_a, sd_s, sd_e, seed, base=1e-3):
+    """A (launch, trajectory, 1) panel with KNOWN variance components."""
+    rng = np.random.default_rng(seed)
+    a = rng.normal(0, sd_a, size=R)[:, None]
+    st = rng.normal(0, sd_s, size=T)[None, :]
+    e = rng.normal(0, sd_e, size=(R, T))
+    return (base + a + st + e)[:, :, None]
+
+
+def test_launch_variance_math():
+    print("launch variance: the decomposition")
+    from harness.quality import launch_variance as LV
+
+    # hand oracle: a pure launch effect, no trajectory or residual structure
+    Y = np.array([[1.0, 1.0, 1.0, 1.0], [3.0, 3.0, 3.0, 3.0]])
+    a = LV.crossed_anova(Y)
+    check("a pure level effect leaves zero residual", round(a["ms_residual"], 15), 0.0)
+    check("a pure level effect leaves zero trajectory variance", a["var_trajectory_moment"], 0.0)
+    close("MS_level oracle: T*sum((lvl-gm)^2)/(R-1) = 4*(1+1)/1", a["ms_level"], 8.0, 1e-12)
+    close("sigma2_level oracle: (MS_A - MS_E)/T = 8/4", a["var_level_moment"], 2.0, 1e-12)
+    close("the ANOVA-unbiased Var(theta) is (MS_A+MS_S-MS_E)/(RT)",
+          a["var_theta_anova"], (a["ms_level"] + a["ms_trajectory"] - a["ms_residual"]) / 8.0,
+          1e-15)
+
+    Y = np.array([[1.0, 3.0, 5.0], [1.0, 3.0, 5.0]])
+    a = LV.crossed_anova(Y)
+    check("a pure trajectory effect leaves zero level variance", a["var_level_moment"], 0.0)
+    close("a pure trajectory effect recovers the trajectory variance",
+          a["var_trajectory_moment"], float(np.var([1.0, 3.0, 5.0], ddof=1)), 1e-12)
+
+    print("launch variance: components recovered from a known panel")
+    R, T = 6, 40
+    ests = []
+    for seed in range(60):
+        a = LV.crossed_anova(_lv_panel(R, T, 3e-4, 8e-4, 2e-4, seed).mean(axis=2))
+        ests.append([a["var_level_moment"], a["var_trajectory_moment"], a["var_residual"]])
+    m = np.array(ests).mean(axis=0)
+    for name, got, want in (("sigma2_launch", m[0], 3e-4 ** 2),
+                            ("sigma2_trajectory", m[1], 8e-4 ** 2),
+                            ("sigma2_residual", m[2], 2e-4 ** 2)):
+        rel = abs(got - want) / want
+        check(f"{name} is recovered unbiased over 60 panels (rel err {rel:.1%})", rel < 0.15, True)
+
+    print("launch variance: Var(theta) = var_launch + var_bootstrap, measured")
+    # the orthogonality claim: the spread of theta over independent panels must equal the sum the
+    # estimator reports. A double-count or an omission shows up here as a ratio away from 1.
+    idx = K.bootstrap_indices(T, 4000, 20260825)
+    thetas, reported, launch_only = [], [], []
+    for seed in range(120):
+        panel = _lv_panel(R, T, 3e-4, 8e-4, 2e-4, 1000 + seed)
+        rec, _, _ = LV.decompose(panel, idx, "sim")
+        thetas.append(rec["expected_kl_over_launches_nats"])
+        reported.append(rec["combined"]["bootstrap_plus_launch"]["se_point_nats"] ** 2)
+        launch_only.append(max(0.0, rec["launch_component"]["var_launch_point"]))
+    empirical = float(np.var(thetas, ddof=1))
+    ratio = float(np.mean(reported) / empirical)
+    check(f"reported Var(theta) matches the empirical spread (ratio {ratio:.2f})",
+          0.75 < ratio < 1.35, True)
+    # the launch term is load-bearing: the bootstrap alone understates the spread
+    boot_only = float(np.mean(reported)) - float(np.mean(launch_only))
+    check(f"the trajectory bootstrap alone understates Var(theta) "
+          f"(ratio {boot_only / empirical:.2f})", boot_only / empirical < 0.85, True)
+
+    print("launch variance: no component is truncated, and the bound is one-sided")
+    # under sigma2_A = 0 the moment estimate is negative ~63% of the time; a max(0,.) point
+    # estimate would report 0.0 more often than not and read as `no launch effect`
+    neg = sum(int(LV.crossed_anova(_lv_panel(3, 64, 0.0, 5e-4, 5e-4, s).mean(axis=2))
+                  ["var_level_moment"] < 0) for s in range(200))
+    check(f"a null launch effect gives a negative moment estimate in {neg}/200 panels",
+          0.5 < neg / 200 < 0.75, True)
+    a = LV.crossed_anova(_lv_panel(3, 64, 0.0, 5e-4, 5e-4, 5).mean(axis=2))
+    check("the moment component is reported untruncated", "var_level_moment" in a, True)
+    check("negativity is flagged rather than clamped away",
+          a["moment_components_may_be_negative"], True)
+    check("the one-sided upper bound is positive even when the moment estimate is not",
+          a["var_level_upper_95"] > 0, True)
+    close("upper bound oracle: MS_A*(R-1)/(T*chi2_{0.05,2}) with chi2 = 0.1025865887",
+          a["var_level_upper_95"], a["ms_level"] * 2 / (64 * 0.1025865887), 1e-15)
+    check("the upper bound always dominates the moment estimate",
+          a["var_level_upper_95"] > a["var_level_moment"], True)
+    check("chi2 lookup takes the next smaller df (widens the bound)",
+          LV.chi2_lower_005(2.9), LV.chi2_lower_005(2))
+
+    print("launch variance: a non-negative quantity never reports a negative bound")
+    ci = LV._nonneg_ci(1e-4, 5e-4, 4.30265272991)
+    check("a lower end below zero is clamped", ci["ci_95"][0], 0.0)
+    check("the raw value is kept beside it", ci["ci_95_raw"][0] < 0, True)
+    check("the clamp is flagged", ci["ci_95_lower_clamped"], True)
+    check("an interval that stays positive is not clamped",
+          LV._nonneg_ci(1e-3, 1e-5, 2.0)["ci_95_lower_clamped"], False)
+
+    print("launch variance: degrees of freedom and critical values")
+    check("t crit at 2 df is the Student value, not 1.96",
+          round(LV.t_crit_975(2), 6), 4.302653)
+    check("a fractional df takes the next SMALLER tabulated df (conservative)",
+          LV.t_crit_975(2.9), LV.t_crit_975(2))
+    check("t crit is monotone decreasing in df", LV.t_crit_975(3) < LV.t_crit_975(2), True)
+    check("large df reaches the normal limit", round(LV.t_crit_975(500), 3), 1.96)
+    check("df below 1 has no critical value", LV.t_crit_975(0.5), None)
+    close("Satterthwaite of one component returns that component's df",
+          LV._satterthwaite(4.0, 7, 0.0, 3), 7.0, 1e-12)
+    check("Satterthwaite of two zero components is undefined",
+          LV._satterthwaite(0.0, 7, 0.0, 3), None)
+
+    print("launch variance: the estimator is a strict generalisation")
+    panel = _lv_panel(1, 8, 0.0, 8e-4, 2e-4, 9)
+    rec, _, _ = LV.decompose(panel, K.bootstrap_indices(8, 2000, 20260825), "R=1")
+    close("R=1 reproduces the pre-registered headline exactly",
+          rec["expected_kl_over_launches_nats"], K.headline(panel[0]), 1e-18)
+    check("R=1 reports the launch component as absent, not as zero",
+          rec["launch_component"]["se_launch_nats_point"], None)
+    check("R=1 says the launch variance is not included",
+          rec["combined"]["launch_variance_included"], False)
+    check("R=1 says the uncertainty decomposition does not exist, not that it is zero",
+          "does not exist" in rec["launch_component"]["not_estimable_because"], True)
+    close("R=1 total SE is exactly the bootstrap SE",
+          rec["combined"]["bootstrap_plus_launch"]["se_point_nats"],
+          rec["trajectory_component"]["se_trajectory_nats"], 1e-18)
+    raises("a decomposition of one level refuses",
+           lambda: LV.crossed_anova(np.array([[1.0, 2.0, 3.0]])), LV.LaunchDesignError)
+    raises("a decomposition of one trajectory refuses",
+           lambda: LV.crossed_anova(np.array([[1.0], [2.0]])), LV.LaunchDesignError)
+    raises("a non-3D cell stack refuses",
+           lambda: LV.decompose(np.zeros((3, 4)), idx, "bad"), LV.LaunchDesignError)
+
+    print("launch variance: no floor is subtracted from the estimate")
+    panel = _lv_panel(4, 8, 3e-4, 8e-4, 2e-4, 21)
+    i8 = K.bootstrap_indices(8, 2000, 20260825)
+    plain, _, _ = LV.decompose(panel, i8, "plain")
+    withfloor, _, _ = LV.decompose(panel, i8, "withfloor", floor_nats=5e-4)
+    check("passing a floor does not move the point estimate",
+          plain["expected_kl_over_launches_nats"], withfloor["expected_kl_over_launches_nats"])
+    check("passing a floor does not move the total SE",
+          plain["combined"]["bootstrap_plus_launch"]["se_point_nats"],
+          withfloor["combined"]["bootstrap_plus_launch"]["se_point_nats"])
+    check("the record states the floor was not subtracted", withfloor["floor_subtracted"], False)
+    close("the estimate is the mean of the per-launch headlines",
+          plain["expected_kl_over_launches_nats"],
+          float(np.mean([K.headline(panel[r]) for r in range(4)])), 1e-15)
+
+
+def test_launch_variance_estimators(tmp):
+    print("launch variance: the ANOVA-unbiased total and its df")
+    from harness.quality import launch_variance as LV
+    R, T = 6, 40
+    idx = K.bootstrap_indices(T, 4000, 20260825)
+    panel = _lv_panel(R, T, 3e-4, 8e-4, 2e-4, 77)
+    a = LV.crossed_anova(panel.mean(axis=2))
+    close("Var(theta) collapses to (MS_A+MS_S-MS_E)/(RT)", a["var_theta_anova"],
+          (a["ms_level"] + a["ms_trajectory"] - a["ms_residual"]) / (R * T), 1e-18)
+    close("and equals sA/R + sS/T + sE/(RT) from the moment components",
+          a["var_theta_anova"],
+          a["var_level_moment"] / R + a["var_trajectory_moment"] / T + a["var_residual"] / (R * T),
+          1e-18)
+    check("the Satterthwaite df is finite and no larger than the total observations",
+          0 < a["df_theta_satterthwaite"] <= R * T, True)
+    check("the expected mean squares are stated in the record",
+          "sigma2_{AxS}" in a["expected_mean_squares"]["E[MS_residual]"], True)
+
+    print("launch variance: the interval is scaled, not rebuilt symmetrically")
+    rec, _, _ = LV.decompose(panel, idx, "scale")
+    bp = rec["combined"]["bootstrap_plus_launch"]
+    b = rec["trajectory_component"]["bootstrap"]
+    theta = rec["expected_kl_over_launches_nats"]
+    lo_asym = (theta - b["ci_low"]) / (b["ci_high"] - theta)
+    lo_asym2 = (theta - bp["ci_point"][0]) / (bp["ci_point"][1] - theta)
+    close("scaling preserves the percentile interval's asymmetry", lo_asym2, lo_asym, 1e-9)
+    check("the scaled interval is wider than the bootstrap interval",
+          bp["ci_point"][1] - bp["ci_point"][0] > b["ci_high"] - b["ci_low"], True)
+    check("the 95%-upper-bound interval is wider still",
+          bp["ci_upper_95"][1] - bp["ci_upper_95"][0] > bp["ci_point"][1] - bp["ci_point"][0], True)
+    check("no comparability with the committed single-launch bootstrap is claimed",
+          "NOT the same interval" in
+          rec["trajectory_component"]["different_estimand_from_committed_artifacts"], True)
+
+    print("launch variance: the first-order scaling law")
+    # SD_launch = sigma_proj * sqrt(2*signal): a signal 100x larger must move the SD 10x, not 100x
+    sl_small = LV.scaling_law(1e-3, 2.0e-3 * np.sqrt(2e-3))
+    sl_big = LV.scaling_law(1e-1, 2.0e-3 * np.sqrt(2e-1))
+    close("sigma_proj is invariant to the signal it was measured at",
+          sl_big["sigma_proj"], sl_small["sigma_proj"], 1e-12)
+    close("a 100x signal predicts a 10x launch SD, not a 100x one",
+          sl_big["sd_launch_headlines_nats"] / sl_small["sd_launch_headlines_nats"], 10.0, 1e-9)
+    check("the law records that its input is not sigma_A",
+          "NOT sigma_A" in sl_small["caution"], True)
+    check("a zero signal yields no law", LV.scaling_law(0.0, 1e-4), None)
+
+    print("launch variance: per position reports no variance components")
+    bypos = LV.by_position(panel[:, :, :1].repeat(10, axis=2), K.bootstrap_indices(T, 500, 1),
+                           floor_by_position={str(p): 1e-4 for p in P.RETAINED_POSITIONS},
+                           sigma_proj=2.0e-3)
+    check("every retained position is present", sorted(bypos, key=int),
+          [str(p) for p in P.RETAINED_POSITIONS])
+    one = bypos["512"]
+    check("no per-position variance components are reported", one["variance_components"], None)
+    check("the omission carries its reason",
+          "not estimable" in one["variance_components_omitted_because"], True)
+    check("the per-launch spread is labelled as not sigma_A",
+          "not sigma_A" in one["launch_spread_nats"]["sd_is_not_sigma_A"], True)
+    close("the predicted launch SD follows the pooled law",
+          one["scaling_law_predicted_launch_sd_nats"],
+          2.0e-3 * np.sqrt(2 * one["expected_kl_over_launches_nats"]), 1e-15)
+    check("the per-position floor is the production one, and says so",
+          "production" in one["floor_source"], True)
+
+    print("launch variance: the direction it moves a failed bound must be establishable")
+    import json as _json
+    smoke_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__))))), "results", "quality", "smoke")
+    got = LV._check_committed("BF16||FP8", None, smoke_dir)
+    check("the committed headline is read even when its launch is not in the set",
+          got["committed_headline_nats"], 3.6897120485158315e-03)
+    check("and the record says it was not recomputed", got["recomputed_bit_identical"], None)
+    check("a recomputation that matches is marked bit-identical",
+          LV._check_committed("BF16||FP8", 3.6897120485158315e-03,
+                              smoke_dir)["recomputed_bit_identical"], True)
+    _raises_msg("a recomputation that drifts from the tracked artifact aborts",
+                lambda: LV._check_committed("BF16||FP8", 3.7e-03, smoke_dir),
+                "differs from the one", LV.LaunchDesignError)
+    _raises_msg("an absent committed artifact aborts rather than skipping the direction",
+                lambda: LV._check_committed("BF16||FP8", None, os.path.join(tmp, "nope")),
+                "could not be stated", LV.LaunchDesignError)
+
+    print("launch variance: the floor's launch-level jackknife")
+    # three launches, one of them displaced: the pair spread understates the launch spread
+    per_pair = {"L1||L2": 1.0e-4, "L2||L1": 1.0e-4, "L1||L3": 3.0e-4,
+                "L3||L1": 3.0e-4, "L2||L3": 3.0e-4, "L3||L2": 3.0e-4}
+    jk = LV.floor_launch_ci(per_pair, 3)
+    close("the point is the mean over ordered pairs", jk["point_nats"],
+          float(np.mean(list(per_pair.values()))), 1e-15)
+    check("the jackknife carries R-1 df, not R(R-1)-1", jk["df"], 2)
+    check("the jackknife SE exceeds the naive over-pairs SE",
+          jk["se_launch_level_nats"] > jk["naive_se_over_ordered_pairs_nats"], True)
+    raises("a floor whose pairs name a different launch count aborts",
+           lambda: LV.floor_launch_ci(per_pair, 4), LV.LaunchDesignError)
+
+
+def test_launch_variance_guards(tmp):
+    print("launch variance: exchangeability preconditions must abort")
+    from harness.quality import launch_variance as LV
+
+    def meta(n=4, **over):
+        base = []
+        for i, name in enumerate(("A", "B", "C")):
+            rec = {"launch": name, "root": f"root{i}", "n_trajectories": 64,
+                   "cells": [{"trajectory_index": 0, "position_p": 1}],
+                   "summary": {"config_id": "BF16_REFERENCE", "launched": True,
+                               "timestamp": f"2026-08-26T00:0{i}:00-0400",
+                               "git": {"git_head": f"{i}" * 40, "git_dirty": False},
+                               "engine_identity_hash": "eng", "n_trajectories": 64,
+                               "engine_metrics": {"vllm:prefix_cache_queries": 100,
+                                                  "vllm:prefix_cache_hits": 75},
+                               "provenance": {"kl_spec_hash": "spec", "trajectory_set_hash": "tsh",
+                                              "contexts_hash": "ctx" + str(i) + "0" * 16,
+                                              "subset_n": 64,
+                                              "checkpoint_content_hash": "ckpt",
+                                              "tokenizer_identity": {"tokenizer.json": "tok"},
+                                              "engine_profile_name": "graph_2048",
+                                              "storage_dtype": "float32",
+                                              "retained_positions": list(P.RETAINED_POSITIONS)}}}
+            base.append(rec)
+        for k, v in over.items():
+            target, field = k.split(":", 1)
+            m = next(r for r in base if r["launch"] == target)
+            if field in m["summary"]["provenance"]:
+                m["summary"]["provenance"][field] = v
+            else:
+                m["summary"][field] = v
+        return base
+
+    ok = LV.check_exchangeability(meta(), 4)
+    check("a clean set of launches passes", ok["n_launches"], 3)
+    check("the precondition record names what it verified",
+          "trajectory_set_hash" in ok["identities_verified"], True)
+    check("the precondition record carries the prefix-cache hit rate",
+          ok["prefix_cache"]["A"]["hit_rate"], 0.75)
+    check("a set of launches with no matrices claims no content distinctness",
+          ok["content_distinct"], False)
+    check("the record names the keys that cannot match by construction",
+          sorted(ok["keys_that_cannot_match_by_construction"]),
+          ["contexts_hash", "subset_n", "substitute"])
+    check("the record says engine_identity_hash is not a launch nonce",
+          "cannot distinguish" in ok["engine_identity_hash_is_not_a_launch_nonce"], True)
+    check("the record carries the session confound", "SESSION" in ok["session_confound"], True)
+
+    print("launch variance: byte-identical launches are the same run twice")
+    same = np.zeros((4, 3))
+    raises("two launches with byte-identical matrices abort",
+           lambda: LV.check_exchangeability(
+               meta(), 4, mats={"A": same, "B": same, "C": same + 1.0}),
+           LV.LaunchDesignError)
+    distinct = LV.check_exchangeability(
+        meta(), 4, mats={"A": same, "B": same + 1.0, "C": same + 2.0})
+    check("distinct matrices pass and record their digests",
+          [distinct["content_distinct"], len(set(distinct["matrix_sha256"].values()))], [True, 3])
+
+    for field, bad in (("kl_spec_hash", "other-spec"),
+                       ("trajectory_set_hash", "other-set"),
+                       ("checkpoint_content_hash", "other-ckpt"),
+                       ("engine_profile_name", "eager_2048"),
+                       ("storage_dtype", "float16"),
+                       ("engine_identity_hash", "other-eng")):
+        raises(f"a launch differing on {field} aborts",
+               lambda f=field, b=bad: LV.check_exchangeability(meta(**{f"C:{f}": b}), 4),
+               LV.LaunchDesignError)
+    raises("a launch that reused its shards rather than rescoring aborts",
+           lambda: LV.check_exchangeability(meta(**{"C:launched": False}), 4),
+           LV.LaunchDesignError)
+    raises("two launches sharing a collection timestamp abort",
+           lambda: LV.check_exchangeability(
+               meta(**{"C:timestamp": "2026-08-26T00:00:00-0400"}), 4),
+           LV.LaunchDesignError)
+    bad_cells = meta()
+    bad_cells[2]["cells"] = [{"trajectory_index": 1, "position_p": 1}]
+    raises("a launch scored on different cells aborts",
+           lambda: LV.check_exchangeability(bad_cells, 4), LV.LaunchDesignError)
+
+    print("launch variance: the grid-regime check refuses to pool when it should")
+    rng = np.random.default_rng(4)
+    vocab = 24
+    def norm(x):
+        return x - np.log(np.exp(x).sum(axis=1, keepdims=True))
+    base = rng.normal(0, 1, size=(40, vocab))
+    mats = {"F1": norm(base + rng.normal(0, 1e-3, base.shape)),
+            "F2": norm(base + rng.normal(0, 1e-3, base.shape)),
+            "F3": norm(base + rng.normal(0, 1e-3, base.shape))}
+    mats["S"] = norm(base + rng.normal(0, 1e-3, base.shape))
+    # the criterion must ACCEPT under its own null: an exchangeable smoke launch, over many draws
+    pooled = 0
+    for seed in range(40):
+        r2 = np.random.default_rng(100 + seed)
+        b2 = r2.normal(0, 1, size=(40, vocab))
+        m2 = {k: norm(b2 + r2.normal(0, 1e-3, b2.shape)) for k in ("F1", "F2", "F3", "S")}
+        pooled += int(not LV.regime_check(m2, ["F1", "F2", "F3", "S"], 4)["gross_regime_effect"])
+    check(f"an exchangeable smoke launch pools in {pooled}/40 draws (the null must not be rejected)",
+          pooled >= 38, True)
+    mats["S"] = norm(base + rng.normal(0, 5e-2, base.shape))
+    bad = LV.regime_check(mats, ["F1", "F2", "F3", "S"], 4)
+    check("a smoke launch far outside the within-regime spread does NOT pool",
+          bad["gross_regime_effect"], True)
+    check("the refusing verdict says not to pool", "DO NOT pool" in bad["verdict"], True)
+    check("the odd launch ranks first on leverage when it is genuinely odd",
+          bad["leverage_rank_of_odd_launch"], 1)
+    check("the record states the rank test cannot reach 0.05 at four launches",
+          bad["rank_p_value_floor"], 0.25)
+    check("no regime check without a smoke launch",
+          LV.regime_check(mats, ["F1", "F2", "F3"], 4), None)
+
+    print("launch variance: BF16->BF16 reports no launch variance component")
+    phi = LV.bf16_to_bf16(mats, ["F1", "F2", "F3"], 4,
+                          K.bootstrap_indices(4, 500, 20260825))
+    check("all ordered pairs are reported", phi["ordered_pairs"], 6)
+    check("no variance component is claimed over dependent pairs",
+          "no_variance_component_reported_because" in phi, True)
+    check("each launch's leverage is reported", sorted(phi["launch_leverage_nats"]),
+          ["F1", "F2", "F3"])
+    check("G2' is named as unchanged", "unchanged" in phi["relationship_to_G2_prime"], True)
+
+
 def main():
     import tempfile
     tests = [test_positions, test_kl_math, test_bootstrap, test_completeness,
              test_floor_reporting, test_analysis_verification, test_collection_contract,
              test_resume_provenance, test_floor_loading, test_analysis_floor_plumbing,
              test_spec_hash, test_observed_identity, test_freeze_guard,
-             test_manifest_adoption, test_collect_manifest_plumbing]
+             test_manifest_adoption, test_collect_manifest_plumbing,
+             test_launch_variance_math, test_launch_variance_estimators,
+             test_launch_variance_guards]
     if os.environ.get("QSELFTEST_ONLY"):
         want = os.environ["QSELFTEST_ONLY"]
         tests = [t for t in tests if want in t.__name__]
     needs_tmp = {"test_floor_loading", "test_analysis_floor_plumbing", "test_freeze_guard",
-                 "test_manifest_adoption", "test_collect_manifest_plumbing"}
+                 "test_manifest_adoption", "test_collect_manifest_plumbing",
+                 "test_launch_variance_guards", "test_launch_variance_estimators"}
     with tempfile.TemporaryDirectory(prefix="qselftest-") as tmp:
         for t in tests:
             t(tmp) if t.__name__ in needs_tmp else t()

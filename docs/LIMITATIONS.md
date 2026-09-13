@@ -240,6 +240,24 @@ difference of a few nanonats reads as many multiples of the floor while being nu
 Every comparison here reports the absolute nats first and the ratio as a reproducibility diagnostic;
 "above the replication floor" means reproducible, not important.
 
+**The floor itself is a range, not a point** (measured 2026-09-12). The production figure is a mean
+over six ordered launch pairs, but six pairs from three launches are a U-statistic carrying `R-1 = 2`
+degrees of freedom, not five. A delete-one-launch jackknife puts the floor at **2.084e-04 with a 95%
+interval of [1.16e-04, 3.01e-04]** — the naive over-pairs standard error understates it by **3.2x**.
+Two consequences: "5.6% of the FP8 signal" is really a **3–8%** statement; and the n=4 figure of
+2.984e-04, described above as a high draw from a noisy sample, sits **inside** that interval, so it
+was never as anomalous as "superseded" implies.
+
+**The floor is not the only reference-side nuisance, and it is not always the larger one.** Which
+BF16 launch scored the grid moves the comparison too, and it moves it *differently*: the floor is
+second order in the launch perturbation while `KL(B_r||Q)` is first order. The two diagnostics
+therefore do not track each other, and their ordering flips across the ladder — the spread of
+per-launch BF16→FP4 headlines (5.18e-04) **exceeds the floor (2.08e-04) by 2.5x**, while for
+BF16→FP8 it sits below it. So "BF16→FP4 sits 141x above the floor" understates the reference-side
+nuisance on that pair by roughly a factor of 2.5. Averaging launches shrinks this first-order term
+by `sqrt(R)` and cannot touch the floor. See `DECISIONS.md` D13's fourth disposition, which is
+proposed and **not adopted**; every BF16→FP8/FP4 figure supporting it is n=4 and is not a result.
+
 ## The execution profile changes quantized model outputs, and that is a result, not a footnote
 
 The quality axis runs `graph_2048` — CUDA graphs, `max_num_batched_tokens = 2048` — because that is
