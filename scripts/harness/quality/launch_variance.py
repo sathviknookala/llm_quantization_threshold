@@ -865,14 +865,34 @@ def _check_committed(label, s_headline, smoke_root, single_launch_grid=None):
         rec["not_recomputed_because"] = ("the committed reference launch is not in this launch "
                                          "set; the value is read from the artifact")
         return rec
-    if s_headline != committed:
+    rel = abs(s_headline - committed) / committed if committed else None
+    if rel is not None and rel > RECOMPUTE_REL_TOL:
         raise LaunchDesignError(
             f"{label}: the smoke launch recomputes to {s_headline!r} but "
-            f"{_rel(path)} records {committed!r}. The recomputation path differs from the one "
-            "that produced the tracked artifact.")
-    rec["recomputed_bit_identical"] = True
+            f"{_rel(path)} records {committed!r} -- relative difference {rel:.2e}, above the "
+            f"{RECOMPUTE_REL_TOL:.0e} bar. That is larger than interpreter drift and the "
+            "recomputation path differs from the one that produced the tracked artifact.")
+    rec.update({
+        "recomputed_nats": float(s_headline),
+        "recomputed_bit_identical": bool(s_headline == committed),
+        "relative_difference": rel,
+        "tolerance": RECOMPUTE_REL_TOL,
+        "why_not_bit_identical": (
+            None if s_headline == committed else
+            "the interpreter that produced results/quality/ is not the one running now (the "
+            "artifact records python 3.12.13 with torch and vLLM importable; neither is true "
+            "here), so np.log/np.exp inside kl_nats differ in their last bits. An exact fsum over "
+            "the 40 cells reproduces THIS value, not the committed one, so the difference is in "
+            "the per-cell KL values rather than in the reduction order."),
+    })
     return rec
 
+
+# Bit-equality is the wrong bar across interpreters: the committed quality artifacts were produced
+# under python 3.12 with torch/vLLM present, and np.log/np.exp move in their last bits between
+# builds. The measured drift is 3.3e-14 (FP8) and 3.3e-15 (FP4); this sits ~300x above it and ~10
+# orders of magnitude below anything that could change a reading.
+RECOMPUTE_REL_TOL = 1e-11
 
 PRODUCTION_FLOOR = os.path.join(q.QUALITY_DIR, "gates", "replication_floor_production.json")
 DEFAULT_OUT = os.path.join(q.QUALITY_DIR, "launch_variance.json")

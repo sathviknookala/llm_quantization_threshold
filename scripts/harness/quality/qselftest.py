@@ -1013,9 +1013,21 @@ def test_launch_variance_estimators(tmp):
     check("a recomputation that matches is marked bit-identical",
           LV._check_committed("BF16||FP8", 3.6897120485158315e-03,
                               smoke_dir)["recomputed_bit_identical"], True)
-    _raises_msg("a recomputation that drifts from the tracked artifact aborts",
+    # the committed artifacts were produced under a different interpreter; np.log/np.exp move in
+    # their last bits, so bit-equality is the wrong bar and a tolerance is the contract
+    drift = 3.6897120485158315e-03 * (1 + 3e-14)
+    got = LV._check_committed("BF16||FP8", drift, smoke_dir)
+    check("interpreter-scale drift passes but is not called bit-identical",
+          got["recomputed_bit_identical"], False)
+    check("and the drift is quantified rather than hidden", got["relative_difference"] < 1e-13, True)
+    check("with its cause named", "last bits" in got["why_not_bit_identical"], True)
+    _raises_msg("a recomputation beyond interpreter drift aborts",
                 lambda: LV._check_committed("BF16||FP8", 3.7e-03, smoke_dir),
-                "differs from the one", LV.LaunchDesignError)
+                "larger than interpreter drift", LV.LaunchDesignError)
+    _raises_msg("a drift just above the bar aborts",
+                lambda: LV._check_committed(
+                    "BF16||FP8", 3.6897120485158315e-03 * (1 + 2e-11), smoke_dir),
+                "above the", LV.LaunchDesignError)
     _raises_msg("an absent committed artifact aborts rather than skipping the direction",
                 lambda: LV._check_committed("BF16||FP8", None, os.path.join(tmp, "nope")),
                 "could not be stated", LV.LaunchDesignError)
