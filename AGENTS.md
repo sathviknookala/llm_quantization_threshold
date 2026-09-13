@@ -32,7 +32,9 @@ the harness outlives the pilot.
 contract), `kl_math.py` (float64 KL, trajectory bootstrap), `qcommon.py` (identity, provenance,
 `KL_SPEC`), `qengine.py` (engine lifecycle, observed identity), `trajectories.py` (the frozen BF16
 continuations), `collect_kl.py`, `analyze_kl.py`, `gates.py`, `preflight.py` (P12), `floor_study.py`
-(the production-scale replication floor), `qselftest.py`. It imports `common.py` and
+(the production-scale replication floor), `launch_variance.py` (BF16 launch identity as a nuisance
+variance component — **proposed, not adopted**; supplements `analyze_kl.py` and changes nothing it
+owns), `qselftest.py`. It imports `common.py` and
 `server.py` and edits neither: the serving contract is frozen. `scripts/logits_probe.py`, `scripts/compute_kl.py` and
 `scripts/harness/correctness_gate.py` are **historical qualification/prototype paths**, kept
 byte-unchanged so `results/qualification/` and `results/pilot/` stay reproducible. They are not the
@@ -149,6 +151,7 @@ the number, never as a bandwidth or weight-residency benefit.
    P12    full preflight, 35/35                                DONE 2026-08-26
    G2'    production BF16 floor, 3 launches x 640 cells        DONE 2026-08-26
    review harness audit, 7 defects closed                     DONE 2026-09-01
+   D13-4  BF16 launch variance, estimator + tests + results    PROPOSED 2026-09-12, NOT adopted
    P13    64-trajectory production KL run                      <- next, NOT authorised
           BLOCKED on the replication-floor disposition, not on the rig
    PPL and downstream tasks still need D14/D15
@@ -199,29 +202,46 @@ number of unstable cells rather than uniform jitter.
 
 ## Last session
 
-**Session 8 — built and pre-registered the SLO-ceiling replication rig, then reviewed the whole
-quality arm and closed seven defects in it.** No GPU cells were run in either half.
+**Session 9 — built, reviewed and measured a fourth disposition for the BF16 replication floor:
+treat BF16 launch identity as a nuisance variance component.** No GPU cells were run. It is
+**PROPOSED and not adopted** — the P13 analysis contract is unchanged, the locked 64-trajectory
+single-reference headline remains the point estimate, and G2/G2' stand as written.
 
-- **Ceiling replication pre-registered and built** (`3656170`). The headline 21/57/70 is n=1 while
-  every ladder point around it is n=3, and the margins are thin — 0.34 ms (FP8) and 0.43 ms (FP4)
-  against a ~0.1 ms matched-cell spread. A confirmatory triplet at K-1/K/K+1 for repetitions 2 and 3
-  rather than a re-run of the bisection: the search's answer is fixed by the verdicts at K and K+1,
-  so re-running it would only re-probe interior points.
-- **Two defects found while building it.** `guard_spec()` restamped `started_at` on every
-  invocation, so any resume or additive phase silently rewrote when the artifact's earliest cell was
-  collected; and `SWEEP_SPEC` held live references to `common.WORKLOADS` and `common.SERVER_CONTROLS`,
-  so anything mutating those moved `sweep_config_hash` out from under the artifact. Snapshotted at
-  import; the hash is unchanged.
-- **Seven quality-harness defects closed** (`02d96f0`), two of them live blockers on P13: the floor
-  comparison was silently skipped for the authoritative artifact, and a no-launch resume erased
-  engine provenance from a tracked summary. See the commit for the full account.
-- **Every plan was reviewed before implementation and each reviewer changed the outcome.** One
-  caught a constant that contradicted `EVALUATION_RIG.md` and would have inflated the floor 1.17x;
-  one proved by experiment that removing a vacuous check would have silently dropped the only guard
-  unique to it; one rejected a `guard_manifest` design that would have dirtied a tracked file between
-  two `require_clean_tree` calls, breaking the partial-resume path it was meant to preserve.
-- **Verification moved 115 -> 181 quality selftest checks**, 29 -> 30 preflight, 28 -> 49 harness
-  selftest. Both frozen hashes unchanged; nothing under `results/` modified.
+- **The estimator** (`19f10e4`, `scripts/harness/quality/launch_variance.py`). Reports
+  `E_r[KL(B_r || Q)]` over BF16 launches, unsubtracted, with the launch term carried as a separable
+  variance component. Artifacts: `results/quality/launch_variance.json` (R=3, reported) and
+  `launch_variance_r4.json` (R=4, sensitivity).
+- **It is not the barred averaged reference, and it makes G2' worse.** That one pools logit
+  matrices into a distribution no launch produced; KL is convex in its first argument, so by Jensen
+  the pool is provably smaller — which is why it would rescue the bound. This averages KL values
+  against real launches and moves the floor's share of the BF16→FP8 signal **5.65% → 6.00%**. FP4
+  goes 0.708% → 0.692%. The code aborts if it cannot recover the committed headline to state the
+  direction.
+- **It cannot fix G2' at any R, structurally.** The floor is second order in the launch
+  perturbation while `KL(B_r||Q)` is first order, so averaging shrinks the first-order nuisance by
+  `sqrt(R)` and leaves the floor untouched.
+- **Two reviewers checked the formulation before implementation and both changed it materially.**
+  The launch effect is not separable at this scale (`F = 1.48` / `2.03` on (2,6) df); the spread of
+  per-launch headlines is `sqrt(sigma2_A + sigma2_E/T)` and quoting it as `sigma_A` overstated the
+  effect **1.8x**; `max(0, ·)` on a variance component would report `0.0` about 63% of the time
+  under a null and already did at 5/10 and 7/10 positions; the floor's own uncertainty was
+  understated **3.2x**; per-position components are not estimable; and a dominance count was
+  dropped as the sign test it denied being. I had also cited a contract rule barring floor
+  subtraction — **no such rule is tracked**, and the bar is now stated as this module's own
+  proposal.
+- **The better formulation came out of review.** `SD_launch = sigma_proj * sqrt(2 * signal)`, with
+  `sigma_proj` measuring **2.05e-03 (FP8) and 2.11e-03 (FP4)** — 3% agreement across configurations
+  whose signals differ by 8.6x. Pooling it buys degrees of freedom no per-configuration estimate at
+  R=3 can, and it yields a prediction worth pre-registering before P13.
+- **The committed quality numbers are not bit-reproducible here** (`1bdb1fb`). Recomputing the
+  smoke BF16→FP8 headline from the same stored distributions gives 3.689712048515711e-03 against a
+  committed 3.6897120485158315e-03 — 3.3e-14 relative, 278 ULP. Not reduction order: an exact
+  `fsum` reproduces the new value. The interpreter moved (the artifact records python 3.12.13 with
+  torch and vLLM importable; neither holds now), so `np.log`/`np.exp` differ in their last bits.
+  Reproduction checks now use a relative tolerance at 1e-11.
+- **Verification moved 181 → 278 quality selftest checks**, harness selftest unchanged at 49/49.
+  `kl_spec_hash` `5565ff73dbe5e36a` and `sweep_config_hash` `df0f0f124d987a5c` both unchanged;
+  nothing previously under `results/` was modified.
 
 ## Known issues / unresolved premises
 
@@ -229,12 +249,39 @@ quality arm and closed seven defects in it.** No GPU cells were run in either ha
   from 3 launches over 640 cells, i.e. **5.6%** of the n=4 BF16→FP8 KL against a 1% bound, leaving
   that comparison 17.7x above noise. BF16→FP4 passes at 0.7%. Worse per position: on the provisional
   FP8 curve the floor is 95% and 148% of the signal at p=2048 and p=512. This remains the binding
-  constraint on the quality axis and is a property of the *reference*. Decide before P13 whether to
-  accept it as a stated resolution limit, restrict FP8 claims to the positions that clear it, or
-  re-register a design that averages repeated BF16 launches.
+  constraint on the quality axis and is a property of the *reference*. **Four dispositions are now
+  on the table and none has been taken**: accept it as a stated resolution limit; restrict FP8
+  claims to the positions that clear it; re-register an averaged reference (barred as written);
+  or D13's fourth — carry BF16 launch identity as a nuisance variance component, which is built,
+  reviewed and measured but **not adopted**.
+- **The floor is a range, not a point** (measured 2026-09-12). Six ordered pairs from three launches
+  are a U-statistic carrying **2 df**, not five, so the naive over-pairs SE understates the floor's
+  own uncertainty **3.2x**. A delete-one-launch jackknife gives **2.084e-04, 95% CI
+  [1.16e-04, 3.01e-04]** — "5.6% of the FP8 signal" is really **3–8%**, and the n=4 figure of
+  2.984e-04 that the hub calls superseded sits **inside** that interval. Anywhere the floor is
+  quoted as a point, it is being quoted more precisely than it was measured.
+- **The floor is not the only reference-side nuisance, and not always the larger one.** The spread
+  of per-launch BF16→FP4 headlines (5.18e-04) **exceeds the floor (2.08e-04) by 2.5x**, while for
+  BF16→FP8 it sits below it — the two diagnostics do not track each other and their ordering flips
+  across the ladder, because the floor is second order in the launch perturbation and the signal's
+  launch sensitivity is first order. "BF16→FP4 sits 141x above the floor" understates the
+  reference-side nuisance on that pair by ~2.5x.
+- **P13 currently plans one BF16 launch, and that carries unmodelled variance.** Projected to 64
+  trajectories, BF16 launch identity would contribute ~10% (FP8) and ~15% (FP4) of the headline
+  variance at R=1, falling to ~3–6% at R=3. Whether to add BF16 launches at P13 is open and is
+  cheap to decide now: the prediction `SD_launch = sigma_proj * sqrt(2 * signal)` with
+  `sigma_proj ≈ 2.1e-03` is registerable before the run.
 - **Seeded generation is not replayable** — 51 of 64, earliest divergence at token 3. Reproduction
   goes through the tracked `trajectories.json` and its hash, never by rerunning generation.
 - **Every quality figure so far is n=4 and is not a result.** The smoke exists to validate the rig.
+  That includes every BF16→FP8/FP4 number in `launch_variance.json`: FP8 and FP4 full-vocabulary
+  distributions exist only on the smoke's four trajectories. Only the BF16↔BF16 arm there is
+  production scale.
+- **The committed quality numbers are not bit-reproducible on the current interpreter** — 3.3e-14
+  relative on the smoke BF16→FP8 headline, traced to `np.log`/`np.exp` rather than reduction order.
+  Immaterial to every reading, but it means the stored distributions, not the derived summaries,
+  are the durable artifact — and `dist/*.npy` is gitignored while a BF16 launch provably does not
+  regenerate itself. `launch_variance.json` records the SHA-256 of every matrix it consumed.
 - **The refined serving ceilings are still n=1** (21 / 57 / 70) and the margins are thin: C=K clears
   the 50 ms bound by 0.34 ms (FP8) and 0.43 ms (FP4) against a ~0.1 ms matched-cell spread, three to
   four noise widths; BF16 has 2.41 ms. The **ceiling replication pass** is pre-registered in

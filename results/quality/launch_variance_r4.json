@@ -1,0 +1,2689 @@
+{
+  "artifact": "BF16 launch-variance supplement to the KL analysis",
+  "supplements": "results/quality/smoke/kl_summary.json",
+  "supersedes": null,
+  "question": "what is the expected BF16->FP8 / BF16->FP4 KL over BF16 launch identity, how much of its uncertainty is launch-to-launch, and does the effect stay resolvable once that is carried?",
+  "contract_position": {
+    "floor_subtracted_from_reported_kl": false,
+    "bf16_launch_treated_as": "nuisance variance component / crossed repeated measure",
+    "reference_definition_changed": false,
+    "logit_matrices_averaged": false,
+    "G2_G2prime_status": "historical outcomes and thresholds preserved unchanged; this analysis supplements them and re-adjudicates nothing",
+    "pre_registered_bootstrap_unchanged": true,
+    "no_failure_converted_to_a_pass": true,
+    "no_failure_converted_to_a_pass_evidence": {
+      "BF16||FP8": {
+        "committed_single_launch_nats": 0.0036897120485158315,
+        "floor_fraction_at_committed_single_launch": 0.05648300648749247,
+        "floor_fraction_at_expected_over_launches": 0.05909694843155326,
+        "bound": 0.01,
+        "direction": "worse -- the floor is a LARGER fraction of the signal under this estimator"
+      },
+      "BF16||FP4": {
+        "committed_single_launch_nats": 0.029453956481186858,
+        "floor_fraction_at_committed_single_launch": 0.00707565483456914,
+        "floor_fraction_at_expected_over_launches": 0.006955326918244253,
+        "bound": 0.01,
+        "direction": "better -- the floor is a smaller fraction of the signal"
+      }
+    },
+    "against": "EXPERIMENTAL_CONTRACT.md quality-run validity: `no result was averaged or re-referenced to convert a failure into a pass`"
+  },
+  "marginal_step_is_unaffected": {
+    "pair": "FP8||FP4",
+    "launch_component": null,
+    "why": "the project's marginal quantity is measured with FP8 as the reference and contains no BF16 distribution at all, so BF16 launch identity cannot enter it. The whole nuisance-variance problem is confined to the BF16-anchored pairs."
+  },
+  "other_fp8_fp4_distributions_considered_and_rejected": {
+    "results/quality/gates/engine_profile/": "4 traj x 10 pos x 2 launches per config under graph_2048 -- the tempting near-miss. Barred twice over: its manifest carries KL_SPEC 4ef13273db16d285, not the current spec, and its provisional_trajectories.json holds different continuations from the frozen set, so the contexts are not the same contexts.",
+    "results/quality/gates/cache_equivalence/": "prefix caching off -- a different engine profile; and no FP8 arm.",
+    "results/qualification/logits/": "fp16 storage (fails G4), single position, historical prototype path.",
+    "results/pilot/gate_logits/": "fp16 storage, position 1 only, self-described as a pre-timing trip-wire and not a quality result."
+  },
+  "n_trajectories": 4,
+  "n_positions": 10,
+  "positions": [
+    1,
+    8,
+    32,
+    64,
+    128,
+    256,
+    512,
+    1024,
+    1536,
+    2048
+  ],
+  "statistical_unit": "trajectory; BF16 launch is a crossed repeated-measure factor",
+  "trajectory_set_hash": "1dd71faeb242c7c1be0011491fb51942fb662dfeb2ba2d2d5c2cb428f7a041ad",
+  "kl_spec_hash": "5565ff73dbe5e36a",
+  "bootstrap": {
+    "draws": 10000,
+    "seed": 20260825,
+    "ci": [
+      0.025,
+      0.975
+    ],
+    "interpolation": "linear",
+    "resampling_unit": "trajectory"
+  },
+  "engine_profile_name": "graph_2048",
+  "bf16_launch_sources": [
+    {
+      "launch": "F1",
+      "root": "results/quality/floor64/launch1",
+      "n_trajectories": 64,
+      "provenance": "production replication floor, launch 1"
+    },
+    {
+      "launch": "F2",
+      "root": "results/quality/floor64/launch2",
+      "n_trajectories": 64,
+      "provenance": "production replication floor, launch 2"
+    },
+    {
+      "launch": "F3",
+      "root": "results/quality/floor64/launch3",
+      "n_trajectories": 64,
+      "provenance": "production replication floor, launch 3"
+    },
+    {
+      "launch": "S",
+      "root": "results/quality/smoke",
+      "n_trajectories": 4,
+      "provenance": "P10 smoke; the only BF16 launch collected on the same 40-context grid as the FP8/FP4 distributions"
+    }
+  ],
+  "exchangeability_preconditions": {
+    "n_launches": 4,
+    "launches": [
+      "F1",
+      "F2",
+      "F3",
+      "S"
+    ],
+    "identities_verified": [
+      "checkpoint_content_hash",
+      "config_id",
+      "engine_identity_hash",
+      "engine_profile_name",
+      "kl_spec_hash",
+      "retained_positions",
+      "storage_dtype",
+      "tokenizer_identity",
+      "trajectory_set_hash"
+    ],
+    "matrix_sha256": {
+      "F1": "89656e7f68e90ee1b9e80be1ed238cb7c6c11fa415aabb5cf657474a7cd8919b",
+      "F2": "0367fc18e6efcee50abcb6e46353d589cbeb70de1dc59c254d9604c15096c367",
+      "F3": "bf0b64928b491a8b9d5996e278020be6efc6fb03810461a7eec49590dbc0ba36",
+      "S": "ce0adb623fc395309bd2f4b428328b7803717460d4472a6645738b2e72cebc36"
+    },
+    "content_distinct": true,
+    "keys_that_cannot_match_by_construction": {
+      "contexts_hash": {
+        "F1": "e666fc81fea35e06",
+        "F2": "e666fc81fea35e06",
+        "F3": "e666fc81fea35e06",
+        "S": "7d6d7045df86176d"
+      },
+      "subset_n": {
+        "F1": 64,
+        "F2": 64,
+        "F3": 64,
+        "S": 4
+      },
+      "substitute": "per-cell context_sha256 equality over the shared cells, asserted above"
+    },
+    "engine_identity_hash_is_not_a_launch_nonce": "it hashes deterministic configuration properties only; it cannot distinguish launches. matrix_sha256 is what establishes independence.",
+    "collection_git_head": {
+      "F1": "530ea88f",
+      "F2": "530ea88f",
+      "F3": "530ea88f",
+      "S": "6cbb35ca"
+    },
+    "collection_git_head_note": "the launches were collected at different commits. Only new files and a 2-line gates.py edit separate them; collect_kl.py, qengine.py, positions.py, kl_math.py and qcommon.py -- the whole collection path -- are byte-identical across the two.",
+    "session_confound": "launch identity is confounded with SESSION: the launches were not all collected in one sitting, so the launch variance component absorbs any between-session drift and rests on fewer independent sessions than launches.",
+    "shared_identity": {
+      "kl_spec_hash": "5565ff73dbe5e36a",
+      "trajectory_set_hash": "1dd71faeb242c7c1be0011491fb51942fb662dfeb2ba2d2d5c2cb428f7a041ad",
+      "checkpoint_content_hash": "ced0573c8e17cd04aa5d33b9d8bb10bce81a061a394cabb7771a16232c874f5b",
+      "engine_profile_name": "graph_2048",
+      "storage_dtype": "float32",
+      "retained_positions": [
+        1,
+        8,
+        32,
+        64,
+        128,
+        256,
+        512,
+        1024,
+        1536,
+        2048
+      ],
+      "engine_identity_hash": "ca16377ea4206028",
+      "config_id": "BF16_REFERENCE"
+    },
+    "cells_identical_across_launches": 40,
+    "distinct_collection_timestamps": {
+      "F1": "2026-08-26T23:24:53-0400",
+      "F2": "2026-08-26T23:26:41-0400",
+      "F3": "2026-08-26T23:28:40-0400",
+      "S": "2026-08-26T00:27:09-0400"
+    },
+    "all_launches_actually_launched": true,
+    "grid_regime": {
+      "F1": 640,
+      "F2": 640,
+      "F3": 640,
+      "S": 40
+    },
+    "prefix_cache": {
+      "F1": {
+        "queries": 686016,
+        "hits": 515072,
+        "hit_rate": 0.7508163074913705
+      },
+      "F2": {
+        "queries": 686016,
+        "hits": 515072,
+        "hit_rate": 0.7508163074913705
+      },
+      "F3": {
+        "queries": 686016,
+        "hits": 515072,
+        "hit_rate": 0.7508163074913705
+      },
+      "S": {
+        "queries": 42876,
+        "hits": 32192,
+        "hit_rate": 0.7508163074913705
+      }
+    }
+  },
+  "grid_regime_check": {
+    "question": "does the smoke's 40-context grid put its BF16 launch in a different regime from the 640-context floor64 launches?",
+    "structural_argument": "trajectories 0-3 are scored first in both regimes, from an identical cold engine, in identical submission order (one trajectory of ten nested contexts per generate call), with identical num_gpu_blocks and kv_cache_tokens and zero preemptions. KV eviction in the 640-context grid begins far later than trajectory 3 and cannot propagate backwards, so the regime difference is causally downstream of the cells used here.",
+    "statistic": "launch leverage -- the mean divergence from one launch to every other",
+    "leverage_nats": {
+      "F1": 0.0001776677198943419,
+      "F2": 0.0002259616798049955,
+      "F3": 0.00029904690019278806,
+      "S": 0.00022214299112795644
+    },
+    "leverage_rank_of_odd_launch": 3,
+    "n_launches": 4,
+    "rank_p_value_floor": 0.25,
+    "power_caveat": "with 4 launches the smallest attainable rank p-value is 0.25, so this test CANNOT reject exchangeability at 0.05 and a moderate regime effect would go undetected. It rules out a gross effect, nothing finer.",
+    "within_regime_pairs_nats": {
+      "F1||F2": 9.056542777242132e-05,
+      "F1||F3": 0.0002890804806422651,
+      "F2||F1": 9.17071765395147e-05,
+      "F2||F3": 0.00034315811476139037,
+      "F3||F1": 0.0002868376027720277,
+      "F3||F2": 0.0003402511238048878
+    },
+    "cross_regime_pairs_nats": {
+      "F1||S": 0.0001547711557887201,
+      "F2||S": 0.0002464783323282348,
+      "F3||S": 0.0002665112806034168,
+      "S||F1": 0.00015304447585110255,
+      "S||F2": 0.00024360990362352387,
+      "S||F3": 0.0002684427985727406
+    },
+    "within_regime_range_nats": [
+      9.056542777242132e-05,
+      0.00034315811476139037
+    ],
+    "cross_regime_mean_nats": 0.00022214299112795644,
+    "gross_regime_factor": 2.0,
+    "gross_regime_effect": false,
+    "verdict": "no gross regime effect: cross-regime mean 2.221e-04 against a largest within-regime pair of 3.432e-04, and S ranks 3 of 4 on leverage. The launches are pooled.",
+    "what_this_cannot_rule_out": "a regime effect common to all launches shifts every BF16 realization together and is invisible to any between-launch comparison; and a moderate effect is beyond this test's power. Only a floor64-scale FP8/FP4 collection (P13) closes either."
+  },
+  "bf16_to_bf16": {
+    "quantity": "D_KL(B_a || B_b) over ordered BF16 launch pairs -- the replication floor",
+    "n_launches": 4,
+    "ordered_pairs": 12,
+    "n_trajectories": 4,
+    "per_pair_headline_nats": {
+      "F1||F2": 9.056542777242132e-05,
+      "F1||F3": 0.0002890804806422651,
+      "F1||S": 0.0001547711557887201,
+      "F2||F1": 9.17071765395147e-05,
+      "F2||F3": 0.00034315811476139037,
+      "F2||S": 0.0002464783323282348,
+      "F3||F1": 0.0002868376027720277,
+      "F3||F2": 0.0003402511238048878,
+      "F3||S": 0.0002665112806034168,
+      "S||F1": 0.00015304447585110255,
+      "S||F2": 0.00024360990362352387,
+      "S||F3": 0.0002684427985727406
+    },
+    "mean_nats": 0.0002312048227550205,
+    "min_nats": 9.056542777242132e-05,
+    "max_nats": 0.00034315811476139037,
+    "sd_over_ordered_pairs_nats": 8.794615619367075e-05,
+    "launch_level_uncertainty": {
+      "method": "delete-one-launch jackknife; the ordered pairs are a U-statistic over launches, not R(R-1) independent levels",
+      "pseudo_values_nats": [
+        7.059351417298477e-05,
+        0.00021547539390494557,
+        0.0004347310550683233,
+        0.0002040193278738285
+      ],
+      "se_nats": 7.539086248123138e-05,
+      "naive_se_over_ordered_pairs_nats": 2.5387868476304343e-05,
+      "naive_understates_by": 2.969562511779873,
+      "df": 3,
+      "ci_95": [
+        0.0,
+        0.00047113219451028784
+      ],
+      "ci_95_raw": [
+        -8.72254900024689e-06,
+        0.00047113219451028784
+      ],
+      "ci_95_lower_clamped": true,
+      "ci_95_note": "the symmetric interval's lower end fell below zero, which a divergence cannot reach; reported clamped, with the raw value beside it",
+      "why": "treating the ordered pairs as independent levels would report df=R(R-1)-1 where the design has R-1, and understate the floor's own uncertainty"
+    },
+    "launch_leverage_nats": {
+      "F1": 0.0001776677198943419,
+      "F2": 0.0002259616798049955,
+      "F3": 0.00029904690019278806,
+      "S": 0.00022214299112795644
+    },
+    "trajectory_bootstrap": {
+      "point": 0.00023120482275502046,
+      "ci_low": 8.35555255912111e-05,
+      "ci_high": 0.0004025086833798853,
+      "ci_half_width": 0.0001594765788943371,
+      "bootstrap_mean": 0.00023000030695424027,
+      "bias": -1.2045158007801908e-06,
+      "std_error": 8.667303523590981e-05,
+      "draws": 10000
+    },
+    "by_position": {
+      "1": {
+        "mean_over_ordered_pairs_nats": 0.000838879921151994,
+        "min_nats": 2.5226631189945876e-05,
+        "max_nats": 0.0013446813031804698,
+        "sd_over_ordered_pairs_nats": 0.00045753468521854564
+      },
+      "8": {
+        "mean_over_ordered_pairs_nats": 0.00011313198596203817,
+        "min_nats": 2.934960545325606e-05,
+        "max_nats": 0.0002042727321158137,
+        "sd_over_ordered_pairs_nats": 5.3536346751331306e-05
+      },
+      "32": {
+        "mean_over_ordered_pairs_nats": 0.0004515920392918974,
+        "min_nats": 0.00019040916082491228,
+        "max_nats": 0.0006542611656971458,
+        "sd_over_ordered_pairs_nats": 0.00015381811197468295
+      },
+      "64": {
+        "mean_over_ordered_pairs_nats": 0.00021646404542492053,
+        "min_nats": 0.00014127922427305048,
+        "max_nats": 0.0002931909073725839,
+        "sd_over_ordered_pairs_nats": 5.589174751878401e-05
+      },
+      "128": {
+        "mean_over_ordered_pairs_nats": 0.00037170713868348357,
+        "min_nats": 7.400353235251207e-06,
+        "max_nats": 0.000717835418024171,
+        "sd_over_ordered_pairs_nats": 0.00033314726817021195
+      },
+      "256": {
+        "mean_over_ordered_pairs_nats": 2.6499933437882712e-05,
+        "min_nats": 2.188644065107571e-07,
+        "max_nats": 5.325453260097125e-05,
+        "sd_over_ordered_pairs_nats": 2.7285721422954958e-05
+      },
+      "512": {
+        "mean_over_ordered_pairs_nats": 3.574325047100255e-05,
+        "min_nats": 7.807860862041977e-09,
+        "max_nats": 5.325803130887985e-05,
+        "sd_over_ordered_pairs_nats": 2.143074065950857e-05
+      },
+      "1024": {
+        "mean_over_ordered_pairs_nats": 2.017550225361369e-05,
+        "min_nats": 5.73197930211861e-07,
+        "max_nats": 4.607753220608303e-05,
+        "sd_over_ordered_pairs_nats": 1.8594702989269087e-05
+      },
+      "1536": {
+        "mean_over_ordered_pairs_nats": 0.00022833521914765315,
+        "min_nats": 2.0485954365959936e-07,
+        "max_nats": 0.0004579767394400233,
+        "sd_over_ordered_pairs_nats": 0.0002355990750446523
+      },
+      "2048": {
+        "mean_over_ordered_pairs_nats": 9.519191725718956e-06,
+        "min_nats": 1.3534677017485574e-06,
+        "max_nats": 1.943202757549045e-05,
+        "sd_over_ordered_pairs_nats": 6.921315744089227e-06
+      }
+    },
+    "no_variance_component_reported_because": "the ordered pairs share launches, so they are not independent levels of a random factor; a crossed ANOVA over them would report a df it does not have",
+    "relationship_to_G2_prime": "this recomputes the same quantity G2' adjudicated. G2' and its 1% bound are historical and unchanged; nothing here re-adjudicates them",
+    "kl_cells_nats": {
+      "axes": [
+        "ordered_launch_pair",
+        "trajectory",
+        "position"
+      ],
+      "ordered_pair_order": [
+        "F1||F2",
+        "F1||F3",
+        "F1||S",
+        "F2||F1",
+        "F2||F3",
+        "F2||S",
+        "F3||F1",
+        "F3||F2",
+        "F3||S",
+        "S||F1",
+        "S||F2",
+        "S||F3"
+      ],
+      "position_order": [
+        1,
+        8,
+        32,
+        64,
+        128,
+        256,
+        512,
+        1024,
+        1536,
+        2048
+      ],
+      "values": [
+        [
+          [
+            4.1157163373140015e-08,
+            4.34870316503071e-06,
+            0.0002650730355930344,
+            0.000307403559546535,
+            1.582908322140784e-07,
+            1.3782619640315982e-06,
+            0.0001793486055005408,
+            1.621058466810963e-05,
+            1.4695349326316021e-05,
+            3.355339033138743e-05
+          ],
+          [
+            0.00010086536759641036,
+            0.00011304971864799353,
+            0.0004965636077066147,
+            0.0002577133375456669,
+            2.944312210879075e-05,
+            1.5074412888658815e-08,
+            1.4926891819192976e-05,
+            4.38195235781279e-07,
+            0.0017871460903798272,
+            2.447673531138829e-07
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        ],
+        [
+          [
+            0.00022522550021452213,
+            1.8998279871374926e-05,
+            0.00019273423685714692,
+            0.0002787157502158846,
+            2.895494203971578e-07,
+            1.1624726207025671e-06,
+            0.00018656232866486134,
+            0.00018076291586544002,
+            1.5268174617195562e-06,
+            7.216216627135094e-05
+          ],
+          [
+            5.598308297987403e-05,
+            9.528628962860004e-05,
+            7.651538057475355e-05,
+            0.0002451202985576664,
+            0.001957709362604744,
+            1.8971228349830214e-08,
+            1.5933003766618427e-05,
+            5.037565855823609e-07,
+            2.3295646103048534e-06,
+            5.215838194939402e-08
+          ],
+          [
+            0.00038872484543697744,
+            0.0002694283166318841,
+            1.4143258461158986e-05,
+            0.00012151727564203564,
+            0.0005901901526150984,
+            0.00021093107007083136,
+            1.0506103154281546e-05,
+            1.860857327136069e-07,
+            1.1397951437209226e-05,
+            2.1298373467743306e-07
+          ],
+          [
+            0.004663126415975903,
+            7.643283272168118e-05,
+            0.001099508049071682,
+            0.00033895250819524663,
+            0.00015557543177853358,
+            5.939858632499252e-07,
+            3.0689649758082764e-08,
+            2.8573706405961314e-06,
+            5.454443195905398e-07,
+            7.665681756480726e-07
+          ]
+        ],
+        [
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.003073518052636048,
+            0.00038612170811712,
+            0.0018402945900572107,
+            0.0005877034167341283,
+            0.00029377567423232614,
+            8.754576260430284e-07,
+            3.123144344816791e-08,
+            2.292791720847444e-06,
+            8.194381746383974e-07,
+            5.41387080699423e-06
+          ]
+        ],
+        [
+          [
+            4.2022040723942546e-08,
+            4.199794629885565e-06,
+            0.0002645219163002347,
+            0.0003157061981189422,
+            1.5732683034509073e-07,
+            1.3562822895957164e-06,
+            0.00017269881471296223,
+            1.6182796194356202e-05,
+            1.3942822313050355e-05,
+            3.1138738987882124e-05
+          ],
+          [
+            0.00010216409732965647,
+            0.00011320283301782562,
+            0.0005122281564311379,
+            0.00026780127962119915,
+            2.999828489187007e-05,
+            1.5287298306269533e-08,
+            1.4145656815283373e-05,
+            4.1839160882983494e-07,
+            0.0018081041269149506,
+            2.6223523355048604e-07
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        ],
+        [
+          [
+            0.0002254290749819614,
+            1.560778593064522e-05,
+            0.00041314588620328845,
+            0.0004578077754962051,
+            3.881918733375004e-07,
+            1.125661178682149e-06,
+            4.9192569407686e-05,
+            0.00012536657411291746,
+            1.4011198028873957e-05,
+            8.174056670301495e-06
+          ],
+          [
+            0.00010144487632703759,
+            8.048951611785792e-05,
+            0.0005058864852320602,
+            1.8924693085150314e-05,
+            0.001947146080718806,
+            1.7521298772295148e-08,
+            4.158444800297172e-07,
+            5.786522345537771e-08,
+            0.0018059523639744196,
+            1.1323080536888745e-07
+          ],
+          [
+            0.00038872484543697744,
+            0.0002694283166318841,
+            1.4143258461158986e-05,
+            0.00012151727564203564,
+            0.0005901901526150984,
+            0.00021093107007083136,
+            1.0506103154281546e-05,
+            1.860857327136069e-07,
+            1.1397951437209226e-05,
+            2.1298373467743306e-07
+          ],
+          [
+            0.004663126415975903,
+            7.643283272168118e-05,
+            0.001099508049071682,
+            0.00033895250819524663,
+            0.00015557543177853358,
+            5.939858632499252e-07,
+            3.0689649758082764e-08,
+            2.8573706405961314e-06,
+            5.454443195905398e-07,
+            7.665681756480726e-07
+          ]
+        ],
+        [
+          [
+            4.2022040723942546e-08,
+            4.199794629885565e-06,
+            0.0002645219163002347,
+            0.0003157061981189422,
+            1.5732683034509073e-07,
+            1.3562822895957164e-06,
+            0.00017269881471296223,
+            1.6182796194356202e-05,
+            1.3942822313050355e-05,
+            3.1138738987882124e-05
+          ],
+          [
+            0.00010216409732965647,
+            0.00011320283301782562,
+            0.0005122281564311379,
+            0.00026780127962119915,
+            2.999828489187007e-05,
+            1.5287298306269533e-08,
+            1.4145656815283373e-05,
+            4.1839160882983494e-07,
+            0.0018081041269149506,
+            2.6223523355048604e-07
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.003073518052636048,
+            0.00038612170811712,
+            0.0018402945900572107,
+            0.0005877034167341283,
+            0.00029377567423232614,
+            8.754576260430284e-07,
+            3.123144344816791e-08,
+            2.292791720847444e-06,
+            8.194381746383974e-07,
+            5.41387080699423e-06
+          ]
+        ],
+        [
+          [
+            0.00021660674126106787,
+            1.8221859260337928e-05,
+            0.00019494803564833532,
+            0.0002707431693340071,
+            2.933915901579722e-07,
+            1.1473534777160742e-06,
+            0.00017823936939342678,
+            0.0001438813175829398,
+            1.532601984190977e-06,
+            6.446177727383136e-05
+          ],
+          [
+            5.6348524508042206e-05,
+            9.522323552769661e-05,
+            7.675731664355155e-05,
+            0.0002547245160076189,
+            0.001950926676197138,
+            1.9217021919197384e-08,
+            1.5093867177234788e-05,
+            4.813922656384679e-07,
+            2.313042356224016e-06,
+            5.4668776163049984e-08
+          ],
+          [
+            0.00037454140388674907,
+            0.00026649743079259624,
+            1.3615751837473705e-05,
+            0.000121191334489803,
+            0.0006109501057646439,
+            0.00020632843415900316,
+            1.0113901630887904e-05,
+            1.8753774866442957e-07,
+            1.1893588280747332e-05,
+            2.1326821344352062e-07
+          ],
+          [
+            0.00460069404450843,
+            7.443543109366364e-05,
+            0.0011291829815905043,
+            0.00035162824285691545,
+            0.00015518901975316004,
+            5.80188679645524e-07,
+            3.057415132889617e-08,
+            2.90322024695854e-06,
+            5.411267739830313e-07,
+            7.684511352687307e-07
+          ]
+        ],
+        [
+          [
+            0.00021679564254690705,
+            1.4958685108903143e-05,
+            0.00041550338560059335,
+            0.00044290238799927687,
+            3.9498202215340395e-07,
+            1.1429767074114875e-06,
+            4.9626587272165247e-05,
+            0.00010019635067918347,
+            1.4692257362579108e-05,
+            7.805143989028551e-06
+          ],
+          [
+            0.00010046871128765818,
+            8.012715167958695e-05,
+            0.0004902323708329879,
+            1.832824423206758e-05,
+            0.0019398378307146093,
+            1.7564787319001942e-08,
+            4.0940033550857033e-07,
+            5.684327879008155e-08,
+            0.0017849539407611193,
+            1.0845740379355124e-07
+          ],
+          [
+            0.00037454140388674907,
+            0.00026649743079259624,
+            1.3615751837473705e-05,
+            0.000121191334489803,
+            0.0006109501057646439,
+            0.00020632843415900316,
+            1.0113901630887904e-05,
+            1.8753774866442957e-07,
+            1.1893588280747332e-05,
+            2.1326821344352062e-07
+          ],
+          [
+            0.00460069404450843,
+            7.443543109366364e-05,
+            0.0011291829815905043,
+            0.00035162824285691545,
+            0.00015518901975316004,
+            5.80188679645524e-07,
+            3.057415132889617e-08,
+            2.90322024695854e-06,
+            5.411267739830313e-07,
+            7.684511352687307e-07
+          ]
+        ],
+        [
+          [
+            0.00021660674126106787,
+            1.8221859260337928e-05,
+            0.00019494803564833532,
+            0.0002707431693340071,
+            2.933915901579722e-07,
+            1.1473534777160742e-06,
+            0.00017823936939342678,
+            0.0001438813175829398,
+            1.532601984190977e-06,
+            6.446177727383136e-05
+          ],
+          [
+            5.6348524508042206e-05,
+            9.522323552769661e-05,
+            7.675731664355155e-05,
+            0.0002547245160076189,
+            0.001950926676197138,
+            1.9217021919197384e-08,
+            1.5093867177234788e-05,
+            4.813922656384679e-07,
+            2.313042356224016e-06,
+            5.4668776163049984e-08
+          ],
+          [
+            0.00037454140388674907,
+            0.00026649743079259624,
+            1.3615751837473705e-05,
+            0.000121191334489803,
+            0.0006109501057646439,
+            0.00020632843415900316,
+            1.0113901630887904e-05,
+            1.8753774866442957e-07,
+            1.1893588280747332e-05,
+            2.1326821344352062e-07
+          ],
+          [
+            0.0025655421914179037,
+            0.0004362542615536183,
+            0.0019102432000042667,
+            0.00027320869674793034,
+            0.000309171498544744,
+            8.623540810925003e-07,
+            1.3354183568372545e-08,
+            1.5432924720112566e-06,
+            9.743296640196573e-07,
+            5.087215376267718e-06
+          ]
+        ],
+        [
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0030084674435829077,
+            0.00038135063490998177,
+            0.0018216037348081898,
+            0.0006076467323981338,
+            0.0002929574066255036,
+            9.107464133455894e-07,
+            3.1338509999818976e-08,
+            2.337466949129419e-06,
+            8.255521583485448e-07,
+            5.647977688561688e-06
+          ]
+        ],
+        [
+          [
+            4.1157163373140015e-08,
+            4.34870316503071e-06,
+            0.0002650730355930344,
+            0.000307403559546535,
+            1.582908322140784e-07,
+            1.3782619640315982e-06,
+            0.0001793486055005408,
+            1.621058466810963e-05,
+            1.4695349326316021e-05,
+            3.355339033138743e-05
+          ],
+          [
+            0.00010086536759641036,
+            0.00011304971864799353,
+            0.0004965636077066147,
+            0.0002577133375456669,
+            2.944312210879075e-05,
+            1.5074412888658815e-08,
+            1.4926891819192976e-05,
+            4.38195235781279e-07,
+            0.0017871460903798272,
+            2.447673531138829e-07
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0030084674435829077,
+            0.00038135063490998177,
+            0.0018216037348081898,
+            0.0006076467323981338,
+            0.0002929574066255036,
+            9.107464133455894e-07,
+            3.1338509999818976e-08,
+            2.337466949129419e-06,
+            8.255521583485448e-07,
+            5.647977688561688e-06
+          ]
+        ],
+        [
+          [
+            0.00022522550021452213,
+            1.8998279871374926e-05,
+            0.00019273423685714692,
+            0.0002787157502158846,
+            2.895494203971578e-07,
+            1.1624726207025671e-06,
+            0.00018656232866486134,
+            0.00018076291586544002,
+            1.5268174617195562e-06,
+            7.216216627135094e-05
+          ],
+          [
+            5.598308297987403e-05,
+            9.528628962860004e-05,
+            7.651538057475355e-05,
+            0.0002451202985576664,
+            0.001957709362604744,
+            1.8971228349830214e-08,
+            1.5933003766618427e-05,
+            5.037565855823609e-07,
+            2.3295646103048534e-06,
+            5.215838194939402e-08
+          ],
+          [
+            0.00038872484543697744,
+            0.0002694283166318841,
+            1.4143258461158986e-05,
+            0.00012151727564203564,
+            0.0005901901526150984,
+            0.00021093107007083136,
+            1.0506103154281546e-05,
+            1.860857327136069e-07,
+            1.1397951437209226e-05,
+            2.1298373467743306e-07
+          ],
+          [
+            0.0025605920711691535,
+            0.00043337804233139566,
+            0.001918267444677184,
+            0.0002832585341761508,
+            0.0003086362240639698,
+            9.056164840012463e-07,
+            1.350936434444334e-08,
+            1.5419128345469522e-06,
+            9.878565961843391e-07,
+            5.300801913984039e-06
+          ]
+        ]
+      ]
+    }
+  },
+  "replication_floor_source": {
+    "path": "results/quality/gates/replication_floor_production.json",
+    "headline_nats": 0.00020840602957329884,
+    "n_trajectories": 64,
+    "n_launches": 3,
+    "launch_level_uncertainty": {
+      "point_nats": 0.00020840602957329884,
+      "se_launch_level_nats": 2.1545621349497087e-05,
+      "df": 2,
+      "ci_95": [
+        0.00011570270305627803,
+        0.00030110935609031965
+      ],
+      "ci_95_raw": [
+        0.00011570270305627803,
+        0.00030110935609031965
+      ],
+      "ci_95_lower_clamped": false,
+      "ci_95_note": null,
+      "naive_se_over_ordered_pairs_nats": 6.820429427065882e-06,
+      "method": "delete-one-launch jackknife over the ordered-pair headlines"
+    },
+    "used_for": "the side-by-side floor column only; never subtracted",
+    "n4_figure_inside_launch_interval": true,
+    "n4_figure_note": "the superseded n=4 floor estimate of 2.984e-04 was called a high draw from a noisy sample. At the launch level it sits INSIDE the production floor's own 95% interval, so `5.6% of the FP8 signal` is really a range, not a point."
+  },
+  "comparisons": {
+    "BF16||FP8": {
+      "comparison": "BF16||FP8",
+      "n_launches": 4,
+      "n_trajectories": 4,
+      "n_positions": 10,
+      "cells_per_launch": 40,
+      "estimator": "mean over BF16 launches of the per-launch headline; each per-launch headline is the pre-registered mean of per-trajectory means",
+      "NOT_THE_HEADLINE": "EVALUATION_RIG.md A.1 locks headline_KL as the mean of 64 per-trajectory means under ONE reference launch, and that remains the point estimate. This is a supplementary expected value over launch identity; the per-launch headlines are reported beside it and this number must never be rendered as `the BF16->Q KL`.",
+      "floor_subtracted": false,
+      "expected_kl_over_launches_nats": 0.0035265108453895384,
+      "per_launch_headline_nats": {
+        "F1": 0.0034359358182013246,
+        "F2": 0.003322273969302036,
+        "F3": 0.0036581215455390825,
+        "S": 0.003689712048515711
+      },
+      "per_trajectory_launch_averaged_nats": [
+        0.0012892747042271687,
+        0.0021912225674873614,
+        0.003931134721205117,
+        0.006694411388638507
+      ],
+      "variance_components": {
+        "levels": 4,
+        "n_trajectories": 4,
+        "grand_mean_nats": 0.0035265108453895384,
+        "level_means_nats": [
+          0.0034359358182013246,
+          0.003322273969302036,
+          0.0036581215455390825,
+          0.003689712048515711
+        ],
+        "ms_level": 1.2516339493308127e-07,
+        "ms_trajectory": 2.2650046225630906e-05,
+        "ms_residual": 8.730368042110292e-08,
+        "df_level": 3,
+        "df_trajectory": 3,
+        "df_residual": 9,
+        "expected_mean_squares": {
+          "E[MS_level]": "sigma2_E + T*sigma2_A",
+          "E[MS_trajectory]": "sigma2_E + R*sigma2_S",
+          "E[MS_residual]": "sigma2_E = sigma2_{AxS} + sigma2_{AxSxP}/P, NOT measurement noise"
+        },
+        "var_level_moment": 9.464928627994587e-09,
+        "var_trajectory_moment": 5.640685636302451e-06,
+        "var_residual": 8.730368042110292e-08,
+        "moment_components_may_be_negative": true,
+        "var_level_upper_95": 2.667998628160415e-07,
+        "var_level_upper_95_rule": "sigma2_A <= MS_A*(R-1)/(T*chi2_{0.05,R-1}), using sigma2_E >= 0. One-sided; the only honest summary at this df.",
+        "f_level": 1.4336554235670798,
+        "f_level_note": "MS_level/MS_residual on (df_level, df_residual). Tests whether the level effect is separable from the level x trajectory interaction at all.",
+        "var_theta_anova": 1.4179941212589303e-06,
+        "se_theta_anova_nats": 0.0011907955833218942,
+        "df_theta_satterthwaite": 3.0099306065933726,
+        "var_theta_rule": "(MS_level + MS_trajectory - MS_residual)/(R*T), the ANOVA-unbiased Var(mean); its Satterthwaite df is the honest df of the whole estimate"
+      },
+      "variance_components_unavailable_because": null,
+      "launch_component": {
+        "primary": "F ratio and the one-sided 95% upper bound; the point estimate is reported beside them and must not be quoted alone at this df",
+        "ms_level": 1.2516339493308127e-07,
+        "df_level": 3,
+        "df_residual": 9,
+        "f_launch": 1.4336554235670798,
+        "launch_effect_separable_at_0_05": false,
+        "sd_launch_identity_nats_point": 9.728786475195448e-05,
+        "sd_launch_identity_nats_point_is_negative_moment": false,
+        "sd_launch_identity_nats_upper_95": 0.0005165267300111791,
+        "var_launch_point": 2.366232156998647e-09,
+        "var_launch_upper_95": 6.669996570401038e-08,
+        "se_launch_nats_point": 4.864393237597724e-05,
+        "se_launch_nats_upper_95": 0.00025826336500558956,
+        "df_caveat": "sigma2_A carries 3 df. Its 95% multiplicative interval is [0.27, 39.5] at 2 df and [0.32, 13.9] at 3 df; reaching +/-30% on SE_launch would need R=37, which is not reachable here."
+      },
+      "trajectory_component": {
+        "method": "pre-registered percentile bootstrap over trajectories, applied to the launch-averaged per-trajectory means",
+        "bootstrap": {
+          "point": 0.0035265108453895384,
+          "ci_low": 0.001740248635857265,
+          "ci_high": 0.00556861418335072,
+          "ci_half_width": 0.0019141827737467277,
+          "bootstrap_mean": 0.0035218407855123006,
+          "bias": -4.670059877237738e-06,
+          "std_error": 0.0010254516093441792,
+          "draws": 10000
+        },
+        "se_trajectory_nats": 0.0010254516093441792,
+        "estimates": "(sigma2_S + sigma2_E/R)/T, the non-launch part of Var(theta)",
+        "different_estimand_from_committed_artifacts": "the committed single-launch bootstrap estimates (sigma2_S + sigma2_E)/T; this one estimates (sigma2_S + sigma2_E/R)/T. They differ by sigma2_E(1-1/R)/T and are NOT the same interval, so no comparability with earlier artifacts is claimed",
+        "finite_sample_note": "the nonparametric bootstrap of a mean carries a (T-1)/T divisor, so at T=4 it understates the SD by 13.4%"
+      },
+      "combined": {
+        "launch_variance_included": true,
+        "anova_unbiased": {
+          "var_theta": 1.4179941212589303e-06,
+          "se_theta_nats": 0.0011907955833218942,
+          "df_satterthwaite": 3.0099306065933726,
+          "rule": "(MS_level + MS_trajectory - MS_residual)/(R*T), the ANOVA-unbiased Var(mean); its Satterthwaite df is the honest df of the whole estimate",
+          "preferred": "this is the single-expression total with one trackable df; the bootstrap-plus-launch form below is reported because the bootstrap is the pre-registered method"
+        },
+        "bootstrap_plus_launch": {
+          "se_point_nats": 0.0010266047122741869,
+          "se_upper_95_nats": 0.0010574738619987623,
+          "inflation_factor_point": 1.001124483027283,
+          "inflation_factor_upper_95": 1.0312274634539438,
+          "ci_point": [
+            0.0017382400143203692,
+            0.0055709104938942156
+          ],
+          "ci_upper_95": [
+            0.0016844681979899352,
+            0.0056323838907060796
+          ],
+          "rule": "the percentile interval is SCALED about the point estimate by sqrt(1 + var_launch/var_bootstrap); the launch component is thereby treated as symmetric while the trajectory skew is preserved",
+          "orthogonality": "the two variances add because A_r is a single constant shared by every trajectory, so no trajectory resampling can see it. This holds by the assumed independence of A from (S,E), not by construction. Note the naive s^2 over the R launch headlines would double-count sigma2_E/(RT) against the bootstrap term; (MS_A - MS_E)/T is what avoids that."
+        }
+      },
+      "relative": {
+        "cv_launch_point": 0.013793784992770675,
+        "cv_launch_upper_95": 0.07323481376591706,
+        "cv_trajectory": 0.2907836256011593
+      },
+      "scaling_law": {
+        "sd_launch_headlines_nats": 0.0001768921952299488,
+        "sigma_proj": 0.002106304045174794,
+        "definition": "sigma_proj = SD(per-launch headlines) / sqrt(2 * headline)",
+        "prediction": "SD_launch(config) = sigma_proj * sqrt(2 * signal(config)); CV_launch falls as 1/sqrt(signal)",
+        "caution": "SD(per-launch headlines) is sqrt(sigma2_A + sigma2_E/T), NOT sigma_A. It is the right input here because the law predicts the observable spread, but it must not be quoted as the launch variance component."
+      },
+      "vs_replication_floor": {
+        "value_nats": 0.0035265108453895384,
+        "replication_floor_nats": 0.00020840602957329884,
+        "excess_over_floor_nats": 0.0033181048158162398,
+        "ratio_to_floor": 16.92134748984901,
+        "above_replication_floor": true,
+        "interpretation": "ratio is a reproducibility diagnostic only; read value_nats for magnitude. No materiality threshold is applied here.",
+        "n_bf16_launches_averaged": 4,
+        "ratio_drifts_with_R": "averaging R launches shrinks the launch noise in the numerator by sqrt(R) while the denominator stays a two-launch quantity, so this ratio moves with a design parameter. Read R beside it.",
+        "launch_sd_vs_floor": 0.8487863599346281,
+        "note": "the floor is reported beside the estimate and is never subtracted from it; G2/G2' adjudicate the floor and are unchanged by this analysis"
+      },
+      "pooling_evidence": {
+        "statistic": "rank of the odd-grid launch's per-launch headline among all launches",
+        "odd_launch": "S",
+        "rank": 4,
+        "of": 4,
+        "extreme": true,
+        "p_extreme_under_exchangeability": 0.5,
+        "caveat": "the odd launch's 40-context grid is perfectly confounded with launch identity for that one level, so an extreme rank cannot be attributed. With R=4 this statistic cannot reach p<0.5 for a two-sided extreme; it is disclosure, not a test. R=3 -- the launches that share a grid regime -- is the reported variant for this reason."
+      },
+      "reproduces_committed_smoke_headline": {
+        "artifact": "results/quality/smoke/kl_summary.json",
+        "committed_headline_nats": 0.0036897120485158315,
+        "reference_launch": "the P10 smoke's BF16 collection",
+        "recomputed_nats": 0.003689712048515711,
+        "recomputed_bit_identical": false,
+        "relative_difference": 3.267552589337807e-14,
+        "tolerance": 1e-11,
+        "why_not_bit_identical": "the interpreter that produced results/quality/ is not the one running now (the artifact records python 3.12.13 with torch and vLLM importable; neither is true here), so np.log/np.exp inside kl_nats differ in their last bits. An exact fsum over the 40 cells reproduces THIS value, not the committed one, so the difference is in the per-cell KL values rather than in the reduction order."
+      },
+      "quantized_source": {
+        "config_id": "FP8_PRIMARY",
+        "root": "results/quality/smoke",
+        "collected_n_trajectories": 4,
+        "engine_identity_hash": "176a222edae755ff",
+        "checkpoint_content_hash": "5c0c3e0aaefadde93e18bfd4af6b7a4608aed80e05aa14ce9ad80b7d1c006e50",
+        "single_realization": true,
+        "note": "one FP8/FP4 launch only; this analysis carries BF16 reference variance and says nothing about quantized-side launch variance"
+      },
+      "by_position": {
+        "1": {
+          "expected_kl_over_launches_nats": 0.011263884378204662,
+          "per_launch_nats": [
+            0.009802653357963025,
+            0.009931283867205421,
+            0.011876773632972168,
+            0.013444826654678034
+          ],
+          "launch_spread_nats": {
+            "min": 0.009802653357963025,
+            "max": 0.013444826654678034,
+            "sd_descriptive": 0.0017361991694839407,
+            "sd_is_not_sigma_A": "this is sqrt(sigma2_A + sigma2_E/T) -- a descriptive spread, not sigma_A"
+          },
+          "trajectory_bootstrap": {
+            "point": 0.011263884378204662,
+            "ci_low": 0.0022960519636820343,
+            "ci_high": 0.02546164142772268,
+            "ci_half_width": 0.011582794732020323,
+            "bootstrap_mean": 0.011188899923879204,
+            "bias": -7.498445432545763e-05,
+            "std_error": 0.006198037453016727,
+            "draws": 10000
+          },
+          "variance_components": null,
+          "variance_components_omitted_because": "effective df on raw cells is ~5% of nominal (kurtosis ~45); the components are not estimable per position",
+          "scaling_law_predicted_launch_sd_nats": 0.00031614051147171016,
+          "scaling_law_predicted_cv_launch": 0.028066739754842855,
+          "replication_floor_nats": 0.0003776668795053865,
+          "ratio_to_floor": 29.824919762507292,
+          "floor_source": "production per-position floor (64 trajectories, 6 ordered pairs); the 4-trajectory per-position floor swings by an order of magnitude and is not used"
+        },
+        "8": {
+          "expected_kl_over_launches_nats": 0.003367890975892623,
+          "per_launch_nats": [
+            0.003334769139592551,
+            0.003356479616102969,
+            0.0032615301113171303,
+            0.00351878503655784
+          ],
+          "launch_spread_nats": {
+            "min": 0.0032615301113171303,
+            "max": 0.00351878503655784,
+            "sd_descriptive": 0.00010848798125356589,
+            "sd_is_not_sigma_A": "this is sqrt(sigma2_A + sigma2_E/T) -- a descriptive spread, not sigma_A"
+          },
+          "trajectory_bootstrap": {
+            "point": 0.003367890975892623,
+            "ci_low": 0.0008713221368182755,
+            "ci_high": 0.006670023125417594,
+            "ci_half_width": 0.002899350494299659,
+            "bootstrap_mean": 0.0033936837478372723,
+            "bias": 2.5792771944649438e-05,
+            "std_error": 0.001541038704343732,
+            "draws": 10000
+          },
+          "variance_components": null,
+          "variance_components_omitted_because": "effective df on raw cells is ~5% of nominal (kurtosis ~45); the components are not estimable per position",
+          "scaling_law_predicted_launch_sd_nats": 0.00017286818482177405,
+          "scaling_law_predicted_cv_launch": 0.05132831972862697,
+          "replication_floor_nats": 0.00035537150935000347,
+          "ratio_to_floor": 9.477099000009044,
+          "floor_source": "production per-position floor (64 trajectories, 6 ordered pairs); the 4-trajectory per-position floor swings by an order of magnitude and is not used"
+        },
+        "32": {
+          "expected_kl_over_launches_nats": 0.004474389512041655,
+          "per_launch_nats": [
+            0.004775158811849348,
+            0.004652159686364754,
+            0.005099829521213497,
+            0.0033704100287390223
+          ],
+          "launch_spread_nats": {
+            "min": 0.0033704100287390223,
+            "max": 0.005099829521213497,
+            "sd_descriptive": 0.0007598268028991205,
+            "sd_is_not_sigma_A": "this is sqrt(sigma2_A + sigma2_E/T) -- a descriptive spread, not sigma_A"
+          },
+          "trajectory_bootstrap": {
+            "point": 0.004474389512041655,
+            "ci_low": 0.0017328913388152366,
+            "ci_high": 0.00867590504710156,
+            "ci_half_width": 0.0034715068541431617,
+            "bootstrap_mean": 0.004441902178813544,
+            "bias": -3.248733322811122e-05,
+            "std_error": 0.0018476209607824296,
+            "draws": 10000
+          },
+          "variance_components": null,
+          "variance_components_omitted_because": "effective df on raw cells is ~5% of nominal (kurtosis ~45); the components are not estimable per position",
+          "scaling_law_predicted_launch_sd_nats": 0.00019925212134343543,
+          "scaling_law_predicted_cv_launch": 0.04453168880518788,
+          "replication_floor_nats": 0.0003365529652802661,
+          "ratio_to_floor": 13.294755873910027,
+          "floor_source": "production per-position floor (64 trajectories, 6 ordered pairs); the 4-trajectory per-position floor swings by an order of magnitude and is not used"
+        },
+        "64": {
+          "expected_kl_over_launches_nats": 0.009309906304609228,
+          "per_launch_nats": [
+            0.009400468439748145,
+            0.0094535788547417,
+            0.009010841194575871,
+            0.009374736729371195
+          ],
+          "launch_spread_nats": {
+            "min": 0.009010841194575871,
+            "max": 0.0094535788547417,
+            "sd_descriptive": 0.00020206123329044576,
+            "sd_is_not_sigma_A": "this is sqrt(sigma2_A + sigma2_E/T) -- a descriptive spread, not sigma_A"
+          },
+          "trajectory_bootstrap": {
+            "point": 0.009309906304609228,
+            "ci_low": 0.0036546143827266096,
+            "ci_high": 0.01743777342552181,
+            "ci_half_width": 0.0068915795213976,
+            "bootstrap_mean": 0.009367156081976927,
+            "bias": 5.7249777367698526e-05,
+            "std_error": 0.003554676019041551,
+            "draws": 10000
+          },
+          "variance_components": null,
+          "variance_components_omitted_because": "effective df on raw cells is ~5% of nominal (kurtosis ~45); the components are not estimable per position",
+          "scaling_law_predicted_launch_sd_nats": 0.0002874145267095303,
+          "scaling_law_predicted_cv_launch": 0.03087190325075932,
+          "replication_floor_nats": 0.00025446831593316314,
+          "ratio_to_floor": 36.5857190136571,
+          "floor_source": "production per-position floor (64 trajectories, 6 ordered pairs); the 4-trajectory per-position floor swings by an order of magnitude and is not used"
+        },
+        "128": {
+          "expected_kl_over_launches_nats": 0.004253219207354056,
+          "per_launch_nats": [
+            0.00419467187592264,
+            0.004192086707373307,
+            0.004301208199601224,
+            0.004324910046519051
+          ],
+          "launch_spread_nats": {
+            "min": 0.004192086707373307,
+            "max": 0.004324910046519051,
+            "sd_descriptive": 6.977939612024072e-05,
+            "sd_is_not_sigma_A": "this is sqrt(sigma2_A + sigma2_E/T) -- a descriptive spread, not sigma_A"
+          },
+          "trajectory_bootstrap": {
+            "point": 0.004253219207354056,
+            "ci_low": 0.0006397809138431372,
+            "ci_high": 0.009843057191924328,
+            "ci_half_width": 0.004601638139040595,
+            "bootstrap_mean": 0.004227306732987121,
+            "bias": -2.5912474366934952e-05,
+            "std_error": 0.0024007685651008456,
+            "draws": 10000
+          },
+          "variance_components": null,
+          "variance_components_omitted_because": "effective df on raw cells is ~5% of nominal (kurtosis ~45); the components are not estimable per position",
+          "scaling_law_predicted_launch_sd_nats": 0.00019426517018160847,
+          "scaling_law_predicted_cv_launch": 0.045674854906540684,
+          "replication_floor_nats": 0.0002614908285874219,
+          "ratio_to_floor": 16.265271062583807,
+          "floor_source": "production per-position floor (64 trajectories, 6 ordered pairs); the 4-trajectory per-position floor swings by an order of magnitude and is not used"
+        },
+        "256": {
+          "expected_kl_over_launches_nats": 0.0007254065183498477,
+          "per_launch_nats": [
+            0.0007202049084953755,
+            0.0007196853528734494,
+            0.0007414366104045132,
+            0.0007202992016260524
+          ],
+          "launch_spread_nats": {
+            "min": 0.0007196853528734494,
+            "max": 0.0007414366104045132,
+            "sd_descriptive": 1.0690135871987843e-05,
+            "sd_is_not_sigma_A": "this is sqrt(sigma2_A + sigma2_E/T) -- a descriptive spread, not sigma_A"
+          },
+          "trajectory_bootstrap": {
+            "point": 0.0007254065183498477,
+            "ci_low": 8.372115257627368e-06,
+            "ci_high": 0.001442440921442068,
+            "ci_half_width": 0.0007170344030922203,
+            "bootstrap_mean": 0.0007279116956366593,
+            "bias": 2.5051772868116187e-06,
+            "std_error": 0.00036248530206054965,
+            "draws": 10000
+          },
+          "variance_components": null,
+          "variance_components_omitted_because": "effective df on raw cells is ~5% of nominal (kurtosis ~45); the components are not estimable per position",
+          "scaling_law_predicted_launch_sd_nats": 8.022815160817586e-05,
+          "scaling_law_predicted_cv_launch": 0.11059750578293477,
+          "replication_floor_nats": 0.00019421816702710421,
+          "ratio_to_floor": 3.7350085702776363,
+          "floor_source": "production per-position floor (64 trajectories, 6 ordered pairs); the 4-trajectory per-position floor swings by an order of magnitude and is not used"
+        },
+        "512": {
+          "expected_kl_over_launches_nats": 0.000178827431103292,
+          "per_launch_nats": [
+            0.00013462383043521327,
+            0.00023226180665146241,
+            0.0002138588075130915,
+            0.0001345652798134008
+          ],
+          "launch_spread_nats": {
+            "min": 0.0001345652798134008,
+            "max": 0.00023226180665146241,
+            "sd_descriptive": 5.1625336713091296e-05,
+            "sd_is_not_sigma_A": "this is sqrt(sigma2_A + sigma2_E/T) -- a descriptive spread, not sigma_A"
+          },
+          "trajectory_bootstrap": {
+            "point": 0.000178827431103292,
+            "ci_low": 3.622402351978595e-05,
+            "ci_high": 0.00045370876761525124,
+            "ci_half_width": 0.00020874237204773264,
+            "bootstrap_mean": 0.00017785979145323237,
+            "bias": -9.676396500596374e-07,
+            "std_error": 0.00011804037301433246,
+            "draws": 10000
+          },
+          "variance_components": null,
+          "variance_components_omitted_because": "effective df on raw cells is ~5% of nominal (kurtosis ~45); the components are not estimable per position",
+          "scaling_law_predicted_launch_sd_nats": 3.9833927499090006e-05,
+          "scaling_law_predicted_cv_launch": 0.22275065549692788,
+          "replication_floor_nats": 0.00019940233564050855,
+          "ratio_to_floor": 0.8968171337054451,
+          "floor_source": "production per-position floor (64 trajectories, 6 ordered pairs); the 4-trajectory per-position floor swings by an order of magnitude and is not used"
+        },
+        "1024": {
+          "expected_kl_over_launches_nats": 0.00013193876689804746,
+          "per_launch_nats": [
+            0.00012384497311862763,
+            0.00012807036710524533,
+            0.00014328025693152724,
+            0.0001325594704367896
+          ],
+          "launch_spread_nats": {
+            "min": 0.00012384497311862763,
+            "max": 0.00014328025693152724,
+            "sd_descriptive": 8.3564083944251e-06,
+            "sd_is_not_sigma_A": "this is sqrt(sigma2_A + sigma2_E/T) -- a descriptive spread, not sigma_A"
+          },
+          "trajectory_bootstrap": {
+            "point": 0.00013193876689804746,
+            "ci_low": 1.2286697513364908e-05,
+            "ci_high": 0.00025159083628273,
+            "ci_half_width": 0.00011965206938468256,
+            "bootstrap_mean": 0.00013071873233911146,
+            "bias": -1.2200345589359997e-06,
+            "std_error": 6.0772827283232e-05,
+            "draws": 10000
+          },
+          "variance_components": null,
+          "variance_components_omitted_because": "effective df on raw cells is ~5% of nominal (kurtosis ~45); the components are not estimable per position",
+          "scaling_law_predicted_launch_sd_nats": 3.421545109372998e-05,
+          "scaling_law_predicted_cv_launch": 0.2593282618759743,
+          "replication_floor_nats": 3.4088774522850135e-05,
+          "ratio_to_floor": 3.8704461731121267,
+          "floor_source": "production per-position floor (64 trajectories, 6 ordered pairs); the 4-trajectory per-position floor swings by an order of magnitude and is not used"
+        },
+        "1536": {
+          "expected_kl_over_launches_nats": 0.0015135670519871582,
+          "per_launch_nats": [
+            0.0018445855268149987,
+            0.0005038361713033728,
+            0.001861494478401434,
+            0.0018443520314288277
+          ],
+          "launch_spread_nats": {
+            "min": 0.0005038361713033728,
+            "max": 0.001861494478401434,
+            "sd_descriptive": 0.0006732017723187428,
+            "sd_is_not_sigma_A": "this is sqrt(sigma2_A + sigma2_E/T) -- a descriptive spread, not sigma_A"
+          },
+          "trajectory_bootstrap": {
+            "point": 0.0015135670519871582,
+            "ci_low": 2.253401816503355e-05,
+            "ci_high": 0.0044579605973384465,
+            "ci_half_width": 0.0022177132895867067,
+            "bootstrap_mean": 0.0015170935812116814,
+            "bias": 3.5265292245231523e-06,
+            "std_error": 0.0012608638063998025,
+            "draws": 10000
+          },
+          "variance_components": null,
+          "variance_components_omitted_because": "effective df on raw cells is ~5% of nominal (kurtosis ~45); the components are not estimable per position",
+          "scaling_law_predicted_launch_sd_nats": 0.0001158875795692284,
+          "scaling_law_predicted_cv_launch": 0.07656587094511597,
+          "replication_floor_nats": 4.0701233470945155e-05,
+          "ratio_to_floor": 37.18725264352561,
+          "floor_source": "production per-position floor (64 trajectories, 6 ordered pairs); the 4-trajectory per-position floor swings by an order of magnitude and is not used"
+        },
+        "2048": {
+          "expected_kl_over_launches_nats": 4.6078307454816775e-05,
+          "per_launch_nats": [
+            2.8377318073325538e-05,
+            5.329726329867697e-05,
+            7.096264246036817e-05,
+            3.1676005986896444e-05
+          ],
+          "launch_spread_nats": {
+            "min": 2.8377318073325538e-05,
+            "max": 7.096264246036817e-05,
+            "sd_descriptive": 1.993401418681679e-05,
+            "sd_is_not_sigma_A": "this is sqrt(sigma2_A + sigma2_E/T) -- a descriptive spread, not sigma_A"
+          },
+          "trajectory_bootstrap": {
+            "point": 4.6078307454816775e-05,
+            "ci_low": 6.779561164166444e-06,
+            "ci_high": 0.00010929672430085819,
+            "ci_half_width": 5.125858156834587e-05,
+            "bootstrap_mean": 4.587538898824995e-05,
+            "bias": -2.029184665668218e-07,
+            "std_error": 2.708082000809646e-05,
+            "draws": 10000
+          },
+          "variance_components": null,
+          "variance_components_omitted_because": "effective df on raw cells is ~5% of nominal (kurtosis ~45); the components are not estimable per position",
+          "scaling_law_predicted_launch_sd_nats": 2.0220147474563133e-05,
+          "scaling_law_predicted_cv_launch": 0.4388214019013285,
+          "replication_floor_nats": 3.009928641533956e-05,
+          "ratio_to_floor": 1.5308770719339644,
+          "floor_source": "production per-position floor (64 trajectories, 6 ordered pairs); the 4-trajectory per-position floor swings by an order of magnitude and is not used"
+        }
+      },
+      "resolvability": {
+        "form": "interval comparison; no floor is subtracted anywhere",
+        "signal": {
+          "expected_kl_over_launches_nats": 0.0035265108453895384,
+          "trajectory_ci": [
+            0.001740248635857265,
+            0.00556861418335072
+          ],
+          "launch_inflated_ci_point": [
+            0.0017382400143203692,
+            0.0055709104938942156
+          ],
+          "launch_inflated_ci_upper_95": [
+            0.0016844681979899352,
+            0.0056323838907060796
+          ],
+          "se_launch_upper_95_nats": 0.00025826336500558956,
+          "survives_worst_case_launch_variance": true,
+          "criterion": "the lower end of the launch-inflated interval, taken at the ONE-SIDED 95% UPPER bound on the launch variance, still exceeds the floor"
+        },
+        "floor": {
+          "replication_floor_nats": 0.00020840602957329884,
+          "launch_level_ci_95": [
+            0.00011570270305627803,
+            0.00030110935609031965
+          ],
+          "phi_used": "the PRODUCTION floor headline (64 trajectories, 3 launches), with the delete-one-launch jackknife interval. Means are comparable across grid sizes; no worst-cell comparison is reported anywhere here, because a maximum is an extreme-value statistic and 40-cell and 640-cell maxima are not comparable."
+        },
+        "per_trajectory_ratio": {
+          "definition": "mean over trajectories of (BF16->Q KL) / (BF16->BF16 KL), both on the SAME trajectories -- a ratio, not a difference, and not a subtraction",
+          "mean": 21.38356283683256,
+          "min": 8.772121220902626,
+          "max": 48.64105703435003,
+          "bootstrap_ci": [
+            10.314309630763416,
+            39.77584233369547
+          ],
+          "phi_used": "the launch-pair-averaged BF16->BF16 KL on THESE trajectories, a different quantity from the production floor headline above",
+          "launch_coverage": "none -- the same BF16 launches enter both arms, so this is conditional on the launch set and its interval covers trajectory sampling only"
+        },
+        "does_not_address_G2_prime": "averaging launches shrinks the FIRST-order launch nuisance by sqrt(R) and leaves the SECOND-order floor untouched -- they are different functionals of the same perturbation. No value of R moves the G2' ratio in the direction of a pass, and this analysis is not an argument that it should."
+      },
+      "kl_cells_nats": {
+        "axes": [
+          "bf16_launch",
+          "trajectory",
+          "position"
+        ],
+        "bf16_launch_order": [
+          "F1",
+          "F2",
+          "F3",
+          "S"
+        ],
+        "position_order": [
+          1,
+          8,
+          32,
+          64,
+          128,
+          256,
+          512,
+          1024,
+          1536,
+          2048
+        ],
+        "values": [
+          [
+            [
+              0.0005887446954038059,
+              6.486996018497076e-05,
+              0.0034179545775578665,
+              0.005979974196396099,
+              1.8788774115648753e-05,
+              0.0016063584475609458,
+              0.0004224818453448329,
+              0.00020060169821583835,
+              6.245014337105685e-05,
+              7.2589776415168e-05
+            ],
+            [
+              0.007212768750629698,
+              0.0016455851643718017,
+              0.002702401773292954,
+              0.002073934913561229,
+              0.001589663316540052,
+              2.7977650249647543e-06,
+              2.088515509230733e-05,
+              1.6914568438202078e-05,
+              0.007259372230070242,
+              1.0709589087570346e-06
+            ],
+            [
+              0.00468904212938471,
+              0.00844073313626888,
+              0.0011309972539099893,
+              0.021430883559977194,
+              0.002853616175881325,
+              0.0012568899767990945,
+              4.908059369196287e-05,
+              5.276825685927475e-06,
+              4.642314367945231e-05,
+              2.4721449035832923e-05
+            ],
+            [
+              0.026720057856433884,
+              0.0031878882975445518,
+              0.01184928164263658,
+              0.00811708108905806,
+              0.012316619237153532,
+              1.477344459649719e-05,
+              4.604772761174989e-05,
+              0.00027258680013454267,
+              1.0096590139242855e-05,
+              1.5127087933544187e-05
+            ]
+          ],
+          [
+            [
+              0.0005890316772414552,
+              7.678906807781803e-05,
+              0.0036365348021250763,
+              0.005692866580511368,
+              1.9222088023729476e-05,
+              0.0016042766649794866,
+              0.0007898255274501945,
+              0.00021291197365709314,
+              4.458808630371138e-05,
+              0.000172835592740783
+            ],
+            [
+              0.007727003805761632,
+              0.001720507962520625,
+              0.00199182504678737,
+              0.0025734841894201757,
+              0.001578889328434643,
+              2.8013251187193517e-06,
+              4.409337785194241e-05,
+              2.150586894341802e-05,
+              0.0019142368650910846,
+              5.049234845477787e-07
+            ],
+            [
+              0.00468904212938471,
+              0.00844073313626888,
+              0.0011309972539099893,
+              0.021430883559977194,
+              0.002853616175881325,
+              0.0012568899767990945,
+              4.908059369196287e-05,
+              5.276825685927475e-06,
+              4.642314367945231e-05,
+              2.4721449035832923e-05
+            ],
+            [
+              0.026720057856433884,
+              0.0031878882975445518,
+              0.01184928164263658,
+              0.00811708108905806,
+              0.012316619237153532,
+              1.477344459649719e-05,
+              4.604772761174989e-05,
+              0.00027258680013454267,
+              1.0096590139242855e-05,
+              1.5127087933544187e-05
+            ]
+          ],
+          [
+            [
+              0.0006395409136051853,
+              0.00010748001816623698,
+              0.0036271218238393306,
+              0.006580723794320126,
+              1.8426680191307924e-05,
+              0.0016116090271356327,
+              0.0007237262774000955,
+              0.0002456935769026632,
+              6.968671045283112e-05,
+              0.0002384690568301557
+            ],
+            [
+              0.007366104166928764,
+              0.0016448897966679788,
+              0.00261878282721195,
+              0.002614885998995821,
+              0.0034455244966916762,
+              2.832787931727282e-06,
+              4.4463696677448896e-05,
+              2.184076332893826e-05,
+              0.007263083499407257,
+              8.527803783263371e-07
+            ],
+            [
+              0.004685906083570207,
+              0.008032401230776458,
+              0.0011492401182579125,
+              0.020630961333643522,
+              0.0014499671445072156,
+              0.001340254853902249,
+              4.1360441098668635e-05,
+              5.287333900376403e-06,
+              0.00010320780912694888,
+              2.380976647799977e-05
+            ],
+            [
+              0.034815543367784516,
+              0.0032613493996578465,
+              0.013004173315544796,
+              0.0062167936513440126,
+              0.012290914477014697,
+              1.1049772648443676e-05,
+              4.5884814876153e-05,
+              0.0003002993535941311,
+              9.999894618698632e-06,
+              2.0718966154990813e-05
+            ]
+          ],
+          [
+            [
+              0.0005887446954038059,
+              6.486996018497076e-05,
+              0.0034179545775578665,
+              0.005979974196396099,
+              1.8788774115648753e-05,
+              0.0016063584475609458,
+              0.0004224818453448329,
+              0.00020060169821583835,
+              6.245014337105685e-05,
+              7.2589776415168e-05
+            ],
+            [
+              0.007212768750629698,
+              0.0016455851643718017,
+              0.002702401773292954,
+              0.002073934913561229,
+              0.001589663316540052,
+              2.7977650249647543e-06,
+              2.088515509230733e-05,
+              1.6914568438202078e-05,
+              0.007259372230070242,
+              1.0709589087570346e-06
+            ],
+            [
+              0.00468904212938471,
+              0.00844073313626888,
+              0.0011309972539099893,
+              0.021430883559977194,
+              0.002853616175881325,
+              0.0012568899767990945,
+              4.908059369196287e-05,
+              5.276825685927475e-06,
+              4.642314367945231e-05,
+              2.4721449035832923e-05
+            ],
+            [
+              0.04128875104329392,
+              0.003923951885405707,
+              0.00623028651019528,
+              0.008014154247550259,
+              0.01283757191953918,
+              1.5150617119204748e-05,
+              4.5813525124500067e-05,
+              0.0003074447894071904,
+              9.16260859455933e-06,
+              2.8321839587827818e-05
+            ]
+          ]
+        ]
+      }
+    },
+    "BF16||FP4": {
+      "comparison": "BF16||FP4",
+      "n_launches": 4,
+      "n_trajectories": 4,
+      "n_positions": 10,
+      "cells_per_launch": 40,
+      "estimator": "mean over BF16 launches of the per-launch headline; each per-launch headline is the pre-registered mean of per-trajectory means",
+      "NOT_THE_HEADLINE": "EVALUATION_RIG.md A.1 locks headline_KL as the mean of 64 per-trajectory means under ONE reference launch, and that remains the point estimate. This is a supplementary expected value over launch identity; the per-launch headlines are reported beside it and this number must never be rendered as `the BF16->Q KL`.",
+      "floor_subtracted": false,
+      "expected_kl_over_launches_nats": 0.029963513149416015,
+      "per_launch_headline_nats": {
+        "F1": 0.030023295408642715,
+        "F2": 0.030697275897684253,
+        "F3": 0.029679524810150328,
+        "S": 0.02945395648118676
+      },
+      "per_trajectory_launch_averaged_nats": [
+        0.025110740177591837,
+        0.022069945943595425,
+        0.03898552327387815,
+        0.03368784320259864
+      ],
+      "variance_components": {
+        "levels": 4,
+        "n_trajectories": 4,
+        "grand_mean_nats": 0.02996351314941602,
+        "level_means_nats": [
+          0.030023295408642715,
+          0.030697275897684253,
+          0.029679524810150328,
+          0.02945395648118676
+        ],
+        "ms_level": 1.1763720856535833e-06,
+        "ms_trajectory": 0.00024150014637308018,
+        "ms_residual": 5.017907681941448e-07,
+        "df_level": 3,
+        "df_trajectory": 3,
+        "df_residual": 9,
+        "expected_mean_squares": {
+          "E[MS_level]": "sigma2_E + T*sigma2_A",
+          "E[MS_trajectory]": "sigma2_E + R*sigma2_S",
+          "E[MS_residual]": "sigma2_E = sigma2_{AxS} + sigma2_{AxSxP}/P, NOT measurement noise"
+        },
+        "var_level_moment": 1.6864532936485962e-07,
+        "var_trajectory_moment": 6.024958890122151e-05,
+        "var_residual": 5.017907681941448e-07,
+        "moment_components_may_be_negative": true,
+        "var_level_upper_95": 2.507569495384813e-06,
+        "var_level_upper_95_rule": "sigma2_A <= MS_A*(R-1)/(T*chi2_{0.05,R-1}), using sigma2_E >= 0. One-sided; the only honest summary at this df.",
+        "f_level": 2.3443478043391193,
+        "f_level_note": "MS_level/MS_residual on (df_level, df_residual). Tests whether the level effect is separable from the level x trajectory interaction at all.",
+        "var_theta_anova": 1.5135920480658726e-05,
+        "se_theta_anova_nats": 0.003890491033360535,
+        "df_theta_satterthwaite": 3.0167072609454566,
+        "var_theta_rule": "(MS_level + MS_trajectory - MS_residual)/(R*T), the ANOVA-unbiased Var(mean); its Satterthwaite df is the honest df of the whole estimate"
+      },
+      "variance_components_unavailable_because": null,
+      "launch_component": {
+        "primary": "F ratio and the one-sided 95% upper bound; the point estimate is reported beside them and must not be quoted alone at this df",
+        "ms_level": 1.1763720856535833e-06,
+        "df_level": 3,
+        "df_residual": 9,
+        "f_launch": 2.3443478043391193,
+        "launch_effect_separable_at_0_05": false,
+        "sd_launch_identity_nats_point": 0.0004106644973270268,
+        "sd_launch_identity_nats_point_is_negative_moment": false,
+        "sd_launch_identity_nats_upper_95": 0.0015835307055389904,
+        "var_launch_point": 4.2161332341214904e-08,
+        "var_launch_upper_95": 6.268923738462032e-07,
+        "se_launch_nats_point": 0.0002053322486635134,
+        "se_launch_nats_upper_95": 0.0007917653527694952,
+        "df_caveat": "sigma2_A carries 3 df. Its 95% multiplicative interval is [0.27, 39.5] at 2 df and [0.32, 13.9] at 3 df; reaching +/-30% on SE_launch would need R=37, which is not reachable here."
+      },
+      "trajectory_component": {
+        "method": "pre-registered percentile bootstrap over trajectories, applied to the launch-averaged per-trajectory means",
+        "bootstrap": {
+          "point": 0.029963513149416015,
+          "ci_low": 0.02359034306059363,
+          "ci_high": 0.036336683238238396,
+          "ci_half_width": 0.006373170088822383,
+          "bootstrap_mean": 0.029994439914662628,
+          "bias": 3.092676524661317e-05,
+          "std_error": 0.003340710836896948,
+          "draws": 10000
+        },
+        "se_trajectory_nats": 0.003340710836896948,
+        "estimates": "(sigma2_S + sigma2_E/R)/T, the non-launch part of Var(theta)",
+        "different_estimand_from_committed_artifacts": "the committed single-launch bootstrap estimates (sigma2_S + sigma2_E)/T; this one estimates (sigma2_S + sigma2_E/R)/T. They differ by sigma2_E(1-1/R)/T and are NOT the same interval, so no comparability with earlier artifacts is claimed",
+        "finite_sample_note": "the nonparametric bootstrap of a mean carries a (T-1)/T divisor, so at T=4 it understates the SD by 13.4%"
+      },
+      "combined": {
+        "launch_variance_included": true,
+        "anova_unbiased": {
+          "var_theta": 1.5135920480658726e-05,
+          "se_theta_nats": 0.003890491033360535,
+          "df_satterthwaite": 3.0167072609454566,
+          "rule": "(MS_level + MS_trajectory - MS_residual)/(R*T), the ANOVA-unbiased Var(mean); its Satterthwaite df is the honest df of the whole estimate",
+          "preferred": "this is the single-expression total with one trackable df; the bootstrap-plus-launch form below is reported because the bootstrap is the pre-registered method"
+        },
+        "bootstrap_plus_launch": {
+          "se_point_nats": 0.0033470151221800483,
+          "se_upper_95_nats": 0.003433255200186393,
+          "inflation_factor_point": 1.0018871089390533,
+          "inflation_factor_upper_95": 1.027701997511226,
+          "ci_point": [
+            0.023578316194348907,
+            0.03634871010448312
+          ],
+          "ci_upper_95": [
+            0.02341379351865445,
+            0.036513232780177575
+          ],
+          "rule": "the percentile interval is SCALED about the point estimate by sqrt(1 + var_launch/var_bootstrap); the launch component is thereby treated as symmetric while the trajectory skew is preserved",
+          "orthogonality": "the two variances add because A_r is a single constant shared by every trajectory, so no trajectory resampling can see it. This holds by the assumed independence of A from (S,E), not by construction. Note the naive s^2 over the R launch headlines would double-count sigma2_E/(RT) against the bootstrap term; (MS_A - MS_E)/T is what avoids that."
+        }
+      },
+      "relative": {
+        "cv_launch_point": 0.006852742788858032,
+        "cv_launch_upper_95": 0.026424316428493518,
+        "cv_trajectory": 0.11149262839234385
+      },
+      "scaling_law": {
+        "sd_launch_headlines_nats": 0.0005423034403481098,
+        "sigma_proj": 0.002215292084729408,
+        "definition": "sigma_proj = SD(per-launch headlines) / sqrt(2 * headline)",
+        "prediction": "SD_launch(config) = sigma_proj * sqrt(2 * signal(config)); CV_launch falls as 1/sqrt(signal)",
+        "caution": "SD(per-launch headlines) is sqrt(sigma2_A + sigma2_E/T), NOT sigma_A. It is the right input here because the law predicts the observable spread, but it must not be quoted as the launch variance component."
+      },
+      "vs_replication_floor": {
+        "value_nats": 0.029963513149416015,
+        "replication_floor_nats": 0.00020840602957329884,
+        "excess_over_floor_nats": 0.029755107119842715,
+        "ratio_to_floor": 143.77469409481503,
+        "above_replication_floor": true,
+        "interpretation": "ratio is a reproducibility diagnostic only; read value_nats for magnitude. No materiality threshold is applied here.",
+        "n_bf16_launches_averaged": 4,
+        "ratio_drifts_with_R": "averaging R launches shrinks the launch noise in the numerator by sqrt(R) while the denominator stays a two-launch quantity, so this ratio moves with a design parameter. Read R beside it.",
+        "launch_sd_vs_floor": 2.6021485148891785,
+        "note": "the floor is reported beside the estimate and is never subtracted from it; G2/G2' adjudicate the floor and are unchanged by this analysis"
+      },
+      "pooling_evidence": {
+        "statistic": "rank of the odd-grid launch's per-launch headline among all launches",
+        "odd_launch": "S",
+        "rank": 1,
+        "of": 4,
+        "extreme": true,
+        "p_extreme_under_exchangeability": 0.5,
+        "caveat": "the odd launch's 40-context grid is perfectly confounded with launch identity for that one level, so an extreme rank cannot be attributed. With R=4 this statistic cannot reach p<0.5 for a two-sided extreme; it is disclosure, not a test. R=3 -- the launches that share a grid regime -- is the reported variant for this reason."
+      },
+      "reproduces_committed_smoke_headline": {
+        "artifact": "results/quality/smoke/kl_summary.json",
+        "committed_headline_nats": 0.029453956481186858,
+        "reference_launch": "the P10 smoke's BF16 collection",
+        "recomputed_nats": 0.02945395648118676,
+        "recomputed_bit_identical": false,
+        "relative_difference": 3.298182188757913e-15,
+        "tolerance": 1e-11,
+        "why_not_bit_identical": "the interpreter that produced results/quality/ is not the one running now (the artifact records python 3.12.13 with torch and vLLM importable; neither is true here), so np.log/np.exp inside kl_nats differ in their last bits. An exact fsum over the 40 cells reproduces THIS value, not the committed one, so the difference is in the per-cell KL values rather than in the reduction order."
+      },
+      "quantized_source": {
+        "config_id": "FP4_PRIMARY",
+        "root": "results/quality/smoke",
+        "collected_n_trajectories": 4,
+        "engine_identity_hash": "434ad8fac783fb7f",
+        "checkpoint_content_hash": "8866dad87d09688303026d3d683ea6ded90d3eaf41210ec4d75a7b7ff5da06ec",
+        "single_realization": true,
+        "note": "one FP8/FP4 launch only; this analysis carries BF16 reference variance and says nothing about quantized-side launch variance"
+      },
+      "by_position": {
+        "1": {
+          "expected_kl_over_launches_nats": 0.03168167663732689,
+          "per_launch_nats": [
+            0.032943595898521395,
+            0.03312314450907951,
+            0.03056567692687079,
+            0.03009428921483588
+          ],
+          "launch_spread_nats": {
+            "min": 0.03009428921483588,
+            "max": 0.03312314450907951,
+            "sd_descriptive": 0.0015743277962238845,
+            "sd_is_not_sigma_A": "this is sqrt(sigma2_A + sigma2_E/T) -- a descriptive spread, not sigma_A"
+          },
+          "trajectory_bootstrap": {
+            "point": 0.03168167663732689,
+            "ci_low": 0.01881506368773586,
+            "ci_high": 0.044548289586917936,
+            "ci_half_width": 0.012866612949591037,
+            "bootstrap_mean": 0.03174422907436545,
+            "bias": 6.255243703855856e-05,
+            "std_error": 0.006762838515002374,
+            "draws": 10000
+          },
+          "variance_components": null,
+          "variance_components_omitted_because": "effective df on raw cells is ~5% of nominal (kurtosis ~45); the components are not estimable per position",
+          "scaling_law_predicted_launch_sd_nats": 0.0005576350611362817,
+          "scaling_law_predicted_cv_launch": 0.017601185300884115,
+          "replication_floor_nats": 0.0003776668795053865,
+          "ratio_to_floor": 83.88788733292941,
+          "floor_source": "production per-position floor (64 trajectories, 6 ordered pairs); the 4-trajectory per-position floor swings by an order of magnitude and is not used"
+        },
+        "8": {
+          "expected_kl_over_launches_nats": 0.03272972313155745,
+          "per_launch_nats": [
+            0.03290078980698407,
+            0.03263088434637451,
+            0.03292423981339469,
+            0.0324629785594765
+          ],
+          "launch_spread_nats": {
+            "min": 0.0324629785594765,
+            "max": 0.03292423981339469,
+            "sd_descriptive": 0.0002221278304232153,
+            "sd_is_not_sigma_A": "this is sqrt(sigma2_A + sigma2_E/T) -- a descriptive spread, not sigma_A"
+          },
+          "trajectory_bootstrap": {
+            "point": 0.03272972313155745,
+            "ci_low": 0.008932556335157413,
+            "ci_high": 0.05652688992795748,
+            "ci_half_width": 0.02379716679640003,
+            "bootstrap_mean": 0.03290087235255463,
+            "bias": 0.00017114922099718127,
+            "std_error": 0.013018593996607932,
+            "draws": 10000
+          },
+          "variance_components": null,
+          "variance_components_omitted_because": "effective df on raw cells is ~5% of nominal (kurtosis ~45); the components are not estimable per position",
+          "scaling_law_predicted_launch_sd_nats": 0.0005667834486101545,
+          "scaling_law_predicted_cv_launch": 0.017317086561715257,
+          "replication_floor_nats": 0.00035537150935000347,
+          "ratio_to_floor": 92.10002003655876,
+          "floor_source": "production per-position floor (64 trajectories, 6 ordered pairs); the 4-trajectory per-position floor swings by an order of magnitude and is not used"
+        },
+        "32": {
+          "expected_kl_over_launches_nats": 0.08012142714869776,
+          "per_launch_nats": [
+            0.08116731153990282,
+            0.08158180662509315,
+            0.07941874389479611,
+            0.07831784653499893
+          ],
+          "launch_spread_nats": {
+            "min": 0.07831784653499893,
+            "max": 0.08158180662509315,
+            "sd_descriptive": 0.001524603681864822,
+            "sd_is_not_sigma_A": "this is sqrt(sigma2_A + sigma2_E/T) -- a descriptive spread, not sigma_A"
+          },
+          "trajectory_bootstrap": {
+            "point": 0.08012142714869776,
+            "ci_low": 0.04898412079219843,
+            "ci_high": 0.11125873350519708,
+            "ci_half_width": 0.031137306356499323,
+            "bootstrap_mean": 0.08021109180086775,
+            "bias": 8.966465216998787e-05,
+            "std_error": 0.015504891622930124,
+            "draws": 10000
+          },
+          "variance_components": null,
+          "variance_components_omitted_because": "effective df on raw cells is ~5% of nominal (kurtosis ~45); the components are not estimable per position",
+          "scaling_law_predicted_launch_sd_nats": 0.0008867890704051789,
+          "scaling_law_predicted_cv_launch": 0.011068063837147866,
+          "replication_floor_nats": 0.0003365529652802661,
+          "ratio_to_floor": 238.06483797275789,
+          "floor_source": "production per-position floor (64 trajectories, 6 ordered pairs); the 4-trajectory per-position floor swings by an order of magnitude and is not used"
+        },
+        "64": {
+          "expected_kl_over_launches_nats": 0.0851216136484754,
+          "per_launch_nats": [
+            0.08486352704577962,
+            0.08575961466517651,
+            0.08508121332188308,
+            0.08478209956106239
+          ],
+          "launch_spread_nats": {
+            "min": 0.08478209956106239,
+            "max": 0.08575961466517651,
+            "sd_descriptive": 0.00044368006256135763,
+            "sd_is_not_sigma_A": "this is sqrt(sigma2_A + sigma2_E/T) -- a descriptive spread, not sigma_A"
+          },
+          "trajectory_bootstrap": {
+            "point": 0.0851216136484754,
+            "ci_low": 0.030276203273807062,
+            "ci_high": 0.13996702402314376,
+            "ci_half_width": 0.05484541037466835,
+            "bootstrap_mean": 0.08530417112043262,
+            "bias": 0.00018255747195722316,
+            "std_error": 0.028588620841587083,
+            "draws": 10000
+          },
+          "variance_components": null,
+          "variance_components_omitted_because": "effective df on raw cells is ~5% of nominal (kurtosis ~45); the components are not estimable per position",
+          "scaling_law_predicted_launch_sd_nats": 0.000914041506770421,
+          "scaling_law_predicted_cv_launch": 0.010738066016289533,
+          "replication_floor_nats": 0.00025446831593316314,
+          "ratio_to_floor": 334.50771007119346,
+          "floor_source": "production per-position floor (64 trajectories, 6 ordered pairs); the 4-trajectory per-position floor swings by an order of magnitude and is not used"
+        },
+        "128": {
+          "expected_kl_over_launches_nats": 0.03889624603770354,
+          "per_launch_nats": [
+            0.038624164084448784,
+            0.03851000809103794,
+            0.03931509239958222,
+            0.03913571957574521
+          ],
+          "launch_spread_nats": {
+            "min": 0.03851000809103794,
+            "max": 0.03931509239958222,
+            "sd_descriptive": 0.00038986672552406964,
+            "sd_is_not_sigma_A": "this is sqrt(sigma2_A + sigma2_E/T) -- a descriptive spread, not sigma_A"
+          },
+          "trajectory_bootstrap": {
+            "point": 0.03889624603770354,
+            "ci_low": 0.004450376630352859,
+            "ci_high": 0.0938973766242921,
+            "ci_half_width": 0.04472349999696962,
+            "bootstrap_mean": 0.038573290925503476,
+            "bias": -0.0003229551122000615,
+            "std_error": 0.024424796407798,
+            "draws": 10000
+          },
+          "variance_components": null,
+          "variance_components_omitted_because": "effective df on raw cells is ~5% of nominal (kurtosis ~45); the components are not estimable per position",
+          "scaling_law_predicted_launch_sd_nats": 0.0006178738823780897,
+          "scaling_law_predicted_cv_launch": 0.015885180327663555,
+          "replication_floor_nats": 0.0002614908285874219,
+          "ratio_to_floor": 148.74803161480557,
+          "floor_source": "production per-position floor (64 trajectories, 6 ordered pairs); the 4-trajectory per-position floor swings by an order of magnitude and is not used"
+        },
+        "256": {
+          "expected_kl_over_launches_nats": 0.012379287864475844,
+          "per_launch_nats": [
+            0.012430846286446147,
+            0.012437349115698845,
+            0.012215775044089779,
+            0.012433181011668605
+          ],
+          "launch_spread_nats": {
+            "min": 0.012215775044089779,
+            "max": 0.012437349115698845,
+            "sd_descriptive": 0.00010904172521653433,
+            "sd_is_not_sigma_A": "this is sqrt(sigma2_A + sigma2_E/T) -- a descriptive spread, not sigma_A"
+          },
+          "trajectory_bootstrap": {
+            "point": 0.012379287864475844,
+            "ci_low": 4.718298652238734e-05,
+            "ci_high": 0.0247113927424293,
+            "ci_half_width": 0.012332104877953456,
+            "bootstrap_mean": 0.01246980289930468,
+            "bias": 9.051503482883534e-05,
+            "std_error": 0.006403746798207329,
+            "draws": 10000
+          },
+          "variance_components": null,
+          "variance_components_omitted_because": "effective df on raw cells is ~5% of nominal (kurtosis ~45); the components are not estimable per position",
+          "scaling_law_predicted_launch_sd_nats": 0.00034857306452794004,
+          "scaling_law_predicted_cv_launch": 0.0281577638668716,
+          "replication_floor_nats": 0.00019421816702710421,
+          "ratio_to_floor": 63.739082980575375,
+          "floor_source": "production per-position floor (64 trajectories, 6 ordered pairs); the 4-trajectory per-position floor swings by an order of magnitude and is not used"
+        },
+        "512": {
+          "expected_kl_over_launches_nats": 0.001118734419176237,
+          "per_launch_nats": [
+            0.0011203807397448177,
+            0.0011108961286547352,
+            0.0011233023657648714,
+            0.0011203584425405243
+          ],
+          "launch_spread_nats": {
+            "min": 0.0011108961286547352,
+            "max": 0.0011233023657648714,
+            "sd_descriptive": 5.405329396017863e-06,
+            "sd_is_not_sigma_A": "this is sqrt(sigma2_A + sigma2_E/T) -- a descriptive spread, not sigma_A"
+          },
+          "trajectory_bootstrap": {
+            "point": 0.001118734419176237,
+            "ci_low": 0.0002617635212906596,
+            "ci_high": 0.002031047056840519,
+            "ci_half_width": 0.0008846417677749297,
+            "bootstrap_mean": 0.001120467463230544,
+            "bias": 1.7330440543069335e-06,
+            "std_error": 0.0004795772744350505,
+            "draws": 10000
+          },
+          "variance_components": null,
+          "variance_components_omitted_because": "effective df on raw cells is ~5% of nominal (kurtosis ~45); the components are not estimable per position",
+          "scaling_law_predicted_launch_sd_nats": 0.00010478750346467593,
+          "scaling_law_predicted_cv_launch": 0.0936661120535065,
+          "replication_floor_nats": 0.00019940233564050855,
+          "ratio_to_floor": 5.610437889720316,
+          "floor_source": "production per-position floor (64 trajectories, 6 ordered pairs); the 4-trajectory per-position floor swings by an order of magnitude and is not used"
+        },
+        "1024": {
+          "expected_kl_over_launches_nats": 0.0006358359798668171,
+          "per_launch_nats": [
+            0.0006157358122155951,
+            0.000618259112440445,
+            0.0006870437109484312,
+            0.0006223052838627971
+          ],
+          "launch_spread_nats": {
+            "min": 0.0006157358122155951,
+            "max": 0.0006870437109484312,
+            "sd_descriptive": 3.4245556719140495e-05,
+            "sd_is_not_sigma_A": "this is sqrt(sigma2_A + sigma2_E/T) -- a descriptive spread, not sigma_A"
+          },
+          "trajectory_bootstrap": {
+            "point": 0.0006358359798668171,
+            "ci_low": 9.76820067235924e-05,
+            "ci_high": 0.001561732791804838,
+            "ci_half_width": 0.0007320253925406228,
+            "bootstrap_mean": 0.0006321107286525569,
+            "bias": -3.7252512142602187e-06,
+            "std_error": 0.00040062527764898344,
+            "draws": 10000
+          },
+          "variance_components": null,
+          "variance_components_omitted_because": "effective df on raw cells is ~5% of nominal (kurtosis ~45); the components are not estimable per position",
+          "scaling_law_predicted_launch_sd_nats": 7.89984451140581e-05,
+          "scaling_law_predicted_cv_launch": 0.12424343323667403,
+          "replication_floor_nats": 3.4088774522850135e-05,
+          "ratio_to_floor": 18.65235664135149,
+          "floor_source": "production per-position floor (64 trajectories, 6 ordered pairs); the 4-trajectory per-position floor swings by an order of magnitude and is not used"
+        },
+        "1536": {
+          "expected_kl_over_launches_nats": 0.016727073262970217,
+          "per_launch_nats": [
+            0.015295653239208565,
+            0.021012213826357106,
+            0.015303433016295054,
+            0.01529699297002015
+          ],
+          "launch_spread_nats": {
+            "min": 0.015295653239208565,
+            "max": 0.021012213826357106,
+            "sd_descriptive": 0.002856762394077544,
+            "sd_is_not_sigma_A": "this is sqrt(sigma2_A + sigma2_E/T) -- a descriptive spread, not sigma_A"
+          },
+          "trajectory_bootstrap": {
+            "point": 0.016727073262970217,
+            "ci_low": 0.00017953130546771465,
+            "ci_high": 0.04972504704956009,
+            "ci_half_width": 0.024772757872046185,
+            "bootstrap_mean": 0.01676560367449655,
+            "bias": 3.853041152633227e-05,
+            "std_error": 0.01415060925950946,
+            "draws": 10000
+          },
+          "variance_components": null,
+          "variance_components_omitted_because": "effective df on raw cells is ~5% of nominal (kurtosis ~45); the components are not estimable per position",
+          "scaling_law_predicted_launch_sd_nats": 0.0004051874385962117,
+          "scaling_law_predicted_cv_launch": 0.024223450942443162,
+          "replication_floor_nats": 4.0701233470945155e-05,
+          "ratio_to_floor": 410.97214596483786,
+          "floor_source": "production per-position floor (64 trajectories, 6 ordered pairs); the 4-trajectory per-position floor swings by an order of magnitude and is not used"
+        },
+        "2048": {
+          "expected_kl_over_launches_nats": 0.00022351336391001478,
+          "per_launch_nats": [
+            0.00027094963317536,
+            0.00018858255692978624,
+            0.00016072760787827627,
+            0.00027379365765663655
+          ],
+          "launch_spread_nats": {
+            "min": 0.00016072760787827627,
+            "max": 0.00027379365765663655,
+            "sd_descriptive": 5.756306691455288e-05,
+            "sd_is_not_sigma_A": "this is sqrt(sigma2_A + sigma2_E/T) -- a descriptive spread, not sigma_A"
+          },
+          "trajectory_bootstrap": {
+            "point": 0.00022351336391001478,
+            "ci_low": 4.352611810390506e-05,
+            "ci_high": 0.0005041873394542663,
+            "ci_half_width": 0.0002303306106751806,
+            "bootstrap_mean": 0.00022275910721810232,
+            "bias": -7.542566919124631e-07,
+            "std_error": 0.00012307879093896842,
+            "draws": 10000
+          },
+          "variance_components": null,
+          "variance_components_omitted_because": "effective df on raw cells is ~5% of nominal (kurtosis ~45); the components are not estimable per position",
+          "scaling_law_predicted_launch_sd_nats": 4.68379351543418e-05,
+          "scaling_law_predicted_cv_launch": 0.2095531754119118,
+          "replication_floor_nats": 3.009928641533956e-05,
+          "ratio_to_floor": 7.42586919921481,
+          "floor_source": "production per-position floor (64 trajectories, 6 ordered pairs); the 4-trajectory per-position floor swings by an order of magnitude and is not used"
+        }
+      },
+      "resolvability": {
+        "form": "interval comparison; no floor is subtracted anywhere",
+        "signal": {
+          "expected_kl_over_launches_nats": 0.029963513149416015,
+          "trajectory_ci": [
+            0.02359034306059363,
+            0.036336683238238396
+          ],
+          "launch_inflated_ci_point": [
+            0.023578316194348907,
+            0.03634871010448312
+          ],
+          "launch_inflated_ci_upper_95": [
+            0.02341379351865445,
+            0.036513232780177575
+          ],
+          "se_launch_upper_95_nats": 0.0007917653527694952,
+          "survives_worst_case_launch_variance": true,
+          "criterion": "the lower end of the launch-inflated interval, taken at the ONE-SIDED 95% UPPER bound on the launch variance, still exceeds the floor"
+        },
+        "floor": {
+          "replication_floor_nats": 0.00020840602957329884,
+          "launch_level_ci_95": [
+            0.00011570270305627803,
+            0.00030110935609031965
+          ],
+          "phi_used": "the PRODUCTION floor headline (64 trajectories, 3 launches), with the delete-one-launch jackknife interval. Means are comparable across grid sizes; no worst-cell comparison is reported anywhere here, because a maximum is an extreme-value statistic and 40-cell and 640-cell maxima are not comparable."
+        },
+        "per_trajectory_ratio": {
+          "definition": "mean over trajectories of (BF16->Q KL) / (BF16->BF16 KL), both on the SAME trajectories -- a ratio, not a difference, and not a subtraction",
+          "mean": 232.01389035119877,
+          "min": 66.32583891741541,
+          "max": 482.37905733674893,
+          "bootstrap_ci": [
+            77.33922633610206,
+            386.68855436629553
+          ],
+          "phi_used": "the launch-pair-averaged BF16->BF16 KL on THESE trajectories, a different quantity from the production floor headline above",
+          "launch_coverage": "none -- the same BF16 launches enter both arms, so this is conditional on the launch set and its interval covers trajectory sampling only"
+        },
+        "does_not_address_G2_prime": "averaging launches shrinks the FIRST-order launch nuisance by sqrt(R) and leaves the SECOND-order floor untouched -- they are different functionals of the same perturbation. No value of R moves the G2' ratio in the direction of a pass, and this analysis is not an argument that it should."
+      },
+      "kl_cells_nats": {
+        "axes": [
+          "bf16_launch",
+          "trajectory",
+          "position"
+        ],
+        "bf16_launch_order": [
+          "F1",
+          "F2",
+          "F3",
+          "S"
+        ],
+        "position_order": [
+          1,
+          8,
+          32,
+          64,
+          128,
+          256,
+          512,
+          1024,
+          1536,
+          2048
+        ],
+        "values": [
+          [
+            [
+              0.01270736657178277,
+              0.0006020193027641525,
+              0.05058171192214575,
+              0.15973935932058303,
+              0.0006773136103094823,
+              0.019681354828773666,
+              0.0025784308898582453,
+              0.0019492606875662506,
+              0.00014271881074187423,
+              0.000835068649266542
+            ],
+            [
+              0.024396843100012805,
+              0.017896268149841504,
+              0.046813843395772804,
+              0.04028159665363703,
+              0.02305313792717718,
+              3.747992865112394e-05,
+              0.0004524877644650085,
+              3.028915934107445e-05,
+              0.06049883012744255,
+              5.312922794396183e-06
+            ],
+            [
+              0.04708607881008968,
+              0.06917577052249056,
+              0.11390255713474692,
+              0.11926094662126634,
+              0.009065910602279086,
+              0.029951255820680277,
+              0.001439555749078963,
+              0.00018495371324458353,
+              0.0003164044027849438,
+              0.0001546499792182434
+            ],
+            [
+              0.047584095112200325,
+              0.04392910125284005,
+              0.1133711337069458,
+              0.020172205587632122,
+              0.12170029419802939,
+              5.329456767952202e-05,
+              1.1048555577054138e-05,
+              0.00029843968871047147,
+              0.00022465961586489214,
+              8.876698142225837e-05
+            ]
+          ],
+          [
+            [
+              0.012706584026048455,
+              0.0005389443407728695,
+              0.05342319263833352,
+              0.1620487298187155,
+              0.0006775887589844892,
+              0.019707362263294746,
+              0.0024246104006898973,
+              0.0019661250703850446,
+              0.00010891946546121404,
+              0.0005026347952685541
+            ],
+            [
+              0.025115820087979582,
+              0.01687972126939455,
+              0.045630343020346346,
+              0.04155657663309209,
+              0.022596238804858806,
+              3.748381114083266e-05,
+              0.0005683698092730259,
+              2.351797742168028e-05,
+              0.08339887182131737,
+              8.278471810089095e-06
+            ],
+            [
+              0.04708607881008968,
+              0.06917577052249056,
+              0.11390255713474692,
+              0.11926094662126634,
+              0.009065910602279086,
+              0.029951255820680277,
+              0.001439555749078963,
+              0.00018495371324458353,
+              0.0003164044027849438,
+              0.0001546499792182434
+            ],
+            [
+              0.047584095112200325,
+              0.04392910125284005,
+              0.1133711337069458,
+              0.020172205587632122,
+              0.12170029419802939,
+              5.329456767952202e-05,
+              1.1048555577054138e-05,
+              0.00029843968871047147,
+              0.00022465961586489214,
+              8.876698142225837e-05
+            ]
+          ],
+          [
+            [
+              0.014272224778316137,
+              0.0004519898191939629,
+              0.049627129300787234,
+              0.16129400853353096,
+              0.0006776304673980228,
+              0.01969358609422217,
+              0.0025673550075842426,
+              0.0022169559303456196,
+              0.00013925602925724513,
+              0.00039557037750012137
+            ],
+            [
+              0.024217461265951576,
+              0.016593220346686602,
+              0.04840119074228326,
+              0.04147949034662464,
+              0.028212789103603152,
+              3.7234383073875636e-05,
+              0.0005769260072733728,
+              2.2931877325912837e-05,
+              0.06050283974560479,
+              6.353960484611245e-06
+            ],
+            [
+              0.04699747208996076,
+              0.07062662596390719,
+              0.1142503018995695,
+              0.11913189532793846,
+              0.0056954347889841385,
+              0.029073716462329324,
+              0.0013381481012669973,
+              0.0001880564015541627,
+              0.00034833673361968657,
+              0.00015669311835727273
+            ],
+            [
+              0.03677554957325468,
+              0.04402512312379102,
+              0.10539635363654447,
+              0.018419459079438275,
+              0.12267451523834355,
+              5.8563236733740814e-05,
+              1.0780346934872281e-05,
+              0.00032023063456802976,
+              0.00022329955669849805,
+              8.429297517109969e-05
+            ]
+          ],
+          [
+            [
+              0.01270736657178277,
+              0.0006020193027641525,
+              0.05058171192214575,
+              0.15973935932058303,
+              0.0006773136103094823,
+              0.019681354828773666,
+              0.0025784308898582453,
+              0.0019492606875662506,
+              0.00014271881074187423,
+              0.000835068649266542
+            ],
+            [
+              0.024396843100012805,
+              0.017896268149841504,
+              0.046813843395772804,
+              0.04028159665363703,
+              0.02305313792717718,
+              3.747992865112394e-05,
+              0.0004524877644650085,
+              3.028915934107445e-05,
+              0.06049883012744255,
+              5.312922794396183e-06
+            ],
+            [
+              0.04708607881008968,
+              0.06917577052249056,
+              0.11390255713474692,
+              0.11926094662126634,
+              0.009065910602279086,
+              0.029951255820680277,
+              0.001439555749078963,
+              0.00018495371324458353,
+              0.0003164044027849438,
+              0.0001546499792182434
+            ],
+            [
+              0.03618686837745828,
+              0.04217785626280979,
+              0.10197327368733028,
+              0.01984649564876319,
+              0.12374651616321508,
+              6.263346856935771e-05,
+              1.095936675988076e-05,
+              0.00032471757529927954,
+              0.0002300185391112273,
+              0.0001001430793473647
+            ]
+          ]
+        ]
+      }
+    }
+  },
+  "scale_limit": {
+    "bf16_to_bf16_scale": "production: 64 trajectories x 10 positions x 3 launches",
+    "bf16_to_quantized_scale": "4 trajectories x 10 positions x 4 BF16 launches",
+    "why": "FP8/FP4 full-vocabulary distributions exist only on the P10 smoke's 4 trajectories. P13 would supply 64 and is not authorised.",
+    "consequence": "every BF16->FP8 / BF16->FP4 number here is n=4 in trajectories and is NOT a result. The estimator, its tests and its behaviour on real artifacts are what this delivers."
+  },
+  "git": {
+    "git_head": "1bdb1fbcfa9eb82de9b61f164b5a1564385f2096",
+    "git_dirty": false
+  },
+  "gpu": {
+    "name": "NVIDIA RTX PRO 4000 Blackwell",
+    "uuid": "GPU-fdc11a18-6edb-7e2f-82b2-6bd0b9ed714d",
+    "driver_version": "575.64.03",
+    "memory_total_mib": "24467",
+    "power_limit_w": "145.00"
+  },
+  "software": {
+    "python": "3.13.13",
+    "kernel": "6.8.0-65-generic",
+    "transformers": "5.13.1",
+    "nvcc": "Cuda compilation tools, release 12.9, V12.9.86",
+    "git_head": "1bdb1fbcfa9eb82de9b61f164b5a1564385f2096",
+    "git_dirty": false,
+    "git_untracked_files": 2
+  },
+  "timestamp": "2026-09-13T17:22:43-0400",
+  "projection": {
+    "BF16||FP8": {
+      "projected_to_n_trajectories": 64,
+      "expected_kl_over_launches_nats_assumed": 0.0035265108453895384,
+      "by_n_bf16_launches": {
+        "R=1": {
+          "se_trajectory_nats": 0.00029916522704653614,
+          "se_launch_nats_point": 9.728786475195448e-05,
+          "se_total_nats_point": 0.0003145866521354651,
+          "launch_share_of_variance_point": 0.0956393817883808,
+          "se_total_over_theta_point": 0.08920620577326364,
+          "se_launch_nats_upper_95": 0.0005165267300111791,
+          "se_total_nats_upper_95": 0.0005969084484993046,
+          "launch_share_of_variance_upper_95": 0.7488074390569361,
+          "se_total_over_theta_upper_95": 0.1692631824115006
+        },
+        "R=3": {
+          "se_trajectory_nats": 0.0002976414281246576,
+          "se_launch_nats_point": 5.616917490342482e-05,
+          "se_total_nats_point": 0.0003028950246296846,
+          "launch_share_of_variance_point": 0.034388387306198365,
+          "se_total_over_theta_point": 0.08589085300153863,
+          "se_launch_nats_upper_95": 0.0002982168466155914,
+          "se_total_nats_upper_95": 0.000421335623157398,
+          "launch_share_of_variance_upper_95": 0.5009656960030753,
+          "se_total_over_theta_upper_95": 0.11947662764407499
+        },
+        "R=4": {
+          "se_trajectory_nats": 0.00029745040438511886,
+          "se_launch_nats_point": 4.864393237597724e-05,
+          "se_total_nats_point": 0.0003014016841788867,
+          "launch_share_of_variance_point": 0.026047497355907983,
+          "se_total_over_theta_point": 0.08546739181957452,
+          "se_launch_nats_upper_95": 0.00025826336500558956,
+          "se_total_nats_upper_95": 0.00039392475014002494,
+          "launch_share_of_variance_upper_95": 0.4298323262006634,
+          "se_total_over_theta_upper_95": 0.11170382494499659
+        },
+        "R=8": {
+          "se_trajectory_nats": 0.00029716363853615784,
+          "se_launch_nats_point": 3.4396454446633354e-05,
+          "se_total_nats_point": 0.0002991476962079895,
+          "launch_share_of_variance_point": 0.0132207481212719,
+          "se_total_over_theta_point": 0.08482823655542895,
+          "se_launch_nats_upper_95": 0.00018261977672750886,
+          "se_total_nats_upper_95": 0.0003487925041053111,
+          "launch_share_of_variance_upper_95": 0.2741330064432237,
+          "se_total_over_theta_upper_95": 0.09890583622089598
+        }
+      },
+      "caveat": "components estimated at n=4 trajectories with 3 df on the launch term and 3 on the trajectory term; indicative, not a measurement",
+      "pre_registerable_prediction": "the scaling law predicts the BF16 launch CV at production scale from sigma_proj pooled across configurations: SD_launch = sigma_proj*sqrt(2*signal). Registering that before P13 turns P13 into a test of the nuisance model rather than a first look at it."
+    },
+    "BF16||FP4": {
+      "projected_to_n_trajectories": 64,
+      "expected_kl_over_launches_nats_assumed": 0.029963513149416015,
+      "by_n_bf16_launches": {
+        "R=1": {
+          "se_trajectory_nats": 0.0009742896424239661,
+          "se_launch_nats_point": 0.0004106644973270268,
+          "se_total_nats_point": 0.0010573011097598827,
+          "launch_share_of_variance_point": 0.15086098597954922,
+          "se_total_over_theta_point": 0.03528628650744478,
+          "se_launch_nats_upper_95": 0.0015835307055389904,
+          "se_total_nats_upper_95": 0.001859249795675512,
+          "launch_share_of_variance_upper_95": 0.7253999029429207,
+          "se_total_over_theta_upper_95": 0.062050460718814225
+        },
+        "R=3": {
+          "se_trajectory_nats": 0.0009716034788770214,
+          "se_launch_nats_point": 0.00023709725807838128,
+          "se_total_nats_point": 0.001000114208455323,
+          "launch_share_of_variance_point": 0.05620227150597952,
+          "se_total_over_theta_point": 0.033377735229782796,
+          "se_launch_nats_upper_95": 0.0009142518791129742,
+          "se_total_nats_upper_95": 0.0013341176179885847,
+          "launch_share_of_variance_upper_95": 0.4696166482030336,
+          "se_total_over_theta_upper_95": 0.04452473951688761
+        },
+        "R=4": {
+          "se_trajectory_nats": 0.0009712671860872498,
+          "se_launch_nats_point": 0.0002053322486635134,
+          "se_total_nats_point": 0.0009927342439500408,
+          "launch_share_of_variance_point": 0.04278074277527975,
+          "se_total_over_theta_point": 0.033131436857876895,
+          "se_launch_nats_upper_95": 0.0007917653527694952,
+          "se_total_nats_upper_95": 0.0012530970914562238,
+          "launch_share_of_variance_upper_95": 0.39923034382159567,
+          "se_total_over_theta_upper_95": 0.04182076665067716
+        },
+        "R=8": {
+          "se_trajectory_nats": 0.0009707625284670373,
+          "se_launch_nats_point": 0.00014519182542625274,
+          "se_total_nats_point": 0.000981560264500516,
+          "launch_share_of_variance_point": 0.02188015493559074,
+          "se_total_over_theta_point": 0.032758517320911895,
+          "se_launch_nats_upper_95": 0.000559862650051869,
+          "se_total_nats_upper_95": 0.0011206364591600688,
+          "launch_share_of_variance_upper_95": 0.24959362885726671,
+          "se_total_over_theta_upper_95": 0.037400035622388625
+        }
+      },
+      "caveat": "components estimated at n=4 trajectories with 3 df on the launch term and 3 on the trajectory term; indicative, not a measurement",
+      "pre_registerable_prediction": "the scaling law predicts the BF16 launch CV at production scale from sigma_proj pooled across configurations: SD_launch = sigma_proj*sqrt(2*signal). Registering that before P13 turns P13 into a test of the nuisance model rather than a first look at it."
+    }
+  }
+}
