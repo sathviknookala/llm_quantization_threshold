@@ -233,12 +233,12 @@ single-reference headline remains the point estimate, and G2/G2' stand as writte
   `sigma_proj` measuring **2.05e-03 (FP8) and 2.11e-03 (FP4)** — 3% agreement across configurations
   whose signals differ by 8.6x. Pooling it buys degrees of freedom no per-configuration estimate at
   R=3 can, and it yields a prediction worth pre-registering before P13.
-- **The committed quality numbers are not bit-reproducible here** (`1bdb1fb`). Recomputing the
-  smoke BF16→FP8 headline from the same stored distributions gives 3.689712048515711e-03 against a
-  committed 3.6897120485158315e-03 — 3.3e-14 relative, 278 ULP. Not reduction order: an exact
-  `fsum` reproduces the new value. The interpreter moved (the artifact records python 3.12.13 with
-  torch and vLLM importable; neither holds now), so `np.log`/`np.exp` differ in their last bits.
-  Reproduction checks now use a relative tolerance at 1e-11.
+- **Quality analysis must run under `~/miniconda3/envs/qnt/bin/python`** (`1bdb1fb`, corrected
+  2026-09-14). Under the login shell's default `python3` (3.13, numpy 2.3.4) the smoke BF16→FP8
+  headline recomputes 3.3e-14 off the committed value; under `qnt` (3.12.13, numpy 2.2.6 — the
+  stack every artifact records) it is **bit-identical**. The default interpreter cannot import
+  vLLM, so a collection fails loudly, but analysis-only paths import fine and drift silently.
+  `RECOMPUTE_REL_TOL` at 1e-11 catches that as a tolerance report rather than a silent pass.
 - **Then an efficiency audit of the benchmarking code, three findings, all fixed** (`f0fffbf`,
   `402cf79`). `load_matrix(n_traj=n)` below the collected count was a trap — it loaded every shard
   then asserted the grid for `n`, raising on the trajectories it had just read — so a prefix caller
@@ -286,11 +286,12 @@ single-reference headline remains the point estimate, and G2/G2' stand as writte
   That includes every BF16→FP8/FP4 number in `launch_variance.json`: FP8 and FP4 full-vocabulary
   distributions exist only on the smoke's four trajectories. Only the BF16↔BF16 arm there is
   production scale.
-- **The committed quality numbers are not bit-reproducible on the current interpreter** — 3.3e-14
-  relative on the smoke BF16→FP8 headline, traced to `np.log`/`np.exp` rather than reduction order.
-  Immaterial to every reading, but it means the stored distributions, not the derived summaries,
-  are the durable artifact — and `dist/*.npy` is gitignored while a BF16 launch provably does not
-  regenerate itself. `launch_variance.json` records the SHA-256 of every matrix it consumed.
+- **Quality work runs under `envs/qnt`, not the login shell's `python3`.** The pinned environment
+  reproduces every committed number bit-identically; the default one drifts 3.3e-14 and imports
+  cleanly enough to do it silently on analysis-only paths. The stored distributions, not the
+  derived summaries, are the durable artifact — `dist/*.npy` is gitignored while a BF16 launch
+  provably does not regenerate itself, so `launch_variance.json` records the SHA-256 of every
+  matrix it consumed.
 - **The refined serving ceilings are still n=1** (21 / 57 / 70) and the margins are thin: C=K clears
   the 50 ms bound by 0.34 ms (FP8) and 0.43 ms (FP4) against a ~0.1 ms matched-cell spread, three to
   four noise widths; BF16 has 2.41 ms. The **ceiling replication pass** is pre-registered in

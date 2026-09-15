@@ -258,26 +258,30 @@ nuisance on that pair by roughly a factor of 2.5. Averaging launches shrinks thi
 by `sqrt(R)` and cannot touch the floor. See `DECISIONS.md` D13's fourth disposition, which is
 proposed and **not adopted**; every BF16→FP8/FP4 figure supporting it is n=4 and is not a result.
 
-## The committed quality numbers are not bit-reproducible on a moved interpreter
+## Quality analysis must run under the pinned interpreter, or it drifts in the last bits
 
-Measured 2026-09-12. `results/quality/smoke/kl_summary.json` records python 3.12.13 with torch
-2.10.0 and vLLM 0.19.1 importable. Recomputing its BF16→FP8 headline from the same stored
-distributions under the interpreter now present reproduces **3.689712048515711e-03 against a
-committed 3.6897120485158315e-03** — a relative difference of **3.3e-14**, or 278 ULP. BF16→FP4
-drifts 3.3e-15.
+**Corrected 2026-09-14.** An earlier version of this section reported that the committed quality
+numbers were not bit-reproducible. They are — under the environment the project actually pins.
+
+The confusion was mine and is worth recording because it is easy to repeat. Recomputing the smoke
+BF16→FP8 headline under the login shell's default `python3` (3.13.13, numpy 2.3.4, no torch or
+vLLM) gives **3.689712048515711e-03 against a committed 3.6897120485158315e-03** — 3.3e-14
+relative, 278 ULP; BF16→FP4 drifts 3.3e-15. Under `~/miniconda3/envs/qnt/bin/python` (3.12.13,
+numpy 2.2.6 — the stack every artifact's `software` block records) **both reproduce bit-identically.**
 
 The cause is the per-cell KL values, not the aggregation: an exact `math.fsum` over the forty cells
-reproduces the *new* value, so the reduction order is not at fault. `kl_nats` calls `np.log` and
-`np.exp`, whose last bits move between numpy builds and libm versions.
+reproduces the drifted value, so reduction order is not at fault. `kl_nats` calls `np.log` and
+`np.exp`, whose last bits move between numpy builds.
 
-This changes no reading anywhere — 3e-14 is ten orders of magnitude below the smallest quantity the
-study interprets — but two things follow. **Reproduction checks against committed quality numbers
-use a relative tolerance, not bit-equality** (`launch_variance.RECOMPUTE_REL_TOL`, 1e-11, about
-300x the measured drift). And **the stored distributions, not the derived summaries, are the
-durable artifact**: they are byte-stable, while anything recomputed from them carries the
-interpreter's signature. Note that `dist/*.npy` is gitignored and a BF16 launch provably does not
-regenerate itself, so those bytes are not recoverable if lost; `launch_variance.json` records the
-SHA-256 of every matrix it consumed for that reason.
+Three things follow. **Run the quality arm under `envs/qnt`** — the default `python3` cannot import
+vLLM at all, so a collection would fail loudly, but analysis-only paths import cleanly and drift
+silently, which is the dangerous case. **Reproduction checks keep a relative tolerance rather than
+bit-equality** (`launch_variance.RECOMPUTE_REL_TOL`, 1e-11, about 300x the observed drift) — not
+because exact reproduction is unavailable, but so a wrong-interpreter run is caught as a tolerance
+report instead of passing silently or aborting a whole analysis. And **the stored distributions,
+not the derived summaries, are the durable artifact**: `dist/*.npy` is gitignored and a BF16 launch
+provably does not regenerate itself, so `launch_variance.json` records the SHA-256 of every matrix
+it consumed.
 
 ## The execution profile changes quantized model outputs, and that is a result, not a footnote
 
