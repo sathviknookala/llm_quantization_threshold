@@ -30,3 +30,6 @@ results/sweep/followup.pid
 results/quality/**/dist/
 results/quality/**/logs/
 results/quality/checkpoint_hashes.json
+
+# Long-form working draft of the project brief; AGENTS.md is the tracked hub.
+quantization_project.md
