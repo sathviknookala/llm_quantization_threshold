@@ -1046,6 +1046,29 @@ def test_launch_variance_estimators(tmp):
            lambda: LV.floor_launch_ci(per_pair, 4), LV.LaunchDesignError)
 
 
+def test_partial_matrix_load():
+    print("collect_kl: n_traj reads a prefix and loads only the shards covering it")
+    import numpy as np
+    from harness.quality import collect_kl as C
+    from harness import common as _c
+    root = os.path.join(_c.REPO, "results", "quality", "floor64", "launch1")
+    if not os.path.exists(os.path.join(root, "collection_BF16.json")):
+        check("floor64 launch1 is present", False, True)
+        return
+    full, cells_full, summary = C.load_matrix("BF16_REFERENCE", root=root)
+    check("the full grid still loads", full.shape[0], summary["n_trajectories"] * 10)
+    for n in (4, 8, 16):
+        mat, cells, _ = C.load_matrix("BF16_REFERENCE", root=root, n_traj=n)
+        check(f"n_traj={n} returns exactly {n * 10} rows", mat.shape[0], n * 10)
+        check(f"n_traj={n} is bit-identical to the full load's prefix",
+              bool(np.array_equal(mat, full[:n * 10])), True)
+        check(f"n_traj={n} returns the matching cells", cells, cells_full[:n * 10])
+    # the regression this guards: n_traj below the collected count used to load every shard and
+    # then assert the grid for n, raising on the trajectories it had just read
+    raises("n_traj above the collected count still aborts",
+           lambda: C.load_matrix("BF16_REFERENCE", root=root, n_traj=65), SystemExit)
+
+
 def test_launch_variance_guards(tmp):
     print("launch variance: exchangeability preconditions must abort")
     from harness.quality import launch_variance as LV
@@ -1176,7 +1199,7 @@ def main():
              test_spec_hash, test_observed_identity, test_freeze_guard,
              test_manifest_adoption, test_collect_manifest_plumbing,
              test_launch_variance_math, test_launch_variance_estimators,
-             test_launch_variance_guards]
+             test_launch_variance_guards, test_partial_matrix_load]
     if os.environ.get("QSELFTEST_ONLY"):
         want = os.environ["QSELFTEST_ONLY"]
         tests = [t for t in tests if want in t.__name__]

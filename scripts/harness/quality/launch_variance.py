@@ -127,11 +127,11 @@ def _rel(path):
 
 
 def load_launch_matrices(sources=BF16_LAUNCH_SOURCES, n_traj=4, traj=None):
-    """BF16 logprob matrices, one per launch, truncated to the first `n_traj` trajectories.
+    """BF16 logprob matrices, one per launch, over the first `n_traj` trajectories.
 
-    Truncation is by ROW RANGE and is only sound because `load_matrix` has already asserted
-    canonical (trajectory, ascending position) order, so rows [0, n_traj*10) are exactly
-    trajectories 0..n_traj-1.
+    `load_matrix` reads only the shards covering those trajectories, so a 4-trajectory design
+    touches one 8-trajectory shard per launch rather than all eight. Loading the full grid and
+    slicing cost 1.34 GB peak to retain 82 MB.
     """
     traj = traj if traj is not None else C.subset(T.load(), None)
     mats, meta = {}, []
@@ -141,11 +141,10 @@ def load_launch_matrices(sources=BF16_LAUNCH_SOURCES, n_traj=4, traj=None):
                 f"launch {src['launch']} collected {src['n_trajectories']} trajectories, "
                 f"the requested design needs {n_traj}")
         root = os.path.join(common.REPO, src["root"])
-        mat, cells, summary = C.load_matrix(q.REFERENCE_CONFIG, root=root,
-                                            n_traj=src["n_trajectories"])
-        A.verify_cells(cells, C.subset(traj, src["n_trajectories"]))
-        mats[src["launch"]] = mat[:n_traj * N_POS]
-        meta.append({**src, "cells": cells[:n_traj * N_POS], "summary": summary})
+        mat, cells, summary = C.load_matrix(q.REFERENCE_CONFIG, root=root, n_traj=n_traj)
+        A.verify_cells(cells, C.subset(traj, n_traj))
+        mats[src["launch"]] = mat
+        meta.append({**src, "cells": cells, "summary": summary})
     return mats, meta
 
 
@@ -997,10 +996,9 @@ def analyze(n_traj=4, sources=BF16_LAUNCH_SOURCES, quantized=("FP8_PRIMARY", "FP
     for cfg in quantized:
         short = q.QUALITY_CONFIGS[cfg]["short"]
         qmat, qcells, qsummary = C.load_matrix(cfg, root=os.path.join(common.REPO, smoke_root),
-                                               n_traj=None)
-        A.verify_cells(qcells, C.subset(traj_full, qsummary["n_trajectories"]))
-        qmat = qmat[:n_traj * N_POS]
-        if qcells[:n_traj * N_POS] != ref_cells:
+                                               n_traj=n_traj)
+        A.verify_cells(qcells, C.subset(traj_full, n_traj))
+        if qcells != ref_cells:
             raise LaunchDesignError(
                 f"{short}'s cells differ from the BF16 launches'; the comparison would not be "
                 "scored on the same contexts")

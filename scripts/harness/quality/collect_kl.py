@@ -289,20 +289,33 @@ def collect(config_id, root=None, allow_dirty=False, n_traj=None,
 
 
 def load_matrix(config_id, root=None, n_traj=None):
-    """The (n_trajectories * 10, vocab) array, assembled from shards in canonical order."""
+    """The (n_traj * 10, vocab) array, assembled from shards in canonical order.
+
+    `n_traj` below the collected count reads the FIRST n trajectories and loads only the shards
+    covering them. It used to load every shard and then assert the grid for n, which raised
+    GridIncompleteError on the trajectories it had just read -- so the argument could only ever be
+    passed as the full count, and a caller wanting a prefix had to load everything and slice.
+    """
     short = q.QUALITY_CONFIGS[config_id]["short"]
     summary = json.load(open(os.path.join(run_dir(root), f"collection_{short}.json")))
-    n = n_traj or summary["n_trajectories"]
+    collected = summary["n_trajectories"]
+    n = n_traj or collected
+    if n > collected:
+        raise SystemExit(f"ABORT: asked for {n} trajectories, {short} collected {collected}")
+    want_rows = n * N_POS
     blocks, cells, identities = [], [], set()
     for s in sorted(summary["shards"], key=lambda x: x["start"]):
+        if s["start"] >= want_rows:
+            break
         arr = np.load(os.path.join(common.REPO, s["npy"]))
         m = json.load(open(os.path.join(common.REPO, s["json"])))
         if arr.shape[0] != s["stop"] - s["start"]:
             raise SystemExit(f"ABORT: {s['npy']} holds {arr.shape[0]} rows, expected "
                              f"{s['stop'] - s['start']}")
         identities.add(m.get("engine_identity_hash"))
-        blocks.append(arr)
-        cells.extend(m["index"])
+        keep = min(arr.shape[0], want_rows - s["start"])
+        blocks.append(arr[:keep])
+        cells.extend(m["index"][:keep])
     mat = np.concatenate(blocks, axis=0)
     P.assert_complete_grid(cells, n)
     # completeness is a set property; the reshape in analysis depends on the ORDER
