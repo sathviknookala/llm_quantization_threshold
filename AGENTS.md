@@ -239,7 +239,16 @@ single-reference headline remains the point estimate, and G2/G2' stand as writte
   `fsum` reproduces the new value. The interpreter moved (the artifact records python 3.12.13 with
   torch and vLLM importable; neither holds now), so `np.log`/`np.exp` differ in their last bits.
   Reproduction checks now use a relative tolerance at 1e-11.
-- **Verification moved 181 → 278 quality selftest checks**, harness selftest unchanged at 49/49.
+- **Then an efficiency audit of the benchmarking code, three findings, all fixed** (`f0fffbf`,
+  `402cf79`). `load_matrix(n_traj=n)` below the collected count was a trap — it loaded every shard
+  then asserted the grid for `n`, raising on the trajectories it had just read — so a prefix caller
+  had to load everything and slice: **1.34 GB peak RSS to retain 82 MB**, now 0.16 GB.
+  **Host and client CPU were never recorded** although `LIMITATIONS.md` has always required it
+  before calling the GPU the limiting resource; the driver now reports `host_cpu_busy_frac`,
+  `client_cpu_cores`, `host_loadavg_1m` and `cpu_count` over the measurement window, in-process at
+  50 µs/sample. And **`gpu_telemetry` forked `/bin/sh` per sample** (~3,700 shells across the
+  sweep), now argv — which also fixes a latent break on any `REPO` path containing a space.
+- **Verification moved 181 → 293 quality selftest checks and 49 → 62 harness checks.**
   `kl_spec_hash` `5565ff73dbe5e36a` and `sweep_config_hash` `df0f0f124d987a5c` both unchanged;
   nothing previously under `results/` was modified.
 
@@ -315,6 +324,10 @@ single-reference headline remains the point estimate, and G2/G2' stand as writte
 - **`results/quality/smoke/kl_summary.json` still carries the n=4-floor ratios** (12.37x / 98.72x)
   while the hub quotes the production-floor ones (17.7x / 141.3x). Regenerating it is now possible
   and would change a committed number, so it needs its own decision.
+- **The completed sweep carries no host/client CPU telemetry.** The fields exist from 2026-09-14
+  onward, so for the 124 cells behind the 21 / 57 / 70 headline the claim that the GPU — not the
+  benchmark client — was the limiting resource rests on the host being a 32-core machine driving
+  one GPU. That is an argument, not a measurement. The ceiling replication will carry it.
 - **The GPU is power-limited at 145 W**, so every number is measured under a power ceiling.
 
 At the end of a session, overwrite `Current focus`, `Last session`, and `Known issues / unresolved premises` in place. Git history is the changelog; this file should remain a current-state hub.
