@@ -283,6 +283,35 @@ def main():
     tok = r["window_streamed_tokens"] / float(40 * 4)
     check("t1.periods_are_token_exact", abs(tok - r["periods_in_window"]) < 0.05, True)
 
+    # LIMITATIONS.md requires client behaviour to be monitored before the GPU is called the
+    # limiting resource. These are recorded over the measurement window, not the whole cell.
+    check("t1.host_cpu_busy_frac_recorded", isinstance(r["host_cpu_busy_frac"], float), True)
+    check("t1.host_cpu_busy_frac_in_range", 0.0 <= r["host_cpu_busy_frac"] <= 1.0, True)
+    check("t1.client_cpu_cores_recorded", isinstance(r["client_cpu_cores"], float), True)
+    check("t1.client_cpu_cores_nonnegative", r["client_cpu_cores"] >= 0.0, True)
+    check("t1.client_cpu_cores_below_host_capacity",
+          r["client_cpu_cores"] <= (r["cpu_count"] or 1), True)
+    check("t1.cpu_count_recorded", (r["cpu_count"] or 0) > 0, True)
+    check("t1.loadavg_recorded", isinstance(r["host_loadavg_1m"], float), True)
+    print("     host:", {k: r[k] for k in ("host_cpu_busy_frac", "client_cpu_cores",
+                                           "host_loadavg_1m", "cpu_count")})
+
+    print("\n== T1b host CPU summary is a difference over the window ==")
+    a = {"cpu_total_jiffies": 1000, "cpu_idle_jiffies": 800, "client_cpu_s": 1.0,
+         "loadavg_1m": 0.5, "cpu_count": 8}
+    b = {"cpu_total_jiffies": 2000, "cpu_idle_jiffies": 1400, "client_cpu_s": 4.0,
+         "loadavg_1m": 2.5, "cpu_count": 8}
+    h = common.host_cpu_summary(a, b, wall_s=6.0)
+    check("t1b.busy_frac_oracle", h["host_cpu_busy_frac"], 0.4)
+    check("t1b.client_cores_oracle", h["client_cpu_cores"], 0.5)
+    check("t1b.loadavg_is_the_last_sample", h["host_loadavg_1m"], 2.5)
+    check("t1b.no_samples_yields_none",
+          common.host_cpu_summary(None, None, 1.0)["host_cpu_busy_frac"], None)
+    check("t1b.zero_wall_yields_no_client_rate",
+          common.host_cpu_summary(a, b, 0.0)["client_cpu_cores"], None)
+    check("t1b.no_subprocess_in_host_telemetry",
+          "cpu_total_jiffies" in common.host_telemetry(), True)
+
     print("\n== T2 within-SLO collapse -> NONSTATIONARY (infeasible), not a defect ==")
     r = run_case("t2_collapse", n_out=40, conc=8, rate=1600,
                  plan=[(11000, 250.0)], min_periods=8, window_floor_s=4.0)

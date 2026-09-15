@@ -5,6 +5,7 @@ import json
 import os
 import platform
 import re
+import resource
 import subprocess
 import time
 
@@ -86,11 +87,62 @@ SMI_FIELDS = [
 ]
 
 
-def gpu_telemetry():
-    q = ("nvidia-smi --query-gpu=" + ",".join(SMI_FIELDS)
-         + " --format=csv,noheader,nounits")
+def host_telemetry():
+    """Host and client CPU, sampled in-process.
+
+    `LIMITATIONS.md` requires client behaviour to be monitored before the GPU is called the
+    limiting resource, and nothing recorded it. Raw counters only -- rates are differences between
+    two samples, taken at the window boundaries where the window is actually defined.
+
+    No subprocess: this runs inside a timed cell, where `gpu_telemetry`'s nvidia-smi already costs
+    a fork. Two small /proc reads and a getrusage are microseconds.
+    """
+    rec = {}
     try:
-        out = subprocess.run(q, shell=True, capture_output=True, text=True, timeout=10)
+        with open("/proc/stat") as fh:
+            f = fh.readline().split()
+        v = [int(x) for x in f[1:]]
+        rec["cpu_total_jiffies"] = sum(v)
+        # iowait counts as not-busy: the client is network-bound on the server, and folding it
+        # into busy would report the harness as saturated while it waits on sockets
+        rec["cpu_idle_jiffies"] = v[3] + (v[4] if len(v) > 4 else 0)
+    except Exception as exc:
+        rec["proc_stat_error"] = str(exc)[:80]
+    try:
+        with open("/proc/loadavg") as fh:
+            rec["loadavg_1m"] = float(fh.read().split()[0])
+    except Exception as exc:
+        rec["loadavg_error"] = str(exc)[:80]
+    ru = resource.getrusage(resource.RUSAGE_SELF)
+    rec["client_cpu_s"] = ru.ru_utime + ru.ru_stime
+    rec["cpu_count"] = os.cpu_count()
+    return rec
+
+
+def host_cpu_summary(first, last, wall_s):
+    """Busy fraction and client core-equivalents between two `host_telemetry` samples."""
+    out = {"host_cpu_busy_frac": None, "host_loadavg_1m": (last or {}).get("loadavg_1m"),
+           "client_cpu_cores": None, "cpu_count": (last or {}).get("cpu_count")}
+    if not first or not last:
+        return out
+    dt = (last.get("cpu_total_jiffies") or 0) - (first.get("cpu_total_jiffies") or 0)
+    di = (last.get("cpu_idle_jiffies") or 0) - (first.get("cpu_idle_jiffies") or 0)
+    if dt > 0:
+        out["host_cpu_busy_frac"] = round(1.0 - di / dt, 4)
+    dc = (last.get("client_cpu_s") or 0.0) - (first.get("client_cpu_s") or 0.0)
+    if wall_s and wall_s > 0:
+        out["client_cpu_cores"] = round(dc / wall_s, 3)
+    return out
+
+
+# argv, not a shell string: this runs every TELEMETRY_PERIOD_S inside a timed cell, and
+# shell=True forks /bin/sh to exec nvidia-smi -- one extra process per sample on the host running
+# the server under measurement. It also breaks on a REPO path containing a space.
+def gpu_telemetry():
+    q = ["nvidia-smi", "--query-gpu=" + ",".join(SMI_FIELDS),
+         "--format=csv,noheader,nounits"]
+    try:
+        out = subprocess.run(q, capture_output=True, text=True, timeout=10)
         vals = [v.strip() for v in out.stdout.strip().split(",")]
         rec = {}
         for k, v in zip(SMI_FIELDS, vals):
@@ -105,9 +157,9 @@ def gpu_telemetry():
 
 
 def gpu_identity():
-    q = ("nvidia-smi --query-gpu=name,uuid,driver_version,memory.total,power.limit"
-         " --format=csv,noheader,nounits")
-    out = subprocess.run(q, shell=True, capture_output=True, text=True, timeout=15)
+    q = ["nvidia-smi", "--query-gpu=name,uuid,driver_version,memory.total,power.limit",
+         "--format=csv,noheader,nounits"]
+    out = subprocess.run(q, capture_output=True, text=True, timeout=15)
     keys = ["name", "uuid", "driver_version", "memory_total_mib", "power_limit_w"]
     return dict(zip(keys, [v.strip() for v in out.stdout.strip().split(",")]))
 
@@ -149,17 +201,19 @@ def software_identity():
         rec["compressed_tensors"] = compressed_tensors.__version__
     except Exception:
         pass
-    rec["nvcc"] = subprocess.run("nvcc --version | tail -2 | head -1", shell=True,
-                                 capture_output=True, text=True).stdout.strip()
-    rec["git_head"] = subprocess.run("git -C %s rev-parse HEAD" % REPO, shell=True,
+    # `nvcc --version | tail -2 | head -1` was the release line; sliced here instead of piping
+    # through two more processes
+    nv = subprocess.run(["nvcc", "--version"], capture_output=True, text=True).stdout.splitlines()
+    rec["nvcc"] = nv[-2].strip() if len(nv) >= 2 else ""
+    rec["git_head"] = subprocess.run(["git", "-C", REPO, "rev-parse", "HEAD"],
                                      capture_output=True, text=True).stdout.strip()
     # provenance asks whether the code that ran matches HEAD, so dirty means tracked-file
     # modifications; untracked scratch files are counted separately rather than conflated
     rec["git_dirty"] = bool(subprocess.run(
-        "git -C %s status --porcelain --untracked-files=no" % REPO, shell=True,
+        ["git", "-C", REPO, "status", "--porcelain", "--untracked-files=no"],
         capture_output=True, text=True).stdout.strip())
     rec["git_untracked_files"] = len([
-        l for l in subprocess.run("git -C %s status --porcelain" % REPO, shell=True,
+        l for l in subprocess.run(["git", "-C", REPO, "status", "--porcelain"],
                                   capture_output=True, text=True).stdout.splitlines()
         if l.startswith("??")])
     return rec

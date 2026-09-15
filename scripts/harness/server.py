@@ -34,8 +34,8 @@ CHILD_ENV["VLLM_LOGGING_LEVEL"] = "INFO"
 
 def gpu_holder_pids():
     out = subprocess.run(
-        "nvidia-smi --query-compute-apps=pid --format=csv,noheader",
-        shell=True, capture_output=True, text=True, timeout=15).stdout
+        ["nvidia-smi", "--query-compute-apps=pid", "--format=csv,noheader"],
+        capture_output=True, text=True, timeout=15).stdout
     return [int(x) for x in out.split() if x.strip().isdigit()]
 
 

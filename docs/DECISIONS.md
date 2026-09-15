@@ -658,6 +658,28 @@ argument rather than a measurement:
 - queue depth and time-in-queue;
 - KV-block utilisation.
 
+**Extended 2026-09-14 — host and client CPU.** `LIMITATIONS.md` has always required client
+behaviour to be monitored before the GPU is called the limiting resource, and nothing recorded it:
+cell records carried four `gpu_*` fields and nothing about the host. The driver now samples
+`/proc/stat`, `/proc/loadavg` and its own `getrusage` alongside the GPU, and each cell reports over
+the **measurement window** (not the whole cell):
+
+```text
+host_cpu_busy_frac    1 - d(idle+iowait)/d(total) across the window
+client_cpu_cores      harness process CPU-seconds per wall-second -- core-equivalents
+host_loadavg_1m       last sample in the window
+cpu_count             so "busy" and "cores" have a denominator
+```
+
+In-process only — two small `/proc` reads and a `getrusage`, measured at **50 us per sample**
+against a 10 s period. It adds no subprocess to a timed cell, and it does not enter `SWEEP_SPEC`,
+so `sweep_config_hash` is unchanged at `df0f0f124d987a5c` and these cells stay comparable with the
+completed sweep.
+
+**The completed sweep predates these fields and does not carry them.** Their absence in
+`results/sweep/cells.jsonl` is the schema it was collected under, not a defect, and the
+client-headroom question stays open for those cells — see `LIMITATIONS.md`.
+
 ### Cell-abort rule
 
 At concurrency 64 the BF16 configuration needs 163,840 KV tokens against 39,664 available — a 4x

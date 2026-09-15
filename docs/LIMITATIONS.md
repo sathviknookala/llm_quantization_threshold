@@ -360,6 +360,18 @@ The host is strong enough that it is not expected to dominate normal single-GPU 
 
 CPU and client behavior should be monitored during saturation testing before claiming the GPU is the limiting resource.
 
+**Instrumented 2026-09-14, and the completed sweep predates it.** The driver now records
+`host_cpu_busy_frac`, `client_cpu_cores`, `host_loadavg_1m` and `cpu_count` over each measurement
+window (see `DECISIONS.md` D11, required per-point logging). **`results/sweep/cells.jsonl` carries
+none of them**, so for the 124 cells behind the 21 / 57 / 70 headline the client-headroom question
+is not answered by evidence — it rests on the host being a 32-core machine driving a single GPU,
+which is an argument, not a measurement. The ceiling replication and any later sweep will carry it.
+
+One residual the instrumentation does not reach: the client timestamps a token *after* parsing its
+SSE chunk, so every inter-token latency carries one JSON parse. That is order 10 us against a 50 ms
+SLO — about 0.02% — and it inflates ITL rather than deflating it, so it cannot manufacture
+headroom.
+
 ## Power / thermal / clock behavior
 
 The GPU uses dynamic clocks and power management. Final results represent performance under the locked stock power/environment policy, not an architecture-level theoretical maximum.

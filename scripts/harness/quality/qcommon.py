@@ -238,9 +238,9 @@ def config_identity(config_id):
 
 def git_state():
     dirty = bool(subprocess.run(
-        "git -C %s status --porcelain --untracked-files=no" % common.REPO, shell=True,
+        ["git", "-C", common.REPO, "status", "--porcelain", "--untracked-files=no"],
         capture_output=True, text=True).stdout.strip())
-    head = subprocess.run("git -C %s rev-parse HEAD" % common.REPO, shell=True,
+    head = subprocess.run(["git", "-C", common.REPO, "rev-parse", "HEAD"],
                           capture_output=True, text=True).stdout.strip()
     return {"git_head": head, "git_dirty": dirty}
 

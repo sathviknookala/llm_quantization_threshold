@@ -193,7 +193,7 @@ class Cell:
                 eng = {"error": str(exc)[:120]}
             self.samples.append({
                 "t": t, "phase": self.phase, "streamed_tokens": self.streamed_tokens,
-                "gpu": gpu, "engine": eng,
+                "gpu": gpu, "engine": eng, "host": common.host_telemetry(),
             })
             try:
                 await asyncio.wait_for(self.stop.wait(), timeout=common.TELEMETRY_PERIOD_S)
@@ -598,6 +598,10 @@ class Cell:
             return round(fn(vals), 2) if vals else None
 
         pcq, pch = delta("prefix_cache_queries"), delta("prefix_cache_hits")
+        # first and last of the WINDOW: a host rate is a difference, and the only interval it may
+        # be quoted over is the one the throughput is quoted over
+        host_cpu = common.host_cpu_summary(
+            (ws[0].get("host") if ws else None), (ws[-1].get("host") if ws else None), dur)
 
         status = self.status
         invalid_reasons = []
@@ -673,6 +677,8 @@ class Cell:
             "prefix_cache_queries_delta": pcq,
             "prefix_cache_hits_delta": pch,
             "prompt_tokens_cached_delta": delta("prompt_tokens_cached"),
+
+            **host_cpu,
 
             "gpu_util_mean_pct": agg("utilization.gpu", common.mean),
             "gpu_mem_used_mib_max": agg("memory.used", max),
