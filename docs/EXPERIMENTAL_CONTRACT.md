@@ -285,11 +285,27 @@ wider bracket would have to be pre-registered as its own phase.
 Recorded but not gating: TPOT P95 and its margin to 50 ms at every point, matched-cell spread
 against repetition 1, per-launch `kv_cache_tokens` (H10), and `num_preemptions_delta`.
 
-**Reproduction.** `python3 scripts/harness/run_sweep.py --job ceiling` (add `--dry-run` to print the
-eighteen cells without launching an engine); `python3 scripts/harness/analyze_ceiling.py --write`
-applies the criterion above and writes `results/sweep/ceiling_replication.json`. The phase is
-deliberately excluded from `--job all` so an additive pass over a completed artifact is never a side
-effect of re-invoking the sweep.
+**Reproduction.** The serving stack lives in `~/miniconda3/envs/qnt` (python 3.12.13, torch
+2.10.0+cu128, vLLM 0.19.1 — the software identity every cell records). The login shell's `python3`
+cannot import vLLM, so the interpreter is named explicitly:
+
+```text
+~/miniconda3/envs/qnt/bin/python scripts/harness/run_sweep.py --job ceiling
+~/miniconda3/envs/qnt/bin/python scripts/harness/analyze_ceiling.py --write
+```
+
+`--dry-run` prints the plan without launching an engine, but it reports the **static** eighteen
+cells: `ceiling_dry_run` does not consult `orch.done_keys`, so on a partially complete pass it
+overstates what remains. The run itself resumes correctly — `replicate_ceiling_group` checks
+`done_keys` per group and again per cell, so a completed cell is skipped, never duplicated.
+
+`analyze_ceiling.py --write` applies the criterion above and writes
+`results/sweep/ceiling_replication.json`. The phase is deliberately excluded from `--job all` so an
+additive pass over a completed artifact is never a side effect of re-invoking the sweep.
+
+**Status 2026-09-14: PARTIAL, 1 of 18 cells.** `FP8 C=56 rep2` measured 48.774 ms against
+repetition 1's 48.958 — a 0.18 ms replication — before the run took SIGTERM during C=57. No cell
+that fixes a K has been measured, and `analyze_ceiling.py` has never run on real cells.
 
 ### Saturation criterion
 

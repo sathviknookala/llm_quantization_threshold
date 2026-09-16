@@ -141,7 +141,7 @@ the number, never as a bandwidth or weight-residency benefit.
 
 ```text
 0-4. serving sweep + refinement                                DONE 2026-08-25
-4b. ceiling replication, rig built + pre-registered            READY 2026-08-31, NOT RUN
+4b. ceiling replication                                        PARTIAL 2026-09-14, 1/18 cells
 5. quality run
    P0-P6  contract, numerics, engine lifecycle, G7, G9         DONE 2026-08-25
    P7     64 BF16 trajectories frozen                          DONE 2026-08-26
@@ -202,55 +202,35 @@ number of unstable cells rather than uniform jitter.
 
 ## Last session
 
-**Session 9 — built, reviewed and measured a fourth disposition for the BF16 replication floor:
-treat BF16 launch identity as a nuisance variance component.** No GPU cells were run. It is
-**PROPOSED and not adopted** — the P13 analysis contract is unchanged, the locked 64-trajectory
-single-reference headline remains the point estimate, and G2/G2' stand as written.
+**Session 10 — started the ceiling replication (it was killed at 1 of 18 cells), and synthesised
+what the BF16 tests have actually established.** No new BF16 serving cells exist.
 
-- **The estimator** (`19f10e4`, `scripts/harness/quality/launch_variance.py`). Reports
-  `E_r[KL(B_r || Q)]` over BF16 launches, unsubtracted, with the launch term carried as a separable
-  variance component. Artifacts: `results/quality/launch_variance.json` (R=3, reported) and
-  `launch_variance_r4.json` (R=4, sensitivity).
-- **It is not the barred averaged reference, and it makes G2' worse.** That one pools logit
-  matrices into a distribution no launch produced; KL is convex in its first argument, so by Jensen
-  the pool is provably smaller — which is why it would rescue the bound. This averages KL values
-  against real launches and moves the floor's share of the BF16→FP8 signal **5.65% → 6.00%**. FP4
-  goes 0.708% → 0.692%. The code aborts if it cannot recover the committed headline to state the
-  direction.
-- **It cannot fix G2' at any R, structurally.** The floor is second order in the launch
-  perturbation while `KL(B_r||Q)` is first order, so averaging shrinks the first-order nuisance by
-  `sqrt(R)` and leaves the floor untouched.
-- **Two reviewers checked the formulation before implementation and both changed it materially.**
-  The launch effect is not separable at this scale (`F = 1.48` / `2.03` on (2,6) df); the spread of
-  per-launch headlines is `sqrt(sigma2_A + sigma2_E/T)` and quoting it as `sigma_A` overstated the
-  effect **1.8x**; `max(0, ·)` on a variance component would report `0.0` about 63% of the time
-  under a null and already did at 5/10 and 7/10 positions; the floor's own uncertainty was
-  understated **3.2x**; per-position components are not estimable; and a dominance count was
-  dropped as the sign test it denied being. I had also cited a contract rule barring floor
-  subtraction — **no such rule is tracked**, and the bar is now stated as this module's own
-  proposal.
-- **The better formulation came out of review.** `SD_launch = sigma_proj * sqrt(2 * signal)`, with
-  `sigma_proj` measuring **2.05e-03 (FP8) and 2.11e-03 (FP4)** — 3% agreement across configurations
-  whose signals differ by 8.6x. Pooling it buys degrees of freedom no per-configuration estimate at
-  R=3 can, and it yields a prediction worth pre-registering before P13.
-- **Quality analysis must run under `~/miniconda3/envs/qnt/bin/python`** (`1bdb1fb`, corrected
-  2026-09-14). Under the login shell's default `python3` (3.13, numpy 2.3.4) the smoke BF16→FP8
-  headline recomputes 3.3e-14 off the committed value; under `qnt` (3.12.13, numpy 2.2.6 — the
-  stack every artifact records) it is **bit-identical**. The default interpreter cannot import
-  vLLM, so a collection fails loudly, but analysis-only paths import fine and drift silently.
-  `RECOMPUTE_REL_TOL` at 1e-11 catches that as a tolerance report rather than a silent pass.
-- **Then an efficiency audit of the benchmarking code, three findings, all fixed** (`f0fffbf`,
-  `402cf79`). `load_matrix(n_traj=n)` below the collected count was a trap — it loaded every shard
-  then asserted the grid for `n`, raising on the trajectories it had just read — so a prefix caller
-  had to load everything and slice: **1.34 GB peak RSS to retain 82 MB**, now 0.16 GB.
-  **Host and client CPU were never recorded** although `LIMITATIONS.md` has always required it
-  before calling the GPU the limiting resource; the driver now reports `host_cpu_busy_frac`,
-  `client_cpu_cores`, `host_loadavg_1m` and `cpu_count` over the measurement window, in-process at
-  50 µs/sample. And **`gpu_telemetry` forked `/bin/sh` per sample** (~3,700 shells across the
-  sweep), now argv — which also fixes a latent break on any `REPO` path containing a space.
-- **Verification moved 181 → 293 quality selftest checks and 49 → 62 harness checks.**
-  `kl_spec_hash` `5565ff73dbe5e36a` and `sweep_config_hash` `df0f0f124d987a5c` both unchanged;
-  nothing previously under `results/` was modified.
+- **Ceiling replication is PARTIAL** (`175ae12`). `run_sweep.py --job ceiling` ran, completed
+  `FP8 C=56 rep2` (48.774 ms, SLO True, 1402.4 tok/s), and took SIGTERM partway through C=57;
+  engines tore down cleanly through the finally blocks and the GPU is idle. The landed cell
+  replicates its rep-1 counterpart to **0.18 ms** (48.774 vs 48.958) and 0.4% on throughput.
+  **The two cells that actually fix K=57 — C=57 and C=58 — did not run.**
+- **Resume is clean; the dry-run's count is not.** `replicate_ceiling_group` consults
+  `orch.done_keys` before each group and again per cell, so C=56 is skipped rather than
+  duplicated. But `ceiling_dry_run` reports the static plan and still prints "18 cells, 6
+  launches" — cosmetic, and misleading in exactly this situation. **17 cells remain.**
+- **The client-headroom question is answered on the cells that carry it.** Driving FP8 at C=56 and
+  1402 tok/s the client used `client_cpu_cores = 0.021` — ~2% of one core on a 32-core host —
+  with `host_cpu_busy_frac = 0.0348`. Not close to limiting. The completed sweep's 124 cells still
+  carry none of this.
+- **The BF16 synthesis, from tracked artifacts.** BF16 is simultaneously the **least** reproducible
+  configuration on the quality axis and the **most** reproducible on the serving axis, and the two
+  are not in tension — they measure bitwise determinism of a 128k logit vector versus an aggregate
+  P95 latency. Quality: BF16 self-KL 2.084e-04 against FP8 1.51e-11 and FP4 3.91e-11, a factor of
+  **1.4e7**; FP8/FP4 are exactly 0.0 at every retained position but p=1 and p=2048, BF16 nowhere.
+  Serving: three reps at C=16 give 32.599 / 32.578 / 32.607 ms, a **0.029 ms** spread, and K=21
+  clears the SLO by 2.41 ms — about 83 noise widths. **BF16's ceiling is the one that never needed
+  replicating; FP8 (0.34 ms) and FP4 (0.43 ms) are why the pass exists.**
+- **G3 fails on a number below its own floor.** Cache-on-vs-off moves BF16 by 1.749e-04 = 4.74% of
+  the FP8 signal against a 1% bound, but BF16's replication floor is 2.084e-04. The cache effect is
+  not resolvable from relaunch noise, so G3 is a measurement about the rig, not about caching.
+- **Docs correction** (`569946c`). My earlier "committed numbers are not bit-reproducible" was an
+  environment mistake, not a property of the artifacts: under `envs/qnt` they reproduce exactly.
 
 ## Known issues / unresolved premises
 
@@ -292,12 +272,28 @@ single-reference headline remains the point estimate, and G2/G2' stand as writte
   derived summaries, are the durable artifact — `dist/*.npy` is gitignored while a BF16 launch
   provably does not regenerate itself, so `launch_variance.json` records the SHA-256 of every
   matrix it consumed.
-- **The refined serving ceilings are still n=1** (21 / 57 / 70) and the margins are thin: C=K clears
-  the 50 ms bound by 0.34 ms (FP8) and 0.43 ms (FP4) against a ~0.1 ms matched-cell spread, three to
-  four noise widths; BF16 has 2.41 ms. The **ceiling replication pass** is pre-registered in
-  `EXPERIMENTAL_CONTRACT.md` and the rig is built, self-tested and dry-run — 18 cells, 6 launches,
-  ~4 h, triplets at K-1/K/K+1 for repetitions 2 and 3, job `SWEEP_CEILING_REP`, run with
-  `run_sweep.py --job ceiling` and adjudicated by `analyze_ceiling.py`. **No cells have been run.**
+- **The refined serving ceilings are still n=1** (21 / 57 / 70) and the FP8/FP4 margins are thin:
+  C=K clears the 50 ms bound by 0.34 ms (FP8) and 0.43 ms (FP4) against a matched-cell spread that
+  BF16 measures at **0.029 ms** (three reps at C=16: 32.599 / 32.578 / 32.607) — so those two are
+  ~12 and ~15 noise widths, not three to four, but still the thin ones. **BF16's 2.41 ms is ~83
+  noise widths and is not in question.**
+- **The ceiling replication is PARTIAL — 1 of 18 cells, and the landed one is FP8 C=56, not a
+  cell that fixes any K.** `FP8 C=56 rep2` measured 48.774 ms against rep 1's 48.958, a 0.18 ms
+  replication. **17 cells remain, ~3.5 h.** Resume and finish with:
+
+  ```text
+  /home/sathvik/miniconda3/envs/qnt/bin/python scripts/harness/run_sweep.py --job ceiling
+  /home/sathvik/miniconda3/envs/qnt/bin/python scripts/harness/analyze_ceiling.py
+  ```
+
+  Resume is safe — `replicate_ceiling_group` checks `orch.done_keys` per group and per cell, so the
+  landed cell is skipped rather than duplicated. **`--dry-run` still prints "18 cells, 6 launches"**
+  because `ceiling_dry_run` reports the static plan without consulting `done_keys`; cosmetic, but it
+  will misstate the remaining work to whoever checks next. The pass is pre-registered in
+  `EXPERIMENTAL_CONTRACT.md`; `analyze_ceiling.py` adjudicates against that criterion and has never
+  been run on real cells.
+- **The run must be launched under `envs/qnt`.** The login shell's `python3` (3.13) cannot import
+  vLLM at all. Verify the GPU is idle and cool first — it was 15 MiB / 0% / 34 °C at handoff.
 - **`PREFILL_PROBE` inherited the decode SLO** and lost BF16's C=8 point; it needs a TTFT-based
   criterion before it is re-run.
 - **The below-wall throughput gap is unattributed**, and that is a settled position.
@@ -325,10 +321,22 @@ single-reference headline remains the point estimate, and G2/G2' stand as writte
 - **`results/quality/smoke/kl_summary.json` still carries the n=4-floor ratios** (12.37x / 98.72x)
   while the hub quotes the production-floor ones (17.7x / 141.3x). Regenerating it is now possible
   and would change a committed number, so it needs its own decision.
-- **The completed sweep carries no host/client CPU telemetry.** The fields exist from 2026-09-14
-  onward, so for the 124 cells behind the 21 / 57 / 70 headline the claim that the GPU — not the
-  benchmark client — was the limiting resource rests on the host being a 32-core machine driving
-  one GPU. That is an argument, not a measurement. The ceiling replication will carry it.
+- **The completed sweep carries no host/client CPU telemetry**, so for the 124 cells behind the
+  21 / 57 / 70 headline the claim that the GPU rather than the benchmark client was limiting is
+  still an argument. **The one replication cell that carries it puts the client at 2% of one core**
+  (`client_cpu_cores` 0.021, `host_cpu_busy_frac` 0.0348, at FP8 C=56 / 1402 tok/s) — strong
+  evidence the argument was right, but it is one cell at one concurrency and the sweep's own cells
+  remain uninstrumented.
+- **BF16 splits across the two axes, and that split is the main BF16 result so far.** It is the
+  least reproducible configuration on quality — self-KL 2.084e-04 against FP8 1.51e-11 and FP4
+  3.91e-11, a factor of 1.4e7, and bit-identical in only 28-39% of 640 cells where the quantized
+  paths are exactly 0.0 almost everywhere — and the most reproducible on serving (0.029 ms across
+  three reps). **The mechanism is unconfirmed**, and the harness currently cannot confirm it:
+  BF16's `dispatch_verdict` is satisfied by silence (empty `kernel_lines`) while FP8 and FP4 each
+  log one line naming a fixed Cutlass/FlashInfer kernel, so there is no positive evidence of which
+  GEMM BF16 dispatched. A split-k or atomic reduction is the plausible story and is **not
+  measured**. This is the same gap listed under dispatch verification below, but it now has a
+  result resting on it.
 - **The GPU is power-limited at 145 W**, so every number is measured under a power ceiling.
 
 At the end of a session, overwrite `Current focus`, `Last session`, and `Known issues / unresolved premises` in place. Git history is the changelog; this file should remain a current-state hub.
