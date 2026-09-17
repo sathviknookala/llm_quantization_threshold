@@ -33,8 +33,10 @@ contract), `kl_math.py` (float64 KL, trajectory bootstrap), `qcommon.py` (identi
 `KL_SPEC`), `qengine.py` (engine lifecycle, observed identity), `trajectories.py` (the frozen BF16
 continuations), `collect_kl.py`, `analyze_kl.py`, `gates.py`, `preflight.py` (P12), `floor_study.py`
 (the production-scale replication floor), `launch_variance.py` (BF16 launch identity as a nuisance
-variance component — **proposed, not adopted**; supplements `analyze_kl.py` and changes nothing it
-owns), `qselftest.py`. It imports `common.py` and
+variance component — **adopted for P13**; supplements `analyze_kl.py` and changes nothing it owns),
+`dispatch_verify.py` (additive positive dispatch evidence — the inherited verdict is satisfied by
+silence for BF16 and cannot enforce FP4's `"emulation"`), `p13.py` (the registered production run:
+`REGISTERED`, collection, and the resolution rule), `qselftest.py`. It imports `common.py` and
 `server.py` and edits neither: the serving contract is frozen. `scripts/logits_probe.py`, `scripts/compute_kl.py` and
 `scripts/harness/correctness_gate.py` are **historical qualification/prototype paths**, kept
 byte-unchanged so `results/qualification/` and `results/pilot/` stay reproducible. They are not the
@@ -129,55 +131,80 @@ A valid result may favor BF16, FP8, FP4, different choices for different workloa
 
 ## Current focus
 
-**The D11 serving sweep is COMPLETE** (124 cells, 14.75 h, `results/sweep/`, zero defect cells).
-Headline: maximum concurrency within the 50 ms TPOT P95 SLO is **21 / 57 / 70** for BF16 / FP8 / FP4
-(refined bisection, **n=1**), i.e. FP8 at 2.71x and FP4 at 3.33x BF16, with KV-pressure walls at
-[17,18], [38,39], [47,48] predicted exactly by peak-footprint arithmetic. The SLO ceiling is not the
-wall: every configuration serves past its wall before breaching latency. Below-wall throughput
-differences are reproducible, concurrency-dependent and **unattributed** — quote the concurrency with
-the number, never as a bandwidth or weight-residency benefit.
+**The quality arm has a production result. P13 is DONE** (3,200 cells, `results/quality/kl/`,
+registration `b42d228a8afdd8df`). **The D11 serving sweep is COMPLETE** (124 cells,
+`results/sweep/`). **The serving ceiling replication is still PARTIAL at 1 of 18 cells** and was
+deliberately not advanced this session.
 
-**The quality arm is built and smoke-validated. The 64-trajectory production run has NOT been run.**
+```text
+                     headline nats     95% CI                       floor fraction (pre-reg / own)
+BF16->FP8             5.557797e-03     [3.610931e-03, 8.751935e-03]      3.75%  /  3.36%
+BF16->FP4             5.298014e-02     [3.649696e-02, 7.717467e-02]      0.39%  /  0.35%
+FP8->FP4  (direct)    5.679499e-02     [3.848252e-02, 8.535338e-02]      n/a -- FP8 is the reference
+BF16<->BF16 floor     1.865e-04        [1.002e-04, 2.729e-04]            this run, 3 launches
+```
+
+**The ladder is not additive and the direct measurement is what shows it.** `FP8->FP4` exceeds
+`BF16->FP4`: paired on the shared 64 trajectories the difference is **3.815e-03 nats, 95%
+[4.99e-04, 8.50e-03], P(<=0) = 0.0083**. The marginal intervals overlap; the paired one does not.
+The barred subtraction proxy would have said 4.742e-02, low by **1.198x**.
+
+Serving headline unchanged: maximum concurrency within the 50 ms TPOT P95 SLO is **21 / 57 / 70**
+for BF16 / FP8 / FP4 (refined bisection, **n=1**), i.e. FP8 at 2.71x and FP4 at 3.33x BF16, with
+KV-pressure walls at [17,18], [38,39], [47,48] predicted exactly by peak-footprint arithmetic. The
+below-wall throughput gap is reproducible, concurrency-dependent and **unattributed**.
 
 ```text
 0-4. serving sweep + refinement                                DONE 2026-08-25
 4b. ceiling replication                                        PARTIAL 2026-09-14, 1/18 cells
 5. quality run
-   P0-P6  contract, numerics, engine lifecycle, G7, G9         DONE 2026-08-25
-   P7     64 BF16 trajectories frozen                          DONE 2026-08-26
-   P8-P9  collect_kl.py / analyze_kl.py                        DONE 2026-08-26
-   P10    real smoke, 4 traj x 10 pos x 3 configs              DONE 2026-08-26
-   P11    replication floor + fp16/fp32 storage gate           DONE 2026-08-26
-   P12    full preflight, 35/35                                DONE 2026-08-26
-   G2'    production BF16 floor, 3 launches x 640 cells        DONE 2026-08-26
-   review harness audit, 7 defects closed                     DONE 2026-09-01
-   D13-4  BF16 launch variance, estimator + tests + results    PROPOSED 2026-09-12, NOT adopted
-   P13    64-trajectory production KL run                      <- next, NOT authorised
-          BLOCKED on the replication-floor disposition, not on the rig
+   P0-P12  contract, numerics, engine, gates, preflight        DONE 2026-08-26
+   G2'     production BF16 floor, 3 launches x 640 cells       DONE 2026-08-26
+   review  harness audit, 7 defects closed                     DONE 2026-09-01
+   D13-4   BF16 launch variance as a nuisance component        ADOPTED 2026-09-16
+   P13     64-trajectory production KL run                     DONE 2026-09-16
+   review  3 reviewers; formulation, implementation, artifacts DONE 2026-09-16
    PPL and downstream tasks still need D14/D15
-6. marginal tradeoff: quality loss vs sustainable concurrency
+6. marginal tradeoff: quality loss vs sustainable concurrency  <- next
 ```
+
+### The floor disposition, taken 2026-09-16
+
+**1 + 4, with 2 as a pre-registered rule; 3 stays barred.** The floor is accepted as a stated
+resolution limit, quantified by carrying BF16 launch identity as a nuisance variance component, and
+where it bites at a position that position is *named* rather than dropped. **G2 and G2' remain
+recorded failures** — the 1% bound was not relaxed, no floor is subtracted from any reported KL, and
+no pooled or averaged BF16 distribution exists anywhere. The locked single-reference headline is
+still the headline; the launch-averaged value supplements it. See `DECISIONS.md` D13.
+
+### What P13 settled, and what it did not
+
+- **The registered nuisance model is not supported.** Observed pooled `sigma_proj` **6.18e-04**
+  against **2.1e-03** registered; launch CV 1.577% / 0.173% against a law-at-observed prediction of
+  4.00% / 1.29%; the two configurations' `sigma_proj` differ by **2.93x** where n=4 had them
+  agreeing to 3%. The registered verdict is `MIXED`, and that label flatters a conjunction over two
+  arms from the same three launches against 12x-wide intervals. Post-hoc and labelled as such: the
+  law's sharp SD-ratio prediction is 3.103, observed **1.058**, and the two arms' launch-effect
+  vectors are anti-correlated at **r = -0.880**.
+- **BF16 launch identity is a small nuisance**: 0.1% (FP8) and 0.0% (FP4) of headline variance,
+  against ~10-15% at R=1 from the n=4 projection. Like for like the miss is larger: 0.088% vs 3.70%
+  at R=3, 0.26% vs 10.2% at R=1. **R=3 was cheap insurance the data says was barely needed — and is
+  the only reason we can say so.**
+- **Resolution: FP4 10/10 positions, FP8 9/10**, p=2048 noise-limited (ratio 0.65). The smoke's
+  worry that p=512 would be unresolvable does not survive — it resolves at 3.95x. Two caveats:
+  **none of the twenty classifications depends on the launch term** (inflation 1.0001-1.0081), and
+  at p=2048 the binding uncertainty is **trajectory sampling**, not relaunch noise.
+- **"Resolved" licenses less than it sounds like.** It means the divergence exceeds the floor's
+  upper launch bound — *not* "separable from relaunch noise". The floor is second order in the
+  launch perturbation while the signal is first order.
 
 ### Locked engine profile — `graph_2048` (G9)
 
-`enforce_eager=False`, `max_num_batched_tokens=2048`, prefix caching on, `detokenize=False`. Chosen
-because it is the only profile reproducing the serving sweep's KV capacities for all three
-configurations (44,688 / 97,888 / 120,944). **Neither control is numerically inert**: flipping
-`enforce_eager` moves FP4 by 3.74e-02 nats and its argmax on 4 of 40 cells; 2048-vs-8192 moves FP4
-by 2.15e-02 and 6 of 40. BF16 sits at its own floor under both. See `LIMITATIONS.md`.
-
-### Smoke KL, 4 trajectories x 10 positions (NOT a result — n=4)
-
-```text
-              headline nats     95% CI                    floor      signal/floor
-BF16||FP8        3.690e-03      [1.748e-03, 6.016e-03]    2.08e-04        17.7x
-BF16||FP4        2.945e-02      [2.315e-02, 3.576e-02]    2.08e-04       141.3x
-FP8||FP4         3.566e-02      [2.627e-02, 4.506e-02]    3.91e-11       9.1e+08x
-```
-
-Floors are the **production-scale** BF16 figure (3 launches, 640 cells); the KL values are still n=4.
-
-The barred subtraction proxy would have put FP8->FP4 at 2.576e-02, low by a factor of 1.38.
+`enforce_eager=False`, `max_num_batched_tokens=2048`, prefix caching on, `detokenize=False`. The only
+profile reproducing the serving sweep's KV capacities for all three configurations (44,688 / 97,888 /
+120,944), which P13 reproduced again on all five collections. **Neither control is numerically
+inert**: flipping `enforce_eager` moves FP4 by 3.74e-02 nats and its argmax on 4 of 40 cells;
+2048-vs-8192 moves FP4 by 2.15e-02 and 6 of 40. See `LIMITATIONS.md`.
 
 ### What the gates returned
 
@@ -185,158 +212,116 @@ The barred subtraction proxy would have put FP8->FP4 at 2.576e-02, low by a fact
 G7  numerics vs the historical EPS formula      PASS
 G9  engine profile                              MEASURED, profile locked
     replayability                               NOT REPLAYABLE (51/64) -- informational
-G2  replication floor (n=4)                     FAIL on BF16 (8.1% of FP8 signal vs 1% bound)
-G2' replication floor, 3 launches x 640 cells   FAIL on BF16 (5.6%); floor 2.084e-04
+G2  replication floor (n=4)                     FAIL on BF16
+G2' replication floor, 3 launches x 640 cells   FAIL on BF16 -- 3.75% of the PRODUCTION FP8
+                                                signal against a 1% bound
 G3  cache equivalence                           FAIL on BF16 (4.74%), below BF16's own floor
 G4  fp16 vs fp32 storage                        FAIL -- fp32 stays
 ```
 
 Two pre-registered bounds fail, both on BF16 and both traceable to one cause: **BF16 is the
-non-reproducible configuration.** Thresholds were not relaxed after seeing the results.
-
-The earlier "BF16 reproduces 0 of 40 cells" figure was pair-specific small-sample noise and is
-**superseded**: at production scale BF16 reproduces 28-39% of 640 cells across launches, and one of
-the six pairs reproduces 20 of the same 40 cells the smoke scored 0 on. What is robust is that the
-floor is worst at short contexts (3.78e-04 at p=1, 3.01e-05 at p=2048) and is carried by a small
-number of unstable cells rather than uniform jitter.
+non-reproducible configuration.** Thresholds were not relaxed after seeing the results, and P13 did
+not relax them either.
 
 ## Last session
 
-**Session 10 — started the ceiling replication (it was killed at 1 of 18 cells), and synthesised
-what the BF16 tests have actually established.** No new BF16 serving cells exist.
+**Session 11 — deferred the serving ceiling, took the BF16-floor disposition, and ran P13 to a
+result.** No GPU time was spent on serving.
 
-- **Ceiling replication is PARTIAL** (`175ae12`). `run_sweep.py --job ceiling` ran, completed
-  `FP8 C=56 rep2` (48.774 ms, SLO True, 1402.4 tok/s), and took SIGTERM partway through C=57;
-  engines tore down cleanly through the finally blocks and the GPU is idle. The landed cell
-  replicates its rep-1 counterpart to **0.18 ms** (48.774 vs 48.958) and 0.4% on throughput.
-  **The two cells that actually fix K=57 — C=57 and C=58 — did not run.**
-- **Resume is clean; the dry-run's count is not.** `replicate_ceiling_group` consults
-  `orch.done_keys` before each group and again per cell, so C=56 is skipped rather than
-  duplicated. But `ceiling_dry_run` reports the static plan and still prints "18 cells, 6
-  launches" — cosmetic, and misleading in exactly this situation. **17 cells remain.**
-- **The client-headroom question is answered on the cells that carry it.** Driving FP8 at C=56 and
-  1402 tok/s the client used `client_cpu_cores = 0.021` — ~2% of one core on a 32-core host —
-  with `host_cpu_busy_frac = 0.0348`. Not close to limiting. The completed sweep's 124 cells still
-  carry none of this.
-- **The BF16 synthesis, from tracked artifacts.** BF16 is simultaneously the **least** reproducible
-  configuration on the quality axis and the **most** reproducible on the serving axis, and the two
-  are not in tension — they measure bitwise determinism of a 128k logit vector versus an aggregate
-  P95 latency. Quality: BF16 self-KL 2.084e-04 against FP8 1.51e-11 and FP4 3.91e-11, a factor of
-  **1.4e7**; FP8/FP4 are exactly 0.0 at every retained position but p=1 and p=2048, BF16 nowhere.
-  Serving: three reps at C=16 give 32.599 / 32.578 / 32.607 ms, a **0.029 ms** spread, and K=21
-  clears the SLO by 2.41 ms — about 83 noise widths. **BF16's ceiling is the one that never needed
-  replicating; FP8 (0.34 ms) and FP4 (0.43 ms) are why the pass exists.**
-- **G3 fails on a number below its own floor.** Cache-on-vs-off moves BF16 by 1.749e-04 = 4.74% of
-  the FP8 signal against a 1% bound, but BF16's replication floor is 2.084e-04. The cache effect is
-  not resolvable from relaunch noise, so G3 is a measurement about the rig, not about caching.
-- **Docs correction** (`569946c`). My earlier "committed numbers are not bit-reproducible" was an
-  environment mistake, not a property of the artifacts: under `envs/qnt` they reproduce exactly.
+- **The disposition is taken and was registered before any FP8/FP4 cell existed** (`1746d28`,
+  `4d813a0`). `scripts/harness/quality/p13.py` carries the machine-readable registration and
+  refuses to collect a cell unless that registration is itself committed.
+- **Two harness defects had to be fixed first.** The repeated-launch clean-tree defect — a run now
+  declares its own output roots, only those are excused, the source tree stays at full strength and
+  HEAD is pinned; `--allow-dirty` was not used anywhere. And dispatch verification that BF16
+  satisfied *by silence*: `dispatch_verify.py` is additive (the kernel patterns are hashed into
+  `KL_SPEC`, so editing them would strand every committed artifact) and requires named positive
+  evidence, which for BF16 is the resolved quantization method, weight dtype, attention backend and
+  compile step rather than a kernel class that does not exist.
+- **P12 refreshed, 39/39, three genuinely fresh engines.** The first refresh attempt returned 36/36
+  while replaying August's probes and launching nothing; the probe artifacts were removed and the
+  freshness flag now keys off an explicit reuse flag. Count is 39 not 36 because the three positive
+  dispatch-evidence checks are new.
+- **P13 ran clean**: 3,200 cells, five collections in the registered interleaved order
+  (BF16 L1 → FP8 → BF16 L2 → FP4 → BF16 L3), 7 minutes of scoring, tree clean at `3aea394`.
+- **Three reviewers went over the formulation, the implementation and the artifacts.** Every
+  headline, CI, per-launch value and floor pair was independently re-derived **bit-identically from
+  the raw matrices**. Every finding was about labelling, durability, or two wrong claims — not about
+  a measured number.
+- **One of those wrong claims was mine.** I attributed the 5.65% → 3.36% move in the floor fraction
+  entirely to the larger production signal. It is mostly that, but 3.36% also swapped in this run's
+  own floor for the pre-registered one. Both are now reported and the move is decomposed.
+- **Defects only production scale could surface**, found and fixed before the final analysis: 4 of
+  64 trajectories reproduce bit-identically across all three BF16 launches, so their floor is
+  exactly 0.0 and the per-trajectory ratio was `inf`/`nan`; and the BF16 floor was being quoted
+  against `FP8||FP4`, which has no BF16 reference.
+- **A guard caught its own data and was right to.** Re-assembling the finished root marked three
+  real launches `launched=false`; independence is now a property of the cells
+  (`cells_scored_by_launch`, `cells_first_collected_timestamp`), with byte-distinctness of the
+  consumed matrices still the real bar.
 
 ## Known issues / unresolved premises
 
-- **The BF16 replication floor fails its pre-registered bound at production scale**: 2.084e-04 nats
-  from 3 launches over 640 cells, i.e. **5.6%** of the n=4 BF16→FP8 KL against a 1% bound, leaving
-  that comparison 17.7x above noise. BF16→FP4 passes at 0.7%. Worse per position: on the provisional
-  FP8 curve the floor is 95% and 148% of the signal at p=2048 and p=512. This remains the binding
-  constraint on the quality axis and is a property of the *reference*. **Four dispositions are now
-  on the table and none has been taken**: accept it as a stated resolution limit; restrict FP8
-  claims to the positions that clear it; re-register an averaged reference (barred as written);
-  or D13's fourth — carry BF16 launch identity as a nuisance variance component, which is built,
-  reviewed and measured but **not adopted**.
-- **The floor is a range, not a point** (measured 2026-09-12). Six ordered pairs from three launches
-  are a U-statistic carrying **2 df**, not five, so the naive over-pairs SE understates the floor's
-  own uncertainty **3.2x**. A delete-one-launch jackknife gives **2.084e-04, 95% CI
-  [1.16e-04, 3.01e-04]** — "5.6% of the FP8 signal" is really **3–8%**, and the n=4 figure of
-  2.984e-04 that the hub calls superseded sits **inside** that interval. Anywhere the floor is
-  quoted as a point, it is being quoted more precisely than it was measured.
-- **The floor is not the only reference-side nuisance, and not always the larger one.** The spread
-  of per-launch BF16→FP4 headlines (5.18e-04) **exceeds the floor (2.08e-04) by 2.5x**, while for
-  BF16→FP8 it sits below it — the two diagnostics do not track each other and their ordering flips
-  across the ladder, because the floor is second order in the launch perturbation and the signal's
-  launch sensitivity is first order. "BF16→FP4 sits 141x above the floor" understates the
-  reference-side nuisance on that pair by ~2.5x.
-- **P13 currently plans one BF16 launch, and that carries unmodelled variance.** Projected to 64
-  trajectories, BF16 launch identity would contribute ~10% (FP8) and ~15% (FP4) of the headline
-  variance at R=1, falling to ~3–6% at R=3. Whether to add BF16 launches at P13 is open and is
-  cheap to decide now: the prediction `SD_launch = sigma_proj * sqrt(2 * signal)` with
-  `sigma_proj ≈ 2.1e-03` is registerable before the run.
-- **Seeded generation is not replayable** — 51 of 64, earliest divergence at token 3. Reproduction
-  goes through the tracked `trajectories.json` and its hash, never by rerunning generation.
-- **Every quality figure so far is n=4 and is not a result.** The smoke exists to validate the rig.
-  That includes every BF16→FP8/FP4 number in `launch_variance.json`: FP8 and FP4 full-vocabulary
-  distributions exist only on the smoke's four trajectories. Only the BF16↔BF16 arm there is
-  production scale.
-- **Quality work runs under `envs/qnt`, not the login shell's `python3`.** The pinned environment
-  reproduces every committed number bit-identically; the default one drifts 3.3e-14 and imports
-  cleanly enough to do it silently on analysis-only paths. The stored distributions, not the
-  derived summaries, are the durable artifact — `dist/*.npy` is gitignored while a BF16 launch
-  provably does not regenerate itself, so `launch_variance.json` records the SHA-256 of every
-  matrix it consumed.
-- **The refined serving ceilings are still n=1** (21 / 57 / 70) and the FP8/FP4 margins are thin:
-  C=K clears the 50 ms bound by 0.34 ms (FP8) and 0.43 ms (FP4) against a matched-cell spread that
-  BF16 measures at **0.029 ms** (three reps at C=16: 32.599 / 32.578 / 32.607) — so those two are
-  ~12 and ~15 noise widths, not three to four, but still the thin ones. **BF16's 2.41 ms is ~83
-  noise widths and is not in question.**
-- **The ceiling replication is PARTIAL — 1 of 18 cells, and the landed one is FP8 C=56, not a
-  cell that fixes any K.** `FP8 C=56 rep2` measured 48.774 ms against rep 1's 48.958, a 0.18 ms
-  replication. **17 cells remain, ~3.5 h.** Resume and finish with:
+- **G2' fails against the production signal: 3.75% (pre-registered floor) or 3.36% (this run's) of
+  BF16→FP8, against a 1% bound.** This is the binding resolution limit on the quality axis and it is
+  a property of the *reference*. The disposition quantifies it; it cannot fix it, and that is
+  structural — the floor is second order in the launch perturbation while the signal is first order,
+  so no value of R moves the ratio toward a pass.
+- **The registered nuisance model is contradicted by its own sharpest consequences** (SD ratio
+  3.103 predicted vs 1.058 observed; `sigma_proj` 2.93x apart across configurations; launch-effect
+  vectors at r = -0.880). The registered verdict is `MIXED` only because the criterion is a weak
+  conjunction. **Anything that relies on pooling one coupling constant across configurations should
+  be treated as unsupported** until a design with more launches says otherwise.
+- **The launch apparatus is operationally inert in the resolution rule at n=64** — 0 of 20
+  classifications depend on it. It is worth keeping because it is what *established* that, but it
+  should not be presented as load-bearing.
+- **Two disclosed conservatisms in the registered rule, deliberately not corrected.** The launch
+  inflation uses `sigma2_A + sigma2_E/T` where a CI on the mean wants `sigma2_A/R` (~4.4x larger,
+  conservative); `floor_hi` omits the floor's own trajectory uncertainty (anti-conservative). Both
+  are reported in `p13_summary.json`; correcting the first after seeing the data would run in the
+  resolution-friendly direction.
+- **`F = 3.123` for the FP8 launch effect is knife-edge and uncorroborated** — p = 0.047, and the
+  FP4 arm on the same three launches gives `F = 0.857`. Do not build on it.
+- **BF16 still has no positive GEMM-kernel evidence.** The additive verifier rules out a quantized
+  path and proves the engine resolved no quantization method, but *which* BF16 GEMM dispatched is
+  still unknown, and the split-k/atomic-reduction story for BF16's non-reproducibility remains
+  **unmeasured**.
+- **`server.py`'s three dispatch gaps are untouched** — the truncate-before-normalise pattern, the
+  unenforceable `"emulation"` pattern, and BF16's silence. They sit on the frozen serving path and
+  should be settled before the serving numbers are written up. The quality arm routes around them
+  additively.
+- **The ceiling replication is PARTIAL — 1 of 18 cells, ~3.3 h remaining**, deferred this session.
+  Resume is safe (`replicate_ceiling_group` checks `done_keys` per group and per cell); `--dry-run`
+  still prints the static "18 cells, 6 launches" and will misstate the remaining work.
 
   ```text
   /home/sathvik/miniconda3/envs/qnt/bin/python scripts/harness/run_sweep.py --job ceiling
-  /home/sathvik/miniconda3/envs/qnt/bin/python scripts/harness/analyze_ceiling.py
+  /home/sathvik/miniconda3/envs/qnt/bin/python scripts/harness/analyze_ceiling.py --write
   ```
 
-  Resume is safe — `replicate_ceiling_group` checks `orch.done_keys` per group and per cell, so the
-  landed cell is skipped rather than duplicated. **`--dry-run` still prints "18 cells, 6 launches"**
-  because `ceiling_dry_run` reports the static plan without consulting `done_keys`; cosmetic, but it
-  will misstate the remaining work to whoever checks next. The pass is pre-registered in
-  `EXPERIMENTAL_CONTRACT.md`; `analyze_ceiling.py` adjudicates against that criterion and has never
-  been run on real cells.
-- **The run must be launched under `envs/qnt`.** The login shell's `python3` (3.13) cannot import
-  vLLM at all. Verify the GPU is idle and cool first — it was 15 MiB / 0% / 34 °C at handoff.
-- **`PREFILL_PROBE` inherited the decode SLO** and lost BF16's C=8 point; it needs a TTFT-based
-  criterion before it is re-run.
-- **The below-wall throughput gap is unattributed**, and that is a settled position.
+- **The refined serving ceilings are still n=1** (21 / 57 / 70). FP8 and FP4 clear the 50 ms bound
+  by 0.34 ms and 0.43 ms against a matched-cell spread BF16 measures at 0.029 ms — ~12 and ~15 noise
+  widths. BF16's 2.41 ms is ~83 and is not in question.
+- **Seeded generation is not replayable** — 51 of 64. Reproduction goes through the tracked
+  `trajectories.json` and its hash, never by rerunning generation.
+- **Quality work runs under `envs/qnt`, not the login shell's `python3`.** Committed artifacts
+  reproduce to a median 8.6e-14 relative — *not* bit-identically, as `569946c` implies; the large
+  relative gaps sit on cells whose absolute value is ~1e-08 nats. Two fresh runs are bit-identical
+  to each other.
+- **`results/quality/smoke/kl_summary.json` still carries n=4-floor ratios.** P13 supersedes the
+  smoke entirely; regenerating it would change a committed number to restate a superseded artifact.
+- **The completed sweep carries no host/client CPU telemetry.** The one replication cell that does
+  puts the client at 2% of one core (FP8 C=56 / 1402 tok/s).
+- **`PREFILL_PROBE` inherited the decode SLO** and needs a TTFT-based criterion before it is re-run.
 - **Latin-square carryover is unbalanced**; queue *time* is still not recorded, only depth;
   `meets_slo` is survivor-biased.
 - **No perplexity or downstream-task axis yet.** D14 and D15 are open; chat-formatted tasks stay
   blocked by the `chat_template` deviation.
-- **Checkpoint provenance has one open deviation** (shorter `chat_template`), and **FP4 calibration
-  sensitivity is untested** — one draw, 128 ultrachat samples, seed 0.
-- **Three dispatch-verification gaps, found by the harness audit and deliberately not fixed.**
-  `server.py:137,142` carries the same truncate-before-normalise pattern that was fixed in
-  `qengine.observed_identity` — it sits on the frozen serving path and was left alone. FP4's
-  forbidden list contains `"emulation"`, which is not in `server.KERNEL_PATTERNS`, so that pattern is
-  unenforceable. And BF16 logs contain no matching kernel lines at all, so the reference
-  configuration's `dispatch_verdict.ok` is satisfied by silence. None blocks P13; all three should be
-  settled before the serving numbers are written up.
-- **`results/quality/preflight.json` is one key and one check stale** — `every_cell_rederive_checked`
-  is superseded by `contract_enforced_by_build_all`, and the count moves 35 -> 36 with engine.
-  Regenerating it costs three GPU launches. **`results/quality/gates/engine_profile/manifest.json`
-  predates the current spec** (`4ef13273db16d285`) and aborts on the KL_SPEC guard before any other
-  check.
-- **Any re-run of `collect()` dirties the tree**: `collection_<short>.json` is tracked and carries a
-  fresh `timestamp`, so `floor_study.py` without `--analyze-only` aborts at launch 2's
-  `require_clean_tree`. Pre-existing and separate from the resume-provenance fix.
-- **`results/quality/smoke/kl_summary.json` still carries the n=4-floor ratios** (12.37x / 98.72x)
-  while the hub quotes the production-floor ones (17.7x / 141.3x). Regenerating it is now possible
-  and would change a committed number, so it needs its own decision.
-- **The completed sweep carries no host/client CPU telemetry**, so for the 124 cells behind the
-  21 / 57 / 70 headline the claim that the GPU rather than the benchmark client was limiting is
-  still an argument. **The one replication cell that carries it puts the client at 2% of one core**
-  (`client_cpu_cores` 0.021, `host_cpu_busy_frac` 0.0348, at FP8 C=56 / 1402 tok/s) — strong
-  evidence the argument was right, but it is one cell at one concurrency and the sweep's own cells
-  remain uninstrumented.
-- **BF16 splits across the two axes, and that split is the main BF16 result so far.** It is the
-  least reproducible configuration on quality — self-KL 2.084e-04 against FP8 1.51e-11 and FP4
-  3.91e-11, a factor of 1.4e7, and bit-identical in only 28-39% of 640 cells where the quantized
-  paths are exactly 0.0 almost everywhere — and the most reproducible on serving (0.029 ms across
-  three reps). **The mechanism is unconfirmed**, and the harness currently cannot confirm it:
-  BF16's `dispatch_verdict` is satisfied by silence (empty `kernel_lines`) while FP8 and FP4 each
-  log one line naming a fixed Cutlass/FlashInfer kernel, so there is no positive evidence of which
-  GEMM BF16 dispatched. A split-k or atomic reduction is the plausible story and is **not
-  measured**. This is the same gap listed under dispatch verification below, but it now has a
-  result resting on it.
+- **Checkpoint provenance has one open deviation** (shorter `chat_template`), FP4's `tokenizer.json`
+  carries a 2048 truncation the base and FP8 do not — inert here because the rig feeds frozen token
+  IDs with `detokenize=False`, and all 640 context hashes match across all five collections — and
+  **FP4 calibration sensitivity is untested** (one draw, 128 ultrachat samples, seed 0).
+- **`scripts/harness/selftest.py` is flaky on its timing-dependent stub cases** — three runs this
+  session gave three different failure sets (t3/t4, t10, t8). The quality suite `qselftest.py` is
+  355/355 and stable.
 - **The GPU is power-limited at 145 W**, so every number is measured under a power ceiling.
-
-At the end of a session, overwrite `Current focus`, `Last session`, and `Known issues / unresolved premises` in place. Git history is the changelog; this file should remain a current-state hub.

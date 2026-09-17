@@ -1017,6 +1017,79 @@ A.1 and is not restated here so the two cannot drift.
 are recorded in `EXPERIMENTAL_CONTRACT.md` under quality-run validity: the repeated-launch
 clean-tree defect, and dispatch verification that BF16 satisfied by silence.
 
+### P13 outcome — RUN 2026-09-16, and what it settled
+
+Artifacts: `results/quality/kl/p13_summary.json` (registration `b42d228a8afdd8df`),
+`kl_summary.json` (the locked headline), `launch_variance_p13.json` (the supplement),
+`collection_record.json`. 3,200 cells, five collections, cells collected at `3aea394`.
+
+```text
+                    headline nats     95% CI                      worst cell
+BF16->FP8            5.557797e-03     [3.610931e-03, 8.751935e-03]  3.383e-01
+BF16->FP4            5.298014e-02     [3.649696e-02, 7.717467e-02]  2.448e+00
+FP8->FP4  (direct)   5.679499e-02     [3.848252e-02, 8.535338e-02]  2.604e+00
+```
+
+**The ladder is not additive, and the direct measurement is what shows it.** `FP8->FP4` is
+*larger* than `BF16->FP4`. Paired on the same 64 trajectories the difference is **3.815e-03 nats,
+95% [4.99e-04, 8.50e-03], P(<=0) = 0.0083** — the marginal intervals overlap, the paired one does
+not. The barred subtraction proxy would have said 4.742e-02, low by a factor of **1.198** (the
+smoke's estimate of that error was 1.38).
+
+**G2' still fails, and the disposition did not rescue it.** Against the pre-registered floor the
+BF16->FP8 fraction is **3.75%**; against this run's own floor, **3.36%**; the bound is 1% and was
+not touched. `BF16->FP4` passes at 0.39% / 0.35%. The fall from the smoke's 5.65% is mostly the
+signal — the production BF16->FP8 KL is 1.5x the n=4 estimate — but **not entirely**, and both
+floors are now reported side by side because quoting only the smaller one would attribute to the
+signal a move that is partly a change of denominator.
+
+**The nuisance model as registered is not supported.** Observed pooled `sigma_proj` is
+**6.18e-04** against **2.1e-03** registered. The registered conjunction returns `MIXED`, and that
+label flatters it: the criterion is a conjunction over two arms computed from the *same* three
+launches, each against a chi-square interval spanning ~12x at 2 df, so it is close to
+unfalsifiable as written — which the registration said in advance. Every diagnostic the data
+support points the same way:
+
+```text
+                          registered / law-at-observed      observed
+launch CV, BF16->FP8            5.00% / 4.00%                1.577%
+launch CV, BF16->FP4            1.80% / 1.29%                0.173%
+sigma_proj FP8 vs FP4       equal (agreed to 3% at n=4)   2.93x apart
+SD ratio FP4/FP8            sqrt(signal ratio) = 3.103        1.058
+launch-effect vectors       should track each other        r = -0.880
+```
+
+The SD ratio and the correlation are **post hoc** and labelled as such in the artifact; they are
+diagnostics, not the adjudication. The pooling assumption — one coupling constant shared across
+configurations, which was the whole argument for buying degrees of freedom — is what the data
+contradict. For FP4 the moment estimate of `sigma2_A` is negative and its `sigma_proj` is ~100%
+launch x trajectory interaction rather than launch identity.
+
+**BF16 launch identity is a small nuisance at production scale.** It carries **0.1%** (FP8) and
+**0.0%** (FP4) of headline variance, against the ~10-15% at R=1 the n=4 projection predicted.
+Like for like the miss is larger, not smaller: observed 0.088% at R=3 against a projected 3.70%,
+and 0.26% at R=1 against 10.2%. The launch effect is separable from the interaction for FP8
+(`F = 3.123` on (2,126), p = 0.047) and not for FP4 (`F = 0.857`) — one knife-edge test,
+uncorroborated by the other arm on the same launches, and worth little on its own.
+
+**R=3 was cheap insurance the data says was barely needed, and it is also the only reason we can
+say so.** At R=1 none of the above is estimable.
+
+**Resolution.** `BF16->FP4` resolves at all ten positions; `BF16->FP8` at nine, with **p=2048
+noise-limited** (ratio 0.65). The smoke's specific worry — that p=512 would be unresolvable —
+does not survive: it resolves at 3.95x. Two honest caveats travel with this. **None of the twenty
+classifications depends on the launch term**: inflation factors span 1.0001-1.0081, and every
+class is identical under the registered `sigma_proj` sensitivity, so at n=64 the launch apparatus
+is operationally inert in the rule. And at p=2048 the binding uncertainty is **trajectory
+sampling**, not relaunch noise — the label names the floor comparison, not the mechanism.
+
+**What "resolved" licenses, stated because the first wording overreached.** It licenses "the
+divergence at this position exceeds the upper launch-level bound on the typical BF16<->BF16
+divergence." It does **not** license "separable from relaunch noise": the floor is second order in
+the launch perturbation while the signal is first order, so the floor is not the noise the signal
+is exposed to. Measured against its own `SD_launch`, every position clears by one to three orders
+of magnitude.
+
 ---
 
 ## D14 — Perplexity corpus and token budget

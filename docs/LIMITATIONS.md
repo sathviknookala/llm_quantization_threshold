@@ -224,16 +224,21 @@ CUDA-graph execution. Where a measured effect is not large relative to these, th
 instead of reporting the effect.
 
 **Measured at production scale, the floor is 2.084e-04 nats** (three independent BF16 launches, 640
-cells, six ordered pairs). Against the smoke's n=4 BF16→FP8 estimate of 3.690e-03 that is **5.6% of
-the signal, against a pre-registered bound of 1%** — the bound fails at production scale too, by a
-factor of 5.6 rather than the 8.1 the smaller sample suggested. BF16→FP4 sits at 0.7% and passes.
+cells, six ordered pairs). P13's own three launches put it at **1.865e-04, 95% [1.002e-04,
+2.729e-04]** — the two are inside each other's launch-level intervals, so the difference between
+them is not itself resolvable.
 
-The per-position picture is worse than the headline for the FP8 comparison specifically. Using the
-n=4 FP8 curve — itself provisional — the floor is 27%, 26%, 95% and 148% of the measured signal at
-p=256, 1024, 2048 and 512 respectively. At those positions a BF16→FP8 difference is at or below what
-two identical BF16 launches produce, and the headline is carried by the positions where the signal is
-large (p=1, 64, 1536). Whether that pattern survives at n=64 is not yet known; it is the first thing
-to check when the production FP8 collection exists.
+**Against the production BF16→FP8 signal the bound still fails**: 3.75% using the pre-registered
+floor, 3.36% using P13's own, against 1%. Both are reported because quoting only the smaller one
+would attribute to the signal a move that is partly a change of denominator. BF16→FP4 passes at
+0.39% / 0.35%. The improvement over the smoke's 5.65% is mostly real — the production BF16→FP8 KL is
+1.5x the n=4 estimate — and nothing was relaxed to obtain it.
+
+**The smoke's per-position worry did not survive.** On the n=4 FP8 curve the floor was 95% and 148%
+of signal at p=2048 and p=512, which suggested the FP8 headline was carried by a few positions. At
+n=64, nine of ten positions resolve and only **p=2048** is noise-limited. The floor falls by an
+order of magnitude at long contexts (2.9e-05 at p=2048 against 2.8e-04 at p=1) and so does the FP8
+signal, and it is the signal that falls faster.
 
 **A floor ratio is not a magnitude.** Under CUDA graphs FP8 and FP4 replicate to ~1e-11 nats, so a
 difference of a few nanonats reads as many multiples of the floor while being numerically nothing.

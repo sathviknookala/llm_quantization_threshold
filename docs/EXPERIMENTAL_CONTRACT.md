@@ -846,7 +846,9 @@ equivalence — is a **measurement about the rig**, and is reported as such. It 
 result only where the contract above says it does; it is not silently absorbed into the number.
 
 **Three of them have failed, and the results stand as measured** (2026-08-26). The BF16 replication
-floor is 5.6% of the provisional BF16→FP8 KL against a 1% bound; cache-on-versus-off is 4.74% on
+floor is 5.6% of the then-provisional BF16→FP8 KL against a 1% bound — **3.75% against the
+production signal P13 later measured, still a failure** (`results/quality/kl/p13_summary.json`);
+cache-on-versus-off is 4.74% on
 BF16, itself below that floor; and fp16 storage misses its per-cell relative bounds by an order of
 magnitude, so fp32 is retained. No threshold was relaxed after the fact, and no result was averaged
 or re-referenced to convert a failure into a pass. Each failure travels with the number it bounds.

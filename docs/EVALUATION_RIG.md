@@ -412,6 +412,43 @@ filtered or reordered by outcome — the classification is a *label on a reporte
 `noise_limited` means this rig cannot separate the effect from BF16 relaunch noise at that
 position; it is not a claim that the effect is absent.
 
+### What P13 measured — 2026-09-16
+
+Result artifacts: `results/quality/kl/p13_summary.json`, `kl_summary.json` (locked headline),
+`launch_variance_p13.json` (supplement). The decision record and the full reading live in
+`DECISIONS.md` D13, "P13 outcome". The numbers this section owns:
+
+```text
+                     headline nats     95% CI                       floor fraction (pre-reg / own)
+BF16->FP8             5.557797e-03     [3.610931e-03, 8.751935e-03]      3.75%  /  3.36%
+BF16->FP4             5.298014e-02     [3.649696e-02, 7.717467e-02]      0.39%  /  0.35%
+FP8->FP4  (direct)    5.679499e-02     [3.848252e-02, 8.535338e-02]      n/a -- FP8 is the reference
+BF16<->BF16 floor     1.865e-04        [1.002e-04, 2.729e-04]            (this run, 3 launches)
+```
+
+Three things the rig established that the smoke could not:
+
+- **The direct marginal step exceeds the BF16-anchored FP4 divergence.** Paired on the shared 64
+  trajectories, `FP8->FP4` minus `BF16->FP4` is **3.815e-03, 95% [4.99e-04, 8.50e-03],
+  P(<=0) = 0.0083**. The marginal intervals overlap and the paired one does not, which is why the
+  paired form is the one reported. It is a comparison of magnitudes, not a derived divergence, and
+  the barred subtraction proxy is still barred — it would have said 4.742e-02, low by 1.198x.
+- **The launch nuisance is small and the registered model that predicted it is not supported.**
+  Launch identity carries 0.1% (FP8) and 0.0% (FP4) of headline variance; observed pooled
+  `sigma_proj` is 6.18e-04 against 2.1e-03 registered, and the two configurations' values differ by
+  2.93x where the n=4 data agreed to 3%.
+- **Nine of ten positions resolve for FP8, ten of ten for FP4**, with p=2048 noise-limited. No
+  classification depends on the launch term (inflation factors 1.0001-1.0081), and a sensitivity
+  check carrying the floor's own trajectory uncertainty changes none of them.
+
+**Two disclosed conservatisms in the registered rule, neither corrected after the fact.** The
+launch inflation uses `sigma2_A + sigma2_E/T` where a CI on the mean wants `sigma2_A/R`; the
+registered form is ~4.4x larger, so it widens the interval and makes `resolved` harder to reach.
+And `floor_hi` covers launch sampling only, not the floor's own trajectory sampling, which runs the
+other way — carrying both would widen it, and the measured effect on classifications is zero. Both
+are reported in `p13_summary.json` rather than silently repaired: correcting a registered rule in
+the resolution-friendly direction after seeing the data is what pre-registration exists to prevent.
+
 ### Persisted distribution precision — LOCKED 2026-08-26 (G4)
 
 Full-vocabulary distributions are persisted as **fp32 by default**, and KL is computed in **float64**
