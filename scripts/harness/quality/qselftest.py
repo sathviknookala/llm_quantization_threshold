@@ -1344,6 +1344,29 @@ def test_p13_resolution_rule():
     check("the launch sources are distinct roots",
           len({s["root"] for s in p13.launch_sources()}), 3)
 
+    # a trajectory whose BF16 reference reproduces bit-identically has floor exactly 0.0, so its
+    # ratio is +inf. Only production scale surfaces this: all four smoke trajectories were non-zero.
+    theta_rec = {"expected_kl_over_launches_nats": 5.0e-3,
+                 "trajectory_component": {"bootstrap": boot},
+                 "launch_component": {"se_launch_nats_upper_95": 2.0e-4},
+                 "combined": {"bootstrap_plus_launch": {"ci_point": [1e-3, 3e-3],
+                                                        "ci_upper_95": [9e-4, 3.1e-3]}}}
+    idx = K.bootstrap_indices(4, 100, 1)
+    qv = np.array([5e-3, 5e-3, 5e-3, 5e-3])
+    phi_zero = np.array([1e-4, 0.0, 1e-4, 1e-4])
+    r = L.resolvability(theta_rec, 2e-4, [1e-4, 3e-4], qv, phi_zero, idx)["per_trajectory_ratio"]
+    check("a zero floor is counted, not hidden", r["trajectories_with_zero_floor"], 1)
+    check("the mean of ratios is reported as undefined", r["mean"], None)
+    check("and says why", bool(r["mean_undefined_because"]), True)
+    check("the bootstrap interval is withheld too", r["bootstrap_ci"], None)
+    check("the median stays finite over ALL trajectories", np.isfinite(r["median"]), True)
+    check("the ratio of means is defined", round(r["ratio_of_means"], 4), 66.6667)
+
+    phi_ok = np.array([1e-4, 2e-4, 1e-4, 1e-4])
+    r2 = L.resolvability(theta_rec, 2e-4, [1e-4, 3e-4], qv, phi_ok, idx)["per_trajectory_ratio"]
+    check("with no zero floor the mean is reported", r2["mean"] is not None, True)
+    check("and the interval comes back", r2["bootstrap_ci"] is not None, True)
+
 
 def main():
     import tempfile

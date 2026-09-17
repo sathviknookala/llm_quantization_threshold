@@ -822,8 +822,19 @@ def resolvability(theta_rec, floor_mean, floor_ci, per_traj_q, per_traj_phi, idx
     boot = theta_rec["trajectory_component"]["bootstrap"]
     lc = theta_rec["launch_component"]
     combined = theta_rec["combined"]["bootstrap_plus_launch"]
-    ratio_t = per_traj_q / per_traj_phi
-    ratio_draws = ratio_t[idx].mean(axis=1)
+    # At production scale some trajectories reproduce BIT-IDENTICALLY across every launch pair, so
+    # their floor is exactly 0.0 and their ratio is +inf. The mean and its bootstrap are then
+    # genuinely undefined, not merely awkward -- and dropping those trajectories would select on
+    # the denominator, removing exactly the ones where the reference is most reproducible. The
+    # median keeps all T trajectories (the infinities order at the top), and the ratio of means is
+    # reported beside it as a defined alternative. The n=4 smoke could not surface this: all four
+    # of its trajectories had a non-zero floor.
+    zero_floor = int((per_traj_phi == 0.0).sum())
+    with np.errstate(divide="ignore", invalid="ignore"):
+        ratio_t = per_traj_q / per_traj_phi
+        ratio_draws = ratio_t[idx].mean(axis=1)
+    defined = zero_floor == 0
+    phi_mean = float(per_traj_phi.mean())
     return {
         "form": "interval comparison; no floor is subtracted anywhere",
         "signal": {
@@ -848,12 +859,24 @@ def resolvability(theta_rec, floor_mean, floor_ci, per_traj_q, per_traj_phi, idx
                         "are not comparable.",
         },
         "per_trajectory_ratio": {
-            "definition": "mean over trajectories of (BF16->Q KL) / (BF16->BF16 KL), both on the "
-                          "SAME trajectories -- a ratio, not a difference, and not a subtraction",
-            "mean": float(ratio_t.mean()),
+            "definition": "per trajectory, (BF16->Q KL) / (BF16->BF16 KL) on the SAME trajectory "
+                          "-- a ratio, not a difference, and not a subtraction",
+            "trajectories_with_zero_floor": zero_floor,
+            "mean": (float(ratio_t.mean()) if defined else None),
+            "mean_undefined_because": (
+                None if defined else
+                f"{zero_floor} of {per_traj_phi.size} trajectories reproduce bit-identically "
+                "across every BF16 launch pair, so their floor is exactly 0.0 and their ratio is "
+                "infinite. The mean and its bootstrap do not exist; they are reported as null "
+                "rather than computed over a denominator-selected subset."),
+            "median": float(np.median(ratio_t)),
+            "ratio_of_means": (float(per_traj_q.mean() / phi_mean) if phi_mean > 0 else None),
+            "ratio_of_means_note": "a different estimand from the mean of ratios, and defined "
+                                   "whenever the pooled floor is non-zero",
             "min": float(ratio_t.min()),
-            "max": float(ratio_t.max()),
-            "bootstrap_ci": list(K.percentile_ci(ratio_draws, tuple(q.BOOTSTRAP["ci"]))),
+            "max": (float(ratio_t.max()) if defined else None),
+            "bootstrap_ci": (list(K.percentile_ci(ratio_draws, tuple(q.BOOTSTRAP["ci"])))
+                             if defined else None),
             "phi_used": "the launch-pair-averaged BF16->BF16 KL on THESE trajectories, a "
                         "different quantity from the production floor headline above",
             "launch_coverage": "none -- the same BF16 launches enter both arms, so this is "

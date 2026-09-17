@@ -391,9 +391,16 @@ def analyze_all(n_traj=None, allow_dirty=False, out=None, floor_path=L.PRODUCTIO
             "threshold_relaxed": False,
             "floor_subtracted": False,
             "averaged_reference_used": False,
+            # BF16-anchored pairs only: FP8||FP4 has no BF16 reference, and FP8/FP4 replicate to
+            # ~1e-11 under CUDA graphs, so quoting the BF16 floor against it invents a bound
             "floor_fraction_of_signal": {
                 label: (lv["bf16_to_bf16"]["mean_nats"] / p["headline_nats"])
-                for label, p in locked["pairs"].items() if p["headline_nats"] > 0},
+                for label, p in locked["pairs"].items()
+                if p["headline_nats"] > 0 and label.startswith("BF16||")},
+            "floor_not_applicable_to": ["FP8||FP4"],
+            "floor_not_applicable_because": "the BF16 replication floor bounds BF16-anchored "
+                                            "comparisons. FP8||FP4 uses FP8 as its reference, "
+                                            "whose own replication floor is ~1e-11 nats.",
         },
         "git": q.git_state(),
         "gpu": common.gpu_identity(),
