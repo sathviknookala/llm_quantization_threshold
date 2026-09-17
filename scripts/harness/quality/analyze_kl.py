@@ -103,9 +103,9 @@ def summarise(grid, idx, cells, label):
 
 
 def analyze(root=None, out=None, n_traj=None, floor_path=None, allow_dirty=False,
-            configs=None):
+            configs=None, own_outputs=()):
     root = C.run_dir(root)
-    q.require_clean_tree(allow_dirty, stage="analyze_kl")
+    q.require_clean_tree(allow_dirty, stage="analyze_kl", own_outputs=own_outputs)
     traj = C.subset(T.load(), n_traj)
     n = traj["n_trajectories"]
     ladder = list(configs or q.LADDER)

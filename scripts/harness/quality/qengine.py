@@ -128,9 +128,11 @@ def _raise_on_term(signum, _frame):
     raise _Terminated(f"parent received signal {signum}")
 
 
-def run_job(job, log_path, allow_dirty=False, require_cool=True, timeout=3600):
+def run_job(job, log_path, allow_dirty=False, require_cool=True, timeout=3600,
+            own_outputs=(), head=None):
     """Parent side: preflight, launch a child engine, harvest observed state, release VRAM."""
-    q.require_clean_tree(allow_dirty, stage=f"engine:{job['config_id']}:{job['task']}")
+    q.require_clean_tree(allow_dirty, stage=f"engine:{job['config_id']}:{job['task']}",
+                         own_outputs=own_outputs, head=head)
     orch.preflight(require_cool=require_cool)
     os.makedirs(os.path.dirname(log_path) or ".", exist_ok=True)
     job_path = log_path + ".job.json"

@@ -15,7 +15,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from harness import common  # noqa: E402
 from harness.quality import positions as P, qcommon as q  # noqa: E402
-from harness.quality import qengine as E, trajectories as T  # noqa: E402
+from harness.quality import dispatch_verify as DV, qengine as E, trajectories as T  # noqa: E402
 
 SHARD_TRAJECTORIES = 8
 N_POS = len(P.RETAINED_POSITIONS)
@@ -173,10 +173,12 @@ def resume_provenance(meta, final, plan):
 
 
 def collect(config_id, root=None, allow_dirty=False, n_traj=None,
-            shard_trajectories=SHARD_TRAJECTORIES, traj=None, require_cool=True):
+            shard_trajectories=SHARD_TRAJECTORIES, traj=None, require_cool=True,
+            own_outputs=(), head=None):
     root = run_dir(root)
     short = q.QUALITY_CONFIGS[config_id]["short"]
-    q.require_clean_tree(allow_dirty, stage=f"collect_kl:{config_id}")
+    q.require_clean_tree(allow_dirty, stage=f"collect_kl:{config_id}",
+                         own_outputs=own_outputs, head=head)
     traj = traj if traj is not None else subset(T.load(), n_traj)
     n = traj["n_trajectories"]
     os.makedirs(dist_dir(short, root), exist_ok=True)
@@ -210,9 +212,16 @@ def collect(config_id, root=None, allow_dirty=False, n_traj=None,
                "group_size": N_POS, "shards": todo, "provenance": prov,
                "out_npy": os.path.join(dist_dir(short, root), "_unused.npy"),
                "out_json": os.path.join(shard_dir(short, root), "_engine.json")}
-        meta = E.run_job(job, os.path.join(run_dir(root), "logs", f"collect_{short}.log"),
-                         allow_dirty=allow_dirty, require_cool=require_cool, timeout=7200)
+        log_path = os.path.join(run_dir(root), "logs", f"collect_{short}.log")
+        meta = E.run_job(job, log_path, allow_dirty=allow_dirty, require_cool=require_cool,
+                         timeout=7200, own_outputs=own_outputs, head=head)
         eid = meta["observed"]["engine_identity_hash"]
+        # additive: the inherited verdict is satisfied by silence for BF16 and cannot enforce
+        # FP4's "emulation" pattern at all (see dispatch_verify). Both must pass.
+        evidence = (DV.require(open(log_path, errors="replace").read(), config_id)
+                    if os.path.exists(log_path) else
+                    {"ok": None, "unavailable_because": f"{log_path} was not written; the engine "
+                                                        "side is stubbed"})
         if prior_ids and prior_ids != [eid]:
             raise SystemExit(
                 f"ABORT: reused shards were scored under engine identity {prior_ids} but this "
@@ -221,6 +230,7 @@ def collect(config_id, root=None, allow_dirty=False, n_traj=None,
             m = json.load(open(sh["json"]))
             m["engine_identity_hash"] = eid
             m["observed"] = meta["observed"]
+            m["dispatch_evidence"] = evidence
             m["engine_metrics"] = meta.get("engine_metrics")
             m["git"] = q.git_state()
             m["software"] = common.software_identity()
@@ -239,6 +249,15 @@ def collect(config_id, root=None, allow_dirty=False, n_traj=None,
     if len(identities) != 1 or None in identities:
         raise SystemExit(f"ABORT: shards span engine identities {sorted(identities)}")
     prov_src = resume_provenance(meta, final, plan)
+    evidence = next((m["dispatch_evidence"] for m in final if m.get("dispatch_evidence")), None)
+    if evidence is None:
+        # pre-2026-09 shards carry none; the log is gitignored, so it is recorded as absent
+        # rather than reconstructed from a file that may no longer exist
+        evidence = {"ok": None, "unavailable_because":
+                    "every shard was reused and none carries a dispatch_evidence block; "
+                    "re-collect, or run dispatch_verify.py against the engine log"}
+    elif evidence.get("ok") is False:
+        raise SystemExit(f"ABORT: stored dispatch evidence for {config_id} failed: {evidence}")
 
     cells = [c for m in final for c in m["index"]]
     P.assert_complete_grid(cells, n)
@@ -278,6 +297,7 @@ def collect(config_id, root=None, allow_dirty=False, n_traj=None,
         "wall_seconds": prov_src["wall_seconds"],
         "engine_metrics": prov_src["engine_metrics"],
         "observed": prov_src["observed"],
+        "dispatch_evidence": evidence,
         "provenance_source": prov_src["provenance_source"],
         "git": q.git_state(),
         "gpu": common.gpu_identity(),

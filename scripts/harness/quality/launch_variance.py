@@ -118,6 +118,55 @@ def chi2_lower_005(df):
     return _CHI2_005[usable[-1]] if usable else None
 
 
+# Two-sided chi-square quantiles, for a 95% interval on an OBSERVED sd. Used to say whether a
+# pre-registered prediction is consistent with what R launches showed -- and, at 2 df, how little
+# that test can exclude.
+_CHI2_025 = {1: 0.00098207, 2: 0.05063562, 3: 0.21579528, 4: 0.48441857, 5: 0.83121164,
+             6: 1.23734674, 7: 1.68986950, 8: 2.17972817, 9: 2.70039052, 10: 3.24697004}
+_CHI2_975 = {1: 5.02388619, 2: 7.37775891, 3: 9.34840360, 4: 11.14328678, 5: 12.83250175,
+             6: 14.44937578, 7: 16.01276190, 8: 17.53454614, 9: 19.02276780, 10: 20.48317735}
+
+
+def sd_ci_chi2(sd, df):
+    """95% interval for a normal-theory sd on `df` degrees of freedom.
+
+    At the R=3 this design supports, df=2 and the interval spans a factor of 12. Reported so that
+    "the prediction is consistent with the data" cannot be mistaken for "the prediction is
+    confirmed": almost nothing is excluded at this df.
+    """
+    if sd is None or df is None or df not in _CHI2_025:
+        return None
+    lo = float(sd * np.sqrt(df / _CHI2_975[df]))
+    hi = float(sd * np.sqrt(df / _CHI2_025[df]))
+    return {"sd": float(sd), "df": int(df), "ci_95": [lo, hi],
+            "width_ratio": float(hi / lo) if lo > 0 else None,
+            "method": "chi-square interval on a normal-theory sd"}
+
+
+def pooled_sigma_proj(comparisons):
+    """One coupling constant shared across the BF16-anchored comparisons.
+
+    The first-order argument makes sigma_proj a property of the launch perturbation, not of the
+    configuration, so pooling it buys degrees of freedom that no per-configuration estimate at R=3
+    can. Pooled in quadrature with equal weights -- the configurations contribute the same 2 df.
+    """
+    vals = {k: (c.get("scaling_law") or {}).get("sigma_proj")
+            for k, c in comparisons.items()}
+    have = {k: v for k, v in vals.items() if v}
+    if not have:
+        return None
+    pooled = float(np.sqrt(np.mean([v ** 2 for v in have.values()])))
+    return {
+        "sigma_proj_pooled": pooled,
+        "per_comparison": have,
+        "spread_ratio": float(max(have.values()) / min(have.values())) if len(have) > 1 else None,
+        "rule": "root-mean-square over the BF16-anchored comparisons, equal weights",
+        "why_pooled": "sigma_proj is a property of the launch perturbation rather than of the "
+                      "configuration; agreement across configurations whose signals differ by "
+                      "nearly an order of magnitude is the evidence for pooling it",
+    }
+
+
 class LaunchDesignError(ValueError):
     pass
 
@@ -711,10 +760,15 @@ def bf16_to_bf16(mats, launches, n_traj, idx):
                 for a in launches}
     by_pos = {}
     for j, p in enumerate(P.RETAINED_POSITIONS):
-        col = np.array([g[:, j].mean() for g in grids.values()])
+        per_pair = {k: float(g[:, j].mean()) for k, g in grids.items()}
+        col = np.array(list(per_pair.values()))
         by_pos[str(p)] = {"mean_over_ordered_pairs_nats": float(col.mean()),
                           "min_nats": float(col.min()), "max_nats": float(col.max()),
-                          "sd_over_ordered_pairs_nats": float(col.std(ddof=1))}
+                          "sd_over_ordered_pairs_nats": float(col.std(ddof=1)),
+                          # the ordered pairs share launches, so an interval on this mean has to
+                          # come from a delete-one-LAUNCH jackknife, not from these six values
+                          "per_ordered_pair_nats": per_pair,
+                          "launch_level_uncertainty": floor_launch_ci(per_pair, len(launches))}
     return {
         "quantity": "D_KL(B_a || B_b) over ordered BF16 launch pairs -- the replication floor",
         "n_launches": len(launches),
@@ -960,8 +1014,9 @@ def production_floor_positions(path=PRODUCTION_FLOOR):
 
 
 def analyze(n_traj=4, sources=BF16_LAUNCH_SOURCES, quantized=("FP8_PRIMARY", "FP4_PRIMARY"),
-            smoke_root=SMOKE_ROOT, out=None, allow_dirty=False, floor_path=PRODUCTION_FLOOR):
-    q.require_clean_tree(allow_dirty, stage="launch_variance")
+            smoke_root=SMOKE_ROOT, out=None, allow_dirty=False, floor_path=PRODUCTION_FLOOR,
+            committed_launch="S", own_outputs=()):
+    q.require_clean_tree(allow_dirty, stage="launch_variance", own_outputs=own_outputs)
     traj_full = T.load()
     traj = C.subset(traj_full, n_traj)
 
@@ -1012,8 +1067,11 @@ def analyze(n_traj=4, sources=BF16_LAUNCH_SOURCES, quantized=("FP8_PRIMARY", "FP
         rec, Y, per_traj_q = decompose(stack, idx, label, floor_nats=floor_mean)
         rec["per_launch_headline_nats"] = {r: float(Y[i].mean()) for i, r in enumerate(launches)}
         rec["pooling_evidence"] = _pooling_evidence(rec["per_launch_headline_nats"])
+        # the launch the committed single-reference headline was computed against: "S" for the
+        # smoke supplement, the designated reference launch for P13. When it IS in the launch set
+        # the recomputation is the end-to-end check that this path produced the tracked number.
         rec["reproduces_committed_smoke_headline"] = _check_committed(
-            label, rec["per_launch_headline_nats"].get("S"), smoke_root,
+            label, rec["per_launch_headline_nats"].get(committed_launch), smoke_root,
             single_launch_grid=pair_grid(mats[launches[0]], qmat, n_traj))
         rec["quantized_source"] = {
             "config_id": cfg,

@@ -1191,6 +1191,160 @@ def test_launch_variance_guards(tmp):
     check("G2' is named as unchanged", "unchanged" in phi["relationship_to_G2_prime"], True)
 
 
+
+
+def test_run_scoped_clean_tree():
+    """The multi-launch clean-tree defect: own outputs excused, everything else still fatal."""
+    print("run-scoped clean tree")
+    check("a path under an own-output root is matched",
+          q._under("results/quality/kl/collection_BF16.json", ["results/quality/kl"]), True)
+    check("the root itself is matched", q._under("results/quality/kl", ["results/quality/kl"]), True)
+    # the bug a bare startswith() would introduce: a sibling directory sharing a prefix
+    check("a prefix-sharing sibling is NOT matched",
+          q._under("results/quality/kl_other/x.json", ["results/quality/kl"]), False)
+    check("an unrelated path is not matched",
+          q._under("scripts/harness/quality/collect_kl.py", ["results/quality/kl"]), False)
+
+    real = q.dirty_paths
+    try:
+        q.dirty_paths = lambda: ["results/quality/kl/collection_BF16.json"]
+        st = q.require_clean_tree(False, "t", own_outputs=["results/quality/kl"])
+        check("own output does not abort", st["dirty_paths_outside_run_outputs"], [])
+        check("the dirt is still recorded", st["dirty_paths"],
+              ["results/quality/kl/collection_BF16.json"])
+        check("git_dirty still reports the raw fact", st["git_dirty"], True)
+        q.dirty_paths = lambda: ["results/quality/kl/collection_BF16.json",
+                                 "scripts/harness/quality/collect_kl.py"]
+        _raises_msg("a source edit still aborts under a scope",
+                    lambda: q.require_clean_tree(False, "t", own_outputs=["results/quality/kl"]),
+                    "scripts/harness")
+        q.dirty_paths = lambda: []
+        _raises_msg("a moved HEAD aborts even on a clean tree",
+                    lambda: q.require_clean_tree(False, "t", head="0" * 40), "HEAD moved")
+    finally:
+        q.dirty_paths = real
+
+    # the guard must fire on the real defect: launch 1 writes a TRACKED summary, launch 2 checks
+    try:
+        q.dirty_paths = lambda: ["results/quality/floor64/launch1/collection_BF16.json"]
+        _raises_msg("unscoped, the launch-1 artifact aborts launch 2",
+                    lambda: q.require_clean_tree(False, "collect_kl:launch2"), "dirty")
+        st = q.require_clean_tree(False, "collect_kl:launch2",
+                                  own_outputs=["results/quality/floor64"])
+        check("scoped, launch 2 proceeds", st["run_scoped"], True)
+    finally:
+        q.dirty_paths = real
+
+
+def test_dispatch_evidence():
+    """Positive evidence, including the two cases the inherited verdict cannot see."""
+    print("dispatch evidence (additive verifier)")
+    from harness.quality import dispatch_verify as DV
+
+    bf16 = ("INFO 09-16 00:00:00 [core.py:105] Initializing a V1 LLM engine (v0.19.1) with "
+            "config: model='x', dtype=torch.bfloat16, quantization=None, seed=0\n"
+            "INFO 09-16 00:00:01 [cuda.py:334] Using FLASH_ATTN attention backend\n"
+            "INFO 09-16 00:00:02 [backends.py:1111] Dynamo bytecode transform time: 1.05 s\n")
+    r = DV.verify(bf16, "BF16_REFERENCE")
+    check("BF16 gets positive evidence, not silence", r["ok"], True)
+    check("BF16 evidence names the resolved quantization method",
+          r["required_evidence"]["quantization_method_is_none"]["present"], True)
+    check("BF16 evidence carries the matched line",
+          bool(r["required_evidence"]["attention_backend_chosen"]["evidence"]), True)
+
+    # the gap this verifier exists to close: an empty log satisfies the INHERITED verdict
+    from harness.quality import qengine as E
+    inherited = E.observed_identity("", {}, "BF16_REFERENCE")["dispatch_verdict"]
+    check("the inherited BF16 verdict is ok on an EMPTY log", inherited["ok"], True)
+    check("the additive verifier is not", DV.verify("", "BF16_REFERENCE")["ok"], False)
+
+    fp4 = ("INFO [core.py:105] Initializing a V1 LLM engine with config: quantization="
+           "compressed-tensors, dtype=torch.bfloat16\n"
+           "INFO [cuda.py:334] Using FLASH_ATTN attention backend\n"
+           "INFO [nvfp4.py:1] Using NvFp4LinearBackend.FLASHINFER_CUTLASS for NVFP4 GEMM\n")
+    check("FP4 passes on a faithful log", DV.verify(fp4, "FP4_PRIMARY")["ok"], True)
+
+    # "emulation" is in FP4's forbidden list but not in server.KERNEL_PATTERNS, so the inherited
+    # scan -- which searches only KERNEL_PATTERNS-matching lines -- can never see it
+    emu = fp4 + "INFO [nvfp4.py:9] falling back to emulation for NVFP4 GEMM\n"
+    check("the inherited verdict misses the emulation fallback",
+          E.observed_identity(emu, {}, "FP4_PRIMARY")["dispatch_verdict"]["forbidden_present"], [])
+    r4 = DV.verify(emu, "FP4_PRIMARY")
+    check("the additive verifier catches it", r4["ok"], False)
+    check("and names the pattern", "emulation" in r4["forbidden_present"], True)
+    raises("require() aborts on failing evidence",
+           lambda: DV.require(emu, "FP4_PRIMARY"), SystemExit)
+
+    fp8 = ("INFO [core.py:105] config: quantization=compressed-tensors\n"
+           "INFO [cuda.py:334] Using FLASH_ATTN attention backend\n"
+           "INFO [fp8.py:1] Selected CutlassFP8ScaledMMLinearKernel for CompressedTensorsW8A8Fp8\n")
+    check("FP8 passes on a faithful log", DV.verify(fp8, "FP8_PRIMARY")["ok"], True)
+    check("FP8 fails when the Marlin fallback appears",
+          DV.verify(fp8 + "using MarlinLinearKernel\n", "FP8_PRIMARY")["ok"], False)
+    check("BF16 fails if a quantization kernel appears",
+          DV.verify(bf16 + "Selected CutlassFP8ScaledMMLinearKernel\n",
+                    "BF16_REFERENCE")["ok"], False)
+
+
+def test_p13_resolution_rule():
+    """The registered resolution rule, and the arithmetic it rests on."""
+    print("P13 resolution rule")
+    from harness.quality import launch_variance as L
+    from harness.quality import p13
+
+    ci = L.sd_ci_chi2(1.0, 2)
+    check("the sd interval at 2 df spans ~12x", round(ci["width_ratio"], 1), 12.1)
+    check("an unlisted df returns None", L.sd_ci_chi2(1.0, 99), None)
+
+    pooled = L.pooled_sigma_proj({"a": {"scaling_law": {"sigma_proj": 3e-3}},
+                                  "b": {"scaling_law": {"sigma_proj": 4e-3}}})
+    close("pooled sigma_proj is the rms", pooled["sigma_proj_pooled"], 3.5355339e-3, 1e-9)
+    check("a comparison with no scaling law is dropped, not zeroed",
+          L.pooled_sigma_proj({"a": {}}), None)
+
+    boot = {"ci_low": 1.0e-3, "ci_high": 3.0e-3, "std_error": 5.0e-4}
+    # signal far above the floor: resolved, and the inflation must not flip it
+    r = p13.classify(2.0e-3, boot, 2.1e-3, 2.0e-4, 3.0e-4)
+    check("a signal clear of the floor resolves", r["class"], "resolved")
+    check("inflation is >= 1", r["inflation_factor"] >= 1.0, True)
+    check("the inflated lower end is below the raw one",
+          r["launch_inflated_ci_low_nats"] < boot["ci_low"], True)
+
+    # same signal, floor raised above the inflated lower end: noise-limited
+    r2 = p13.classify(2.0e-3, boot, 2.1e-3, 9.0e-4, 1.5e-3)
+    check("a floor above the inflated lower end is noise-limited", r2["class"], "noise_limited")
+    check("the margin goes negative there", r2["margin_nats"] < 0, True)
+
+    # the rule must be MONOTONE in launch variance: more nuisance can only lose resolution
+    wide = p13.classify(2.0e-3, boot, 2.0e-2, 2.0e-4, 3.0e-4)
+    check("a much larger sigma_proj cannot gain resolution",
+          not (wide["class"] == "resolved" and r["class"] == "noise_limited"), True)
+    check("and it lowers the inflated bound",
+          wide["launch_inflated_ci_low_nats"] < r["launch_inflated_ci_low_nats"], True)
+
+    # zero launch variance reduces to the plain pre-registered bootstrap interval
+    z = p13.classify(2.0e-3, boot, 0.0, 2.0e-4, 3.0e-4)
+    close("sigma_proj=0 leaves the bootstrap interval untouched",
+          z["launch_inflated_ci_low_nats"], boot["ci_low"], 1e-15)
+
+    check("the registration hashes deterministically",
+          p13.registration_hash() == p13.registration_hash(), True)
+    check("the registered design is R=3", p13.REGISTERED["design"]["n_bf16_launches"], 3)
+    check("launch 1 is the designated locked reference",
+          p13.REGISTERED["design"]["designated_reference_launch_for_locked_headline"], 1)
+    check("no floor is subtracted anywhere in the registration",
+          p13.REGISTERED["what_is_not_changed"]["floor_subtracted_from_any_reported_kl"], False)
+    check("no averaged BF16 distribution is registered",
+          p13.REGISTERED["what_is_not_changed"]["averaged_or_pooled_bf16_distribution"], False)
+    check("the locked headline definition is unchanged",
+          p13.REGISTERED["what_is_not_changed"]["locked_headline_definition"], False)
+    check("three BF16 launch roots are declared", len(p13.BF16_LAUNCH_ROOTS), 3)
+    check("launch 1 is the production root itself",
+          p13.BF16_LAUNCH_ROOTS[1], q.KL_DIR)
+    check("the launch sources are distinct roots",
+          len({s["root"] for s in p13.launch_sources()}), 3)
+
+
 def main():
     import tempfile
     tests = [test_positions, test_kl_math, test_bootstrap, test_completeness,
@@ -1199,7 +1353,8 @@ def main():
              test_spec_hash, test_observed_identity, test_freeze_guard,
              test_manifest_adoption, test_collect_manifest_plumbing,
              test_launch_variance_math, test_launch_variance_estimators,
-             test_launch_variance_guards, test_partial_matrix_load]
+             test_launch_variance_guards, test_partial_matrix_load,
+             test_run_scoped_clean_tree, test_dispatch_evidence, test_p13_resolution_rule]
     if os.environ.get("QSELFTEST_ONLY"):
         want = os.environ["QSELFTEST_ONLY"]
         tests = [t for t in tests if want in t.__name__]

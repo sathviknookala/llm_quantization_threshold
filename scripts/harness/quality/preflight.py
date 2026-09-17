@@ -241,9 +241,14 @@ def rejection_tests(traj, index):
     return out
 
 
-def engine_probe(traj, allow_dirty=False, reference=None):
-    """One trajectory's ten contexts per configuration: do the engines still come up identically?"""
+def engine_probe(traj, allow_dirty=False, reference=None, head=None):
+    """One trajectory's ten contexts per configuration: do the engines still come up identically?
+
+    Each probe writes a TRACKED summary before the next configuration launches, so the run declares
+    its own output root; without that the second launch aborts on the first launch's artifact.
+    """
     out, observed = [], {}
+    scope = [os.path.relpath(PREFLIGHT_DIR, common.REPO)]
     os.makedirs(PREFLIGHT_DIR, exist_ok=True)
     view = C.subset(traj, 1)
     contexts, _ = C.build_grid(view)
@@ -252,7 +257,7 @@ def engine_probe(traj, allow_dirty=False, reference=None):
     for cfg in q.LADDER:
         short = q.QUALITY_CONFIGS[cfg]["short"]
         _, meta = G._score_contexts(cfg, contexts, os.path.join(PREFLIGHT_DIR, f"{short}_probe"),
-                                    {}, allow_dirty, chash)
+                                    {}, allow_dirty, chash, own_outputs=scope, head=head)
         obs = meta["observed"]
         observed[short] = {"engine_identity_hash": obs["engine_identity_hash"],
                            "kv_cache_tokens": obs["kv_cache_tokens"],
@@ -308,7 +313,8 @@ def main():
 
     observed = {}
     if not a.skip_engine:
-        ec, observed = engine_probe(traj, allow_dirty=a.allow_dirty, reference=reference)
+        ec, observed = engine_probe(traj, allow_dirty=a.allow_dirty, reference=reference,
+                                    head=git["git_head"])
         checks += ec
 
     per_ctx = [r["seconds_per_context"] for r in reference.values()] or [0.15]

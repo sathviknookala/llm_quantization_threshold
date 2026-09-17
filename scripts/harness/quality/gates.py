@@ -517,7 +517,8 @@ def replayability(out_dir=None, n_traj=None, allow_dirty=False):
     }
 
 
-def _score_contexts(config_id, contexts, out_stem, overrides, allow_dirty, contexts_hash):
+def _score_contexts(config_id, contexts, out_stem, overrides, allow_dirty, contexts_hash,
+                    own_outputs=(), head=None):
     """One scoring launch into a bare .npy/.json pair, reused only under matching identity."""
     npy, js = out_stem + ".npy", out_stem + ".json"
     ident = q.config_identity(config_id)
@@ -538,7 +539,8 @@ def _score_contexts(config_id, contexts, out_stem, overrides, allow_dirty, conte
            "engine_overrides": dict(overrides or {})}
     meta = E.run_job(job, os.path.join(os.path.dirname(out_stem), "logs",
                                        os.path.basename(out_stem) + ".log"),
-                     allow_dirty=allow_dirty, timeout=7200)
+                     allow_dirty=allow_dirty, timeout=7200,
+                     own_outputs=own_outputs, head=head)
     meta["kl_spec_hash"] = q.spec_hash()
     meta["contexts_hash"] = contexts_hash
     meta["config_identity"] = ident

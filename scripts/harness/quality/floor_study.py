@@ -34,10 +34,17 @@ def launch_root(i, root=None):
 
 
 def collect(n_launches, root=None, allow_dirty=False):
-    """One independent engine launch per repetition, each scoring the full grid."""
+    """One independent engine launch per repetition, each scoring the full grid.
+
+    The run's own output roots are declared so that launch 1's TRACKED collection summary does not
+    abort launch 2 on `require_clean_tree`; HEAD is pinned so the scope cannot widen mid-run.
+    """
+    scope = [os.path.relpath(root or STUDY_DIR, common.REPO)]
+    head = q.require_clean_tree(allow_dirty, stage="floor_study:start")["git_head"]
     out = []
     for i in range(1, n_launches + 1):
-        rec = C.collect(CONFIG, root=launch_root(i, root), allow_dirty=allow_dirty)
+        rec = C.collect(CONFIG, root=launch_root(i, root), allow_dirty=allow_dirty,
+                        own_outputs=scope, head=head)
         obs = rec.get("observed") or {}
         out.append({"launch": i,
                     "engine_identity_hash": rec["engine_identity_hash"],
@@ -88,7 +95,8 @@ def _pair_stats(grid, idx, cells, label):
 
 
 def analyze(n_launches, root=None, allow_dirty=False, out=None):
-    q.require_clean_tree(allow_dirty, stage="floor_study")
+    q.require_clean_tree(allow_dirty, stage="floor_study",
+                         own_outputs=[os.path.relpath(root or STUDY_DIR, common.REPO)])
     traj = T.load()
     n = traj["n_trajectories"]
     idx = K.bootstrap_indices(n, q.BOOTSTRAP["draws"], q.BOOTSTRAP["seed"])

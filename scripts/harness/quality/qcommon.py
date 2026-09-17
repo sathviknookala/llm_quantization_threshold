@@ -236,24 +236,65 @@ def config_identity(config_id):
     }
 
 
-def git_state():
-    dirty = bool(subprocess.run(
+def dirty_paths():
+    """Repo-relative paths of tracked files that differ from HEAD."""
+    out = subprocess.run(
         ["git", "-C", common.REPO, "status", "--porcelain", "--untracked-files=no"],
-        capture_output=True, text=True).stdout.strip())
+        capture_output=True, text=True).stdout
+    paths = []
+    for line in out.splitlines():
+        if not line.strip():
+            continue
+        path = line[3:]
+        # a rename records "old -> new"; the new name is the one on disk now
+        if " -> " in path:
+            path = path.split(" -> ", 1)[1]
+        paths.append(path.strip().strip('"'))
+    return sorted(paths)
+
+
+def git_state():
+    paths = dirty_paths()
     head = subprocess.run(["git", "-C", common.REPO, "rev-parse", "HEAD"],
                           capture_output=True, text=True).stdout.strip()
-    return {"git_head": head, "git_dirty": dirty}
+    return {"git_head": head, "git_dirty": bool(paths)}
 
 
-def require_clean_tree(allow_dirty, stage):
-    """Re-checked per launch: a run spans hours and the tree can go dirty mid-run."""
+def _under(path, prefixes):
+    return any(path == p or path.startswith(p.rstrip("/") + "/") for p in prefixes)
+
+
+def require_clean_tree(allow_dirty, stage, own_outputs=(), head=None):
+    """Re-checked per launch: a run spans hours and the tree can go dirty mid-run.
+
+    `own_outputs` names repo-relative roots this run writes into. A multi-launch run writes a
+    TRACKED collection summary after launch 1, so an unscoped check fails launch 2 on the run's
+    own output and the only escape was `--allow-dirty` -- which drops the provenance guard for
+    the source tree too. Scoping keeps the source-code guard at full strength; `head` pins the
+    commit so the scope cannot be widened by committing mid-run either.
+    """
     st = git_state()
-    if st["git_dirty"] and not allow_dirty:
+    paths = dirty_paths()
+    own = sorted(own_outputs or ())
+    foreign = [p for p in paths if not _under(p, own)]
+    if foreign and not allow_dirty:
+        scoped = (f" Paths under {own} are this run's own outputs and are excused; these are not:"
+                  if own else "")
         raise SystemExit(
             f"ABORT: working tree is dirty at {stage} and --allow-dirty was not given; "
-            "a quality result must name the commit that produced it")
+            f"a quality result must name the commit that produced it.{scoped} "
+            + ", ".join(foreign[:10]) + (" ..." if len(foreign) > 10 else ""))
+    if head is not None and st["git_head"] != head:
+        raise SystemExit(
+            f"ABORT: HEAD moved from {head[:12]} to {st['git_head'][:12]} during {stage}; "
+            "the artifacts of one run must all name one commit")
     st["allow_dirty"] = bool(allow_dirty)
     st["stage"] = stage
+    st["run_scoped"] = bool(own)
+    st["run_outputs"] = own
+    st["dirty_paths"] = paths
+    st["dirty_paths_outside_run_outputs"] = foreign
+    st["head_pinned_to"] = head
     return st
 
 
