@@ -68,6 +68,81 @@
       "fp8_fp4_direct_measurement": false
     }
   },
+  "collection_record": {
+    "available": true,
+    "artifact": "P13 collection record",
+    "registration": {
+      "registration_file": "scripts/harness/quality/p13.py",
+      "registration_hash": "b42d228a8afdd8df",
+      "committed": true,
+      "git_head": "fcc211376cf3196a498779a642eccc613836fb60",
+      "git_dirty": false
+    },
+    "steps": [
+      {
+        "step": "BF16 launch 1",
+        "config_id": "BF16_REFERENCE",
+        "root": "results/quality/kl",
+        "engine_identity_hash": "ca16377ea4206028",
+        "kv_cache_tokens": 44688,
+        "cells": 640,
+        "seconds": 85.69,
+        "wall_seconds": null,
+        "dispatch_evidence_ok": true,
+        "launched": false
+      },
+      {
+        "step": "FP8",
+        "config_id": "FP8_PRIMARY",
+        "root": "results/quality/kl",
+        "engine_identity_hash": "176a222edae755ff",
+        "kv_cache_tokens": 97888,
+        "cells": 640,
+        "seconds": 79.13,
+        "wall_seconds": null,
+        "dispatch_evidence_ok": true,
+        "launched": false
+      },
+      {
+        "step": "BF16 launch 2",
+        "config_id": "BF16_REFERENCE",
+        "root": "results/quality/kl/bf16_launch2",
+        "engine_identity_hash": "ca16377ea4206028",
+        "kv_cache_tokens": 44688,
+        "cells": 640,
+        "seconds": 85.46,
+        "wall_seconds": null,
+        "dispatch_evidence_ok": true,
+        "launched": false
+      },
+      {
+        "step": "FP4",
+        "config_id": "FP4_PRIMARY",
+        "root": "results/quality/kl",
+        "engine_identity_hash": "434ad8fac783fb7f",
+        "kv_cache_tokens": 120944,
+        "cells": 640,
+        "seconds": 76.36,
+        "wall_seconds": null,
+        "dispatch_evidence_ok": true,
+        "launched": false
+      },
+      {
+        "step": "BF16 launch 3",
+        "config_id": "BF16_REFERENCE",
+        "root": "results/quality/kl/bf16_launch3",
+        "engine_identity_hash": "ca16377ea4206028",
+        "kv_cache_tokens": 44688,
+        "cells": 640,
+        "seconds": 84.71,
+        "wall_seconds": null,
+        "dispatch_evidence_ok": true,
+        "launched": false
+      }
+    ],
+    "collection_git_head": "fcc211376cf3196a498779a642eccc613836fb60",
+    "timestamp": "2026-09-16T20:55:06-0400"
+  },
   "n_trajectories": 64,
   "n_positions": 10,
   "n_bf16_launches": 3,
@@ -211,7 +286,812 @@
       0.0853533775270066
     ],
     "launch_component": null,
-    "why_no_launch_component": "FP8 is the reference; no BF16 distribution enters it"
+    "why_no_launch_component": "FP8 is the reference; no BF16 distribution enters it",
+    "larger_than_bf16_to_fp4": {
+      "quantity": "FP8||FP4 minus BF16||FP4, paired on the same 64 trajectories",
+      "point_nats": 0.0038148482371407055,
+      "ci_95": [
+        0.0004988849488903723,
+        0.008501108459275474
+      ],
+      "p_le_zero": 0.0083,
+      "why_paired": "the two marginal intervals overlap; the paired one is the interval the shared trajectories support",
+      "not_a_divergence": "a difference of two KLs is not a KL. This is a comparison of magnitudes and is never reported as the marginal step, which is the directly measured FP8||FP4."
+    },
+    "matrix_sha256": {
+      "FP8": "20d1a55c79cad6a8713847c95270267bf9d7670c0732cca8fb51b77125ac99fe",
+      "FP4": "7202795dea30e95a95a8041f77b1af07bae1e1576ae201c814d738e7ecd5e716"
+    },
+    "matrix_sha256_note": "SHA-256 of the exact float32 bytes consumed; the BF16 launches' digests are in launch_variance_p13.json",
+    "kl_cells_nats": {
+      "pair": "FP8||FP4",
+      "axes": [
+        "trajectory",
+        "position"
+      ],
+      "position_order": [
+        1,
+        8,
+        32,
+        64,
+        128,
+        256,
+        512,
+        1024,
+        1536,
+        2048
+      ],
+      "values": [
+        [
+          0.014370056984319797,
+          0.000741889396588118,
+          0.054301390647463525,
+          0.16626051767684236,
+          0.0006863306100047655,
+          0.025469253066196507,
+          0.0033784376092008714,
+          0.0016688063105603133,
+          0.00019131411492118237,
+          0.0013957072215276531
+        ],
+        [
+          0.017606519625729036,
+          0.020040001895266994,
+          0.03656541393820737,
+          0.05571675532894032,
+          0.01552815521693158,
+          2.9642554095489836e-05,
+          0.00041635311716632976,
+          0.00011553135470855703,
+          0.11086277754318793,
+          1.085297886317137e-05
+        ],
+        [
+          0.05368630731187725,
+          0.08801733666058992,
+          0.13196844977893782,
+          0.11693453370313263,
+          0.0044361090508937264,
+          0.019302857819932275,
+          0.0009956753601032676,
+          0.00019886779830793636,
+          0.0002559304483535074,
+          0.00026465840377400205
+        ],
+        [
+          0.1287347015942511,
+          0.04742953171295,
+          0.11576534127587824,
+          0.02413325250996425,
+          0.1681038497636374,
+          8.54054930421036e-05,
+          0.0001123926915428817,
+          0.0003711281764100846,
+          0.00022842514526097516,
+          0.00011343640008933264
+        ],
+        [
+          0.0011854918301933879,
+          0.049620051926964254,
+          0.023483926260060052,
+          0.02597203594922144,
+          0.01369250194236161,
+          0.01597706803274833,
+          0.00011658344525875408,
+          9.60762090979746e-05,
+          4.614820452594158e-05,
+          2.3663556801413956e-05
+        ],
+        [
+          0.009237673738517868,
+          0.30707116949612656,
+          0.0013583798522822097,
+          0.0005155769875511819,
+          0.24485706354970171,
+          0.0007474179232577127,
+          0.1354705866632942,
+          9.18610026824137e-05,
+          9.589552952610323e-05,
+          0.007195762828113431
+        ],
+        [
+          0.08734191449297447,
+          0.10148906814947342,
+          0.053231854804851986,
+          0.03422404802477388,
+          0.11288235188257259,
+          0.029039304752316804,
+          0.01896147192080289,
+          0.0019314560814792077,
+          0.05079005909295527,
+          0.10558144184750758
+        ],
+        [
+          0.012182336286614838,
+          0.042482247723867654,
+          0.0559805945707981,
+          0.07349788739627498,
+          0.008297606582123595,
+          0.0017136948615555214,
+          0.00046939464005769596,
+          0.00205501204652481,
+          0.0001197531904449049,
+          0.0005366584306748612
+        ],
+        [
+          0.005032907570685323,
+          0.036852396147764116,
+          0.042742460960198396,
+          0.012286810765460543,
+          0.018855989728036367,
+          0.019966664681526136,
+          0.012756079454843045,
+          2.1910987335202215e-05,
+          0.00039108307986464715,
+          0.0008144784643271021
+        ],
+        [
+          0.23954823737421332,
+          0.257397715980938,
+          0.3133077703759307,
+          0.009867785962784705,
+          0.0022919971082207167,
+          0.0006284225558467313,
+          0.011922911290230308,
+          0.00010732188725769347,
+          0.00028608598272642015,
+          7.74979281104849e-05
+        ],
+        [
+          0.07394157335219323,
+          0.04084910246663383,
+          0.001077590736268458,
+          0.22772179647171598,
+          3.8626504630882314e-05,
+          0.00014607290301321037,
+          0.02904798425328975,
+          0.03266392971858922,
+          0.002216429964460903,
+          2.3499528539927997e-05
+        ],
+        [
+          1.3630769595495391,
+          2.6035934681518427,
+          0.008783713421131488,
+          1.8091411307573313,
+          0.005613702747205976,
+          0.1645803106599005,
+          1.6983902199047618,
+          0.009335436204106947,
+          3.794128096058524e-05,
+          5.041804749445099e-05
+        ],
+        [
+          0.04210590678906058,
+          0.050440220249435896,
+          3.0513891682107014e-05,
+          0.0010262386274663502,
+          0.0005861106153722941,
+          0.00013541098485316588,
+          0.015169346259862432,
+          1.6170080902520143e-05,
+          0.0026811311222155253,
+          4.8563326229738755e-05
+        ],
+        [
+          0.029448197501489908,
+          0.0330282476166422,
+          0.028462307465026784,
+          0.02515597863760116,
+          0.059029481221659214,
+          0.0315063552327748,
+          3.414023866132205e-05,
+          1.853650984281802e-05,
+          0.00034161209024286427,
+          3.502048938659609e-07
+        ],
+        [
+          0.06885407399365047,
+          0.09711454922228138,
+          0.00016963382384621285,
+          0.00011003932969725029,
+          0.12115393692698945,
+          0.021776074114657207,
+          0.006223080144604474,
+          0.0056459483788556235,
+          0.0032269121284866373,
+          0.003071214963615002
+        ],
+        [
+          0.06614929295024449,
+          0.07712581758876352,
+          0.00034938322281355074,
+          0.11108845209768074,
+          0.014767357513517654,
+          1.130233071174518e-06,
+          0.15935308938084733,
+          0.014292139566680835,
+          3.5493656606551302e-06,
+          6.042912711886541e-06
+        ],
+        [
+          0.055137159916729205,
+          0.020559772477208513,
+          0.029860470785168482,
+          0.03582779678001375,
+          0.0022902657064790815,
+          0.0007436508178185605,
+          0.0003984741908272365,
+          8.325063493428263e-05,
+          0.0004825884200431785,
+          0.0006599005394203653
+        ],
+        [
+          0.04587672669354805,
+          0.00685700471798561,
+          0.12438775319966669,
+          0.034570475540620454,
+          0.0868140031446822,
+          0.02169883822131989,
+          0.03008373482372588,
+          0.006292770118542802,
+          0.0022119901312639854,
+          0.0007851620029001832
+        ],
+        [
+          0.05567369871651026,
+          0.00774996163310371,
+          0.08669729921551295,
+          0.07820876890731926,
+          0.06191281357745529,
+          0.0026867553672372496,
+          8.165484350642978e-05,
+          3.4173812668062516e-05,
+          1.7467779835990546e-05,
+          0.00018994873503551821
+        ],
+        [
+          0.031026268328632017,
+          0.03399942673636948,
+          0.09281689913172711,
+          0.042365716652051404,
+          0.05864560640180349,
+          0.0006388093232043134,
+          0.017158260238494573,
+          0.00025038758261272724,
+          0.000536504943005131,
+          0.00011684371379864867
+        ],
+        [
+          0.14540668445232713,
+          0.10184903163577898,
+          0.03671585564854282,
+          0.007552844467423441,
+          0.027919551623485486,
+          0.048696800731950894,
+          0.11511172738476418,
+          4.887174075868474e-06,
+          0.0007138838482191421,
+          0.0002822983140738543
+        ],
+        [
+          0.03996976730604691,
+          0.09595871100693297,
+          0.09000207291717573,
+          0.0657160158527037,
+          2.3763484083970674,
+          0.02629484443271291,
+          0.040483609680699674,
+          8.36907370713045e-05,
+          1.5435602581184556e-05,
+          1.0989361694454323e-05
+        ],
+        [
+          1.5861418788376116,
+          0.2143983387832827,
+          0.09653476852337642,
+          0.07207352593663867,
+          0.00033539179009531745,
+          0.007659459383572715,
+          0.00026391897798584994,
+          0.000751381296885989,
+          0.0004675455494165156,
+          0.0006161396880614695
+        ],
+        [
+          0.0838142100504847,
+          0.05465915826459031,
+          0.0703413040025108,
+          0.02129962491943871,
+          0.09802387347266438,
+          0.023657518215063608,
+          0.08437031307001482,
+          0.002508910557236258,
+          0.0006790142204390486,
+          0.0011931984887257657
+        ],
+        [
+          0.2191453042853148,
+          0.030721941265744998,
+          0.02583564991831432,
+          0.13997774635833457,
+          0.7319193270682207,
+          0.026603758527233772,
+          0.0002497954994819117,
+          5.340301650866383e-07,
+          0.09189486108901726,
+          0.0002618608740224439
+        ],
+        [
+          0.04783641721616128,
+          0.05941515369622338,
+          0.026782436050677618,
+          0.00012769198585936827,
+          0.03314743119345832,
+          0.023339216184569495,
+          0.007192144449417693,
+          0.00025988126466724873,
+          0.00011620707366162153,
+          8.788113972218436e-05
+        ],
+        [
+          0.00014596225173645663,
+          0.062400164939754414,
+          0.0013811584253623575,
+          0.08282195157164482,
+          0.3761971509901301,
+          0.08850928777275588,
+          0.031992740467997036,
+          0.001061882668250767,
+          0.00019525415993705572,
+          0.0026529616934914874
+        ],
+        [
+          0.03861937427736942,
+          0.08530024554693444,
+          0.06795112338634629,
+          0.030653954162745405,
+          0.15220539112408377,
+          0.0012544907737583497,
+          0.006032118119212687,
+          0.02672100662403232,
+          1.8396507767172382e-06,
+          4.0395349790287724e-07
+        ],
+        [
+          0.032846198409779134,
+          0.001868572159187598,
+          9.436355533172927e-06,
+          0.13093947207253878,
+          0.08219204164130826,
+          0.02912872941842077,
+          3.1348190287962966e-06,
+          2.3517352317373853e-07,
+          0.007870891806132579,
+          2.9692906491442215e-05
+        ],
+        [
+          0.04272840440660722,
+          0.060446737207314694,
+          0.09461607965754498,
+          0.06388475385255932,
+          0.12644737842204515,
+          0.024393324905321256,
+          7.183210097155552e-05,
+          4.206223065580931e-05,
+          0.00025345829811054165,
+          1.7880042818196473e-05
+        ],
+        [
+          0.0004892716333839667,
+          0.012228679374324937,
+          0.0010369072196556258,
+          0.00017065678383346863,
+          0.00023541188352093275,
+          0.0001439814849484327,
+          0.14005151627485696,
+          0.0008634127597652517,
+          0.1478482436813417,
+          0.0018543854994998274
+        ],
+        [
+          0.03455593732717334,
+          0.03346029743697764,
+          0.04334343277447659,
+          0.1761164384904815,
+          0.13442820703455569,
+          0.0038658699012414153,
+          0.002224948059250618,
+          0.00039374249969113405,
+          0.0006982767932495381,
+          0.0001592559667831917
+        ],
+        [
+          0.22054297269410092,
+          0.0517638587517495,
+          0.14259736811719187,
+          0.0024286569569474735,
+          0.06615900788805695,
+          0.06622445858282741,
+          0.016415911207368537,
+          0.00011299451821132091,
+          2.4738566876845896e-05,
+          0.0001607294723075309
+        ],
+        [
+          0.04670043804315184,
+          0.030082459022890234,
+          0.06311214892516728,
+          0.0878032354945667,
+          0.02498864308579598,
+          0.0018592249441824942,
+          8.253840225667213e-05,
+          4.6942493427936e-05,
+          3.5539730720671864e-05,
+          1.6170950849641732e-05
+        ],
+        [
+          0.1269521732193918,
+          0.04179073995150373,
+          0.05560128598768791,
+          0.0825344601366349,
+          0.06752425523198179,
+          0.06996681660035799,
+          0.09421878118925317,
+          0.024610518265647256,
+          0.00016897775326947084,
+          0.0001380612740454982
+        ],
+        [
+          0.0029652692433739013,
+          0.12074801301157222,
+          0.00013290378870223443,
+          0.011481749184634947,
+          4.094952164040266e-05,
+          0.0003307086399889574,
+          0.001855444576551891,
+          0.0008168782986410486,
+          0.00013245681112596864,
+          0.005682547805657193
+        ],
+        [
+          0.08997235018721148,
+          0.07868517382945127,
+          0.023972674635421274,
+          0.05963472530522668,
+          0.2940601995091548,
+          0.08442741934191646,
+          0.0006657918635997332,
+          0.003532936523593198,
+          0.0006806299124812074,
+          0.0005926458528238309
+        ],
+        [
+          0.04624159389636085,
+          0.04465955195583146,
+          0.16194986045260698,
+          0.21490600096314472,
+          0.06663768774871297,
+          0.0014426840515161896,
+          6.077287387653227e-07,
+          0.00015579563687195466,
+          0.00022474730762618602,
+          3.0970724280834774e-05
+        ],
+        [
+          0.0005813553386446789,
+          0.08129265372514095,
+          1.0765554874227685e-06,
+          0.0545965238221345,
+          0.02694867353263204,
+          0.013276964491159879,
+          0.0062960274531042625,
+          0.00011460292689429662,
+          3.533230327502435e-05,
+          0.00022218859616131103
+        ],
+        [
+          0.004390410979417531,
+          0.09363467474654877,
+          0.0069071218989201644,
+          0.03150405386228986,
+          0.10397290587733116,
+          0.20935143869608003,
+          0.012651925761633823,
+          3.59455080621672e-06,
+          7.199396848841343e-07,
+          1.6852277123881315e-05
+        ],
+        [
+          0.6526304893309655,
+          0.05711804088521898,
+          0.04201675361116765,
+          0.024715930792524245,
+          0.056092268323245736,
+          0.04365057010728097,
+          0.0010179821699752708,
+          0.0004999337769515702,
+          0.0001731021648768991,
+          0.005845937665388497
+        ],
+        [
+          0.07366492106777867,
+          0.008823191984736252,
+          0.03815500987611446,
+          0.0684327623327566,
+          0.02484097960509897,
+          0.015433890941950914,
+          5.389656984549467e-05,
+          0.016796598537875553,
+          6.811704058668953e-06,
+          4.861189615282761e-05
+        ],
+        [
+          0.004591454849626334,
+          0.02614020368726715,
+          0.12138865339563835,
+          0.057468216465318314,
+          0.0340820760527598,
+          0.13955169554033567,
+          0.06428208615222733,
+          0.019877220544479515,
+          1.2123446115977653e-05,
+          0.0005018006770316177
+        ],
+        [
+          0.005482537421510352,
+          0.0012952838640622373,
+          0.012221961437547736,
+          0.060363288399079444,
+          0.0012934574397131034,
+          0.20286717958396705,
+          0.0012283508466625632,
+          7.018531075783524e-05,
+          0.00033723301406691754,
+          3.996098490422936e-05
+        ],
+        [
+          0.0811133355445135,
+          0.0662697047796674,
+          0.051513523808589014,
+          0.0002929339801921446,
+          0.018613904582847958,
+          0.00023229309314472488,
+          0.0008862249962830621,
+          0.0018613677157460152,
+          2.6239631376227207e-05,
+          0.00015367565790267012
+        ],
+        [
+          0.0015293641028617517,
+          0.022818901966659273,
+          0.05424093241772829,
+          0.06747121232542737,
+          0.09496069009973754,
+          0.011078208575208033,
+          0.028362141629712595,
+          1.3103313709122735e-05,
+          0.13226147646885,
+          1.0568192420327726e-05
+        ],
+        [
+          0.017773152652127186,
+          0.042285310876474046,
+          0.02022381626152093,
+          0.0013468989339837597,
+          0.0030171727401992316,
+          1.8537847116386964e-05,
+          0.025773676184540167,
+          0.00020358155909650188,
+          9.389991203198401e-05,
+          1.1087902196886032e-05
+        ],
+        [
+          0.002029771668243013,
+          0.1299290359638184,
+          0.003122874116118903,
+          0.04320627284058875,
+          0.049923956159988875,
+          0.10558202356538622,
+          8.705719976022308e-06,
+          0.0018258522242325234,
+          0.0008739355153465318,
+          0.003124921056147806
+        ],
+        [
+          0.05679525118557645,
+          0.023412404622537172,
+          0.032051983837356544,
+          0.007523056361896073,
+          0.004633940376975993,
+          0.00022926825029151,
+          0.0009381807432608196,
+          0.00017119108772556117,
+          0.00048357681417095927,
+          0.00016593243876337381
+        ],
+        [
+          0.7835307758322758,
+          0.01619248857866758,
+          0.06047747325817398,
+          0.0006123422413346785,
+          0.0006720512280911886,
+          1.5767151374945866e-05,
+          2.752864004029742e-07,
+          0.0016262921051129376,
+          5.5518603824219e-06,
+          0.00012051621302612679
+        ],
+        [
+          0.022024588583503733,
+          0.4765124128431556,
+          0.010962026768282165,
+          0.06448205835132242,
+          0.0011553064142237905,
+          0.002122090360317103,
+          0.0005721301488999754,
+          9.526299133206143e-05,
+          0.0001867997064131934,
+          8.310053501561845e-06
+        ],
+        [
+          0.00445709957157896,
+          0.04303192729015787,
+          0.03176541669896439,
+          0.023087778571889383,
+          0.06016526034039151,
+          0.01333858864147234,
+          0.13522818179941987,
+          8.772983324507981e-05,
+          0.00010936501662798169,
+          0.00021910393211388226
+        ],
+        [
+          0.028967632460279884,
+          0.09340922285930119,
+          0.21413587811066942,
+          0.004646480462627492,
+          0.20025873887612325,
+          0.031843494149128175,
+          0.13122207731528646,
+          0.0004485084471730052,
+          0.006637237090158257,
+          0.00013888632665865787
+        ],
+        [
+          0.06433893140400052,
+          0.0942104214840397,
+          0.00015370350988904786,
+          0.10511762257094655,
+          0.0064219023247462865,
+          0.0002019667142503464,
+          0.15960224490764333,
+          0.0013347057929360264,
+          4.404131580851229e-05,
+          0.025188325389841264
+        ],
+        [
+          0.07270511566048081,
+          0.06726226673122683,
+          0.008043383591978894,
+          0.00364826934060655,
+          0.0008369426229906783,
+          0.6433415241428629,
+          0.005697792136940581,
+          0.0006215037293293746,
+          0.0003324784643447372,
+          0.00010729459526474058
+        ],
+        [
+          0.08847548123881979,
+          0.00016343519027687604,
+          5.7989928913061214e-05,
+          0.004267751486778486,
+          0.0028423763061884684,
+          0.0024201258181341806,
+          0.00028781427583387474,
+          4.481349046930014e-05,
+          1.026693889572384e-05,
+          3.0183212946999825e-05
+        ],
+        [
+          0.04541385590254793,
+          0.04324715430210234,
+          0.05105816937506097,
+          0.00016487537323061174,
+          0.05425343248086786,
+          0.13336225295810114,
+          0.06753674414552051,
+          0.0001476459186084903,
+          1.021371887894447e-05,
+          3.3478208069344625e-05
+        ],
+        [
+          0.021502810502021984,
+          0.011820153993123935,
+          0.0668837386538126,
+          0.47041666530978077,
+          0.004930007932906962,
+          0.0027023186940654752,
+          0.00036612180685694916,
+          0.00012003307247292083,
+          0.0005790933438730813,
+          0.0001925850367700117
+        ],
+        [
+          0.07804218649119846,
+          0.07175746861913336,
+          0.020745120051375125,
+          0.00621649858451936,
+          0.001837869001353783,
+          0.0017139660170972341,
+          0.00034682016868089696,
+          0.00030316316126387244,
+          0.00036269033757246216,
+          0.00034552070050993374
+        ],
+        [
+          0.11276994424405104,
+          0.014943425315062486,
+          9.549986206850599e-05,
+          0.08733927662626119,
+          0.027891576007764964,
+          0.07444290208783318,
+          0.000195573474962349,
+          0.0001369981615666929,
+          0.0006300055337587658,
+          0.0002800255062374103
+        ],
+        [
+          0.00774418124428612,
+          0.037610878193083785,
+          0.08603241703420632,
+          0.05612172514784757,
+          0.004620326553967731,
+          0.00047063765376151664,
+          0.0003703322484333315,
+          0.0012427112640639336,
+          0.001130064318435358,
+          0.0006004453702032444
+        ],
+        [
+          0.07952617165028127,
+          0.002115716272672464,
+          0.07221675165669424,
+          0.003796195910939343,
+          0.000986186912916213,
+          0.00032718614781963233,
+          2.477203126482702e-06,
+          0.0039889489976436205,
+          6.895557406207388e-05,
+          5.6629530312492354e-05
+        ],
+        [
+          0.0022930284827314593,
+          0.03475857062939935,
+          0.07919903369567471,
+          0.018837255790558487,
+          0.00919723968937039,
+          0.0809799115469553,
+          3.909741741899228e-05,
+          2.108575623569015e-05,
+          3.1720839597918488e-06,
+          3.3422948475440575e-06
+        ],
+        [
+          0.005109308135003776,
+          0.02392004319224845,
+          0.05550289223620379,
+          0.05042944326225932,
+          0.019791602200918683,
+          0.0002594235522433051,
+          0.0010383657285274021,
+          0.00019605914513770478,
+          7.231732522285122e-05,
+          0.00014787584833838096
+        ]
+      ]
+    }
   },
   "replication_floor_this_run": {
     "mean_nats": 0.00018652298121384566,
@@ -256,7 +1136,10 @@
         "registered_sigma_proj": 0.0021,
         "predicted_sd_launch_nats": 0.00022033381000360878,
         "observed_cv_launch": 0.015767853067708656,
-        "predicted_cv_launch_registered": 0.05,
+        "predicted_cv_launch_at_observed_signal": 0.04003017058460314,
+        "predicted_cv_launch_as_registered": 0.05,
+        "predicted_cv_registered_was_computed_at": "the n=4 signal, not this run's",
+        "sigma_A_share_of_sd_headlines": 0.6798059743582374,
         "predicted_sd_inside_observed_ci": true,
         "ratio_observed_over_predicted": 0.39389922244731745
       },
@@ -270,10 +1153,21 @@
         "registered_sigma_proj": 0.0021,
         "predicted_sd_launch_nats": 0.0006836303115689768,
         "observed_cv_launch": 0.001732900063007161,
-        "predicted_cv_launch_registered": 0.018,
+        "predicted_cv_launch_at_observed_signal": 0.012901709960398793,
+        "predicted_cv_launch_as_registered": 0.018,
+        "predicted_cv_registered_was_computed_at": "the n=4 signal, not this run's",
+        "sigma_A_share_of_sd_headlines": 0.0,
         "predicted_sd_inside_observed_ci": false,
         "ratio_observed_over_predicted": 0.13431553401264007
       }
+    },
+    "sharp_post_hoc_diagnostic": {
+      "status": "POST HOC -- not registered before the run; reported as a diagnostic, never as the adjudication",
+      "statistic": "SD_launch(BF16||FP4) / SD_launch(BF16||FP8)",
+      "predicted_by_the_law": 3.1027027198312407,
+      "observed": 1.0579893255624322,
+      "why_it_is_sharp": "both SDs are functions of the same three launch perturbations, so the ratio carries far less sampling error than either SD alone",
+      "reading": "the law says the ratio is sqrt(signal ratio); a ratio near 1 says the launch spread does not scale with the signal at all"
     },
     "pooled_observed": {
       "sigma_proj_pooled": 0.0006179805486974107,
@@ -287,6 +1181,7 @@
     },
     "pooled_ratio_observed_over_registered": 0.2942764517606718,
     "verdict": "MIXED",
+    "verdict_is_weak_by_construction": "the registered criterion is a CONJUNCTION over two arms computed from the SAME three BF16 launches, each tested against a chi-square interval spanning ~12x at 2 df. It is close to unfalsifiable as written. Read the verdict's own gloss and the pooled ratio rather than the label.",
     "verdict_meaning": {
       "CONSISTENT": "the registered sigma_proj sits inside the observed interval for every comparison. At 2 df that interval spans a factor of ~12, so this is a failure to embarrass the model, not a confirmation of it.",
       "FALSIFIED": "the registered value is outside the observed interval for every comparison; the nuisance model as registered is wrong",
@@ -297,6 +1192,11 @@
     "BF16||FP8": {
       "rule": "RESOLVED iff the lower end of the launch-inflated 95% interval on the signal exceeds the upper end of the 95% launch-level interval on the BF16<->BF16 replication floor, both evaluated at the same position",
       "sigma_proj_used": 0.0006179805486974107,
+      "classifications_that_depend_on_the_launch_term": 0,
+      "inflation_factor_range": [
+        1.0001220064875247,
+        1.008086021612479
+      ],
       "headline": {
         "expected_kl_over_launches_nats": 0.005504193631599363,
         "predicted_launch_sd_nats": 6.4839051810772e-05,
@@ -310,7 +1210,9 @@
         "replication_floor_ci_high_nats": 0.00027288830829381766,
         "class": "resolved",
         "margin_nats": 0.0033117073503734734,
-        "ratio_signal_low_to_floor_high": 13.1357612243606
+        "ratio_signal_low_to_floor_high": 13.1357612243606,
+        "class_depends_on_launch_term": false,
+        "binding_uncertainty": "trajectory_sampling"
       },
       "headline_under_registered_sigma_proj": {
         "expected_kl_over_launches_nats": 0.005504193631599363,
@@ -325,7 +1227,9 @@
         "replication_floor_ci_high_nats": 0.00027288830829381766,
         "class": "resolved",
         "margin_nats": 0.003289838380126396,
-        "ratio_signal_low_to_floor_high": 13.055622319239273
+        "ratio_signal_low_to_floor_high": 13.055622319239273,
+        "class_depends_on_launch_term": false,
+        "binding_uncertainty": "trajectory_sampling"
       },
       "by_position": {
         "1": {
@@ -342,6 +1246,8 @@
           "class": "resolved",
           "margin_nats": 0.005664305892385069,
           "ratio_signal_low_to_floor_high": 17.49396619158153,
+          "class_depends_on_launch_term": false,
+          "binding_uncertainty": "trajectory_sampling",
           "class_under_registered_sigma_proj": "resolved",
           "per_launch_nats": [
             0.012241455111794815,
@@ -363,6 +1269,8 @@
           "class": "resolved",
           "margin_nats": 0.0043737220547010935,
           "ratio_signal_low_to_floor_high": 7.465976283640049,
+          "class_depends_on_launch_term": false,
+          "binding_uncertainty": "trajectory_sampling",
           "class_under_registered_sigma_proj": "resolved",
           "per_launch_nats": [
             0.011651549152431055,
@@ -384,6 +1292,8 @@
           "class": "resolved",
           "margin_nats": 0.0028666698375371877,
           "ratio_signal_low_to_floor_high": 5.504208172286161,
+          "class_depends_on_launch_term": false,
+          "binding_uncertainty": "trajectory_sampling",
           "class_under_registered_sigma_proj": "resolved",
           "per_launch_nats": [
             0.0047858292455258584,
@@ -405,6 +1315,8 @@
           "class": "resolved",
           "margin_nats": 0.0036219391013048658,
           "ratio_signal_low_to_floor_high": 11.202264606567429,
+          "class_depends_on_launch_term": false,
+          "binding_uncertainty": "trajectory_sampling",
           "class_under_registered_sigma_proj": "resolved",
           "per_launch_nats": [
             0.0057187974456078166,
@@ -426,6 +1338,8 @@
           "class": "resolved",
           "margin_nats": 0.002774963427156841,
           "ratio_signal_low_to_floor_high": 6.03546434523786,
+          "class_depends_on_launch_term": false,
+          "binding_uncertainty": "trajectory_sampling",
           "class_under_registered_sigma_proj": "resolved",
           "per_launch_nats": [
             0.004974952733939891,
@@ -447,6 +1361,8 @@
           "class": "resolved",
           "margin_nats": 0.0028172193711252583,
           "ratio_signal_low_to_floor_high": 7.594130934833294,
+          "class_depends_on_launch_term": false,
+          "binding_uncertainty": "trajectory_sampling",
           "class_under_registered_sigma_proj": "resolved",
           "per_launch_nats": [
             0.007518531095757069,
@@ -468,6 +1384,8 @@
           "class": "resolved",
           "margin_nats": 0.0013002876654073137,
           "ratio_signal_low_to_floor_high": 3.9498768773936717,
+          "class_depends_on_launch_term": false,
+          "binding_uncertainty": "trajectory_sampling",
           "class_under_registered_sigma_proj": "resolved",
           "per_launch_nats": [
             0.007328642019193373,
@@ -489,6 +1407,8 @@
           "class": "resolved",
           "margin_nats": 0.00012390868787121923,
           "ratio_signal_low_to_floor_high": 2.7830215803140654,
+          "class_depends_on_launch_term": false,
+          "binding_uncertainty": "trajectory_sampling",
           "class_under_registered_sigma_proj": "resolved",
           "per_launch_nats": [
             0.00040532646540074405,
@@ -510,6 +1430,8 @@
           "class": "resolved",
           "margin_nats": 8.575620719218752e-05,
           "ratio_signal_low_to_floor_high": 1.8710517938345779,
+          "class_depends_on_launch_term": false,
+          "binding_uncertainty": "trajectory_sampling",
           "class_under_registered_sigma_proj": "resolved",
           "per_launch_nats": [
             0.0004823104510027049,
@@ -531,6 +1453,8 @@
           "class": "noise_limited",
           "margin_nats": -3.246558592070538e-05,
           "ratio_signal_low_to_floor_high": 0.6498682485954724,
+          "class_depends_on_launch_term": false,
+          "binding_uncertainty": "trajectory_sampling",
           "class_under_registered_sigma_proj": "noise_limited",
           "per_launch_nats": [
             0.00047057633167923844,
@@ -556,11 +1480,19 @@
       "n_resolved": 9,
       "n_positions": 10,
       "all_positions_reported": true,
-      "reading": "a noise-limited position is one where this rig cannot separate the quantization effect from BF16 relaunch noise. It is a statement about resolution, not about the effect being absent, and the position still contributes to the headline."
+      "what_resolved_licenses": "the estimated divergence at this position, after trajectory-sampling uncertainty and the registered launch inflation, exceeds the upper launch-level bound on the typical BF16<->BF16 divergence. It does NOT license 'separable from relaunch noise': the floor is SECOND order in the launch perturbation while the signal is FIRST order, so the floor is not the noise the signal is exposed to. Separability from relaunch noise would be theta against its own SD_launch, against which every position clears by one to three orders of magnitude.",
+      "what_noise_limited_means": "this rig cannot put the position's divergence above the floor's upper launch bound. It is a statement about resolution, not about the effect being absent, and the position still contributes to the headline. Read `binding_uncertainty` before attributing it to launch noise -- where the inflation factor is ~1.00 the limit is trajectory sampling, not relaunching.",
+      "multiplicity": "no multiplicity correction is applied and none is implied. The ten positions are repeated measures on the same 64 trajectories sharing one bootstrap index matrix, so they are strongly dependent and must not be read as ten independent tests.",
+      "floor_side_uncertainty_is_launch_only": "floor_hi covers launch sampling (delete-one-launch jackknife, 2 df) and not the floor's own trajectory sampling. Carrying both would widen floor_hi; see floor_side_sensitivity."
     },
     "BF16||FP4": {
       "rule": "RESOLVED iff the lower end of the launch-inflated 95% interval on the signal exceeds the upper end of the 95% launch-level interval on the BF16<->BF16 replication floor, both evaluated at the same position",
       "sigma_proj_used": 0.0006179805486974107,
+      "classifications_that_depend_on_the_launch_term": 0,
+      "inflation_factor_range": [
+        1.000023731837752,
+        1.0015452189209784
+      ],
       "headline": {
         "expected_kl_over_launches_nats": 0.052987574024478054,
         "predicted_launch_sd_nats": 0.00020117630240456104,
@@ -574,7 +1506,9 @@
         "replication_floor_ci_high_nats": 0.00027288830829381766,
         "class": "resolved",
         "margin_nats": 0.036216481211130566,
-        "ratio_signal_low_to_floor_high": 133.71540080836456
+        "ratio_signal_low_to_floor_high": 133.71540080836456,
+        "class_depends_on_launch_term": false,
+        "binding_uncertainty": "trajectory_sampling"
       },
       "headline_under_registered_sigma_proj": {
         "expected_kl_over_launches_nats": 0.052987574024478054,
@@ -589,7 +1523,9 @@
         "replication_floor_ci_high_nats": 0.00027288830829381766,
         "class": "resolved",
         "margin_nats": 0.03618606951753211,
-        "ratio_signal_low_to_floor_high": 133.60395706865802
+        "ratio_signal_low_to_floor_high": 133.60395706865802,
+        "class_depends_on_launch_term": false,
+        "binding_uncertainty": "trajectory_sampling"
       },
       "by_position": {
         "1": {
@@ -606,6 +1542,8 @@
           "class": "resolved",
           "margin_nats": 0.05639743408545958,
           "ratio_signal_low_to_floor_high": 165.22442374591313,
+          "class_depends_on_launch_term": false,
+          "binding_uncertainty": "trajectory_sampling",
           "class_under_registered_sigma_proj": "resolved",
           "per_launch_nats": [
             0.12403078894256636,
@@ -627,6 +1565,8 @@
           "class": "resolved",
           "margin_nats": 0.04699090695814889,
           "ratio_signal_low_to_floor_high": 70.46991284266504,
+          "class_depends_on_launch_term": false,
+          "binding_uncertainty": "trajectory_sampling",
           "class_under_registered_sigma_proj": "resolved",
           "per_launch_nats": [
             0.07726721132636843,
@@ -648,6 +1588,8 @@
           "class": "resolved",
           "margin_nats": 0.0369692734555327,
           "ratio_signal_low_to_floor_high": 59.087367244548304,
+          "class_depends_on_launch_term": false,
+          "binding_uncertainty": "trajectory_sampling",
           "class_under_registered_sigma_proj": "resolved",
           "per_launch_nats": [
             0.04841952358056667,
@@ -669,6 +1611,8 @@
           "class": "resolved",
           "margin_nats": 0.04222315816085781,
           "ratio_signal_low_to_floor_high": 119.9340350661405,
+          "class_depends_on_launch_term": false,
+          "binding_uncertainty": "trajectory_sampling",
           "class_under_registered_sigma_proj": "resolved",
           "per_launch_nats": [
             0.0825162319610439,
@@ -690,6 +1634,8 @@
           "class": "resolved",
           "margin_nats": 0.039625698813369276,
           "ratio_signal_low_to_floor_high": 72.90501740568617,
+          "class_depends_on_launch_term": false,
+          "binding_uncertainty": "trajectory_sampling",
           "class_under_registered_sigma_proj": "resolved",
           "per_launch_nats": [
             0.09479221602778892,
@@ -711,6 +1657,8 @@
           "class": "resolved",
           "margin_nats": 0.023826047240460932,
           "ratio_signal_low_to_floor_high": 56.768491716840956,
+          "class_depends_on_launch_term": false,
+          "binding_uncertainty": "trajectory_sampling",
           "class_under_registered_sigma_proj": "resolved",
           "per_launch_nats": [
             0.05075432429616544,
@@ -732,6 +1680,8 @@
           "class": "resolved",
           "margin_nats": 0.016913121199005447,
           "ratio_signal_low_to_floor_high": 39.369682706998844,
+          "class_depends_on_launch_term": false,
+          "binding_uncertainty": "trajectory_sampling",
           "class_under_registered_sigma_proj": "resolved",
           "per_launch_nats": [
             0.03801903677838053,
@@ -753,6 +1703,8 @@
           "class": "resolved",
           "margin_nats": 0.0015684465906070201,
           "ratio_signal_low_to_floor_high": 23.569637098642126,
+          "class_depends_on_launch_term": false,
+          "binding_uncertainty": "trajectory_sampling",
           "class_under_registered_sigma_proj": "resolved",
           "per_launch_nats": [
             0.003121059853623238,
@@ -774,6 +1726,8 @@
           "class": "resolved",
           "margin_nats": 0.0025072620608802354,
           "ratio_signal_low_to_floor_high": 26.46702084023686,
+          "class_depends_on_launch_term": false,
+          "binding_uncertainty": "trajectory_sampling",
           "class_under_registered_sigma_proj": "resolved",
           "per_launch_nats": [
             0.00881323916094113,
@@ -795,6 +1749,8 @@
           "class": "resolved",
           "margin_nats": 0.0003797495287147376,
           "ratio_signal_low_to_floor_high": 5.095486460915415,
+          "class_depends_on_launch_term": false,
+          "binding_uncertainty": "trajectory_sampling",
           "class_under_registered_sigma_proj": "resolved",
           "per_launch_nats": [
             0.0020677931785909836,
@@ -819,7 +1775,150 @@
       "n_resolved": 10,
       "n_positions": 10,
       "all_positions_reported": true,
-      "reading": "a noise-limited position is one where this rig cannot separate the quantization effect from BF16 relaunch noise. It is a statement about resolution, not about the effect being absent, and the position still contributes to the headline."
+      "what_resolved_licenses": "the estimated divergence at this position, after trajectory-sampling uncertainty and the registered launch inflation, exceeds the upper launch-level bound on the typical BF16<->BF16 divergence. It does NOT license 'separable from relaunch noise': the floor is SECOND order in the launch perturbation while the signal is FIRST order, so the floor is not the noise the signal is exposed to. Separability from relaunch noise would be theta against its own SD_launch, against which every position clears by one to three orders of magnitude.",
+      "what_noise_limited_means": "this rig cannot put the position's divergence above the floor's upper launch bound. It is a statement about resolution, not about the effect being absent, and the position still contributes to the headline. Read `binding_uncertainty` before attributing it to launch noise -- where the inflation factor is ~1.00 the limit is trajectory sampling, not relaunching.",
+      "multiplicity": "no multiplicity correction is applied and none is implied. The ten positions are repeated measures on the same 64 trajectories sharing one bootstrap index matrix, so they are strongly dependent and must not be read as ten independent tests.",
+      "floor_side_uncertainty_is_launch_only": "floor_hi covers launch sampling (delete-one-launch jackknife, 2 df) and not the floor's own trajectory sampling. Carrying both would widen floor_hi; see floor_side_sensitivity."
+    }
+  },
+  "resolution_rule_conservatism": {
+    "registered_var_launch": "(sigma_proj * sqrt(2*theta))^2, i.e. the variance of the SPREAD OF PER-LAUNCH HEADLINES, sigma2_A + sigma2_E/T",
+    "what_a_ci_on_the_mean_would_use": "sigma2_A / R -- the launch term of Var(mean over R launches). sigma2_E/(R*T) is already inside the trajectory bootstrap, so the registered form double-counts it and omits the 1/R.",
+    "direction": "CONSERVATIVE -- the registered form is larger, so it widens the interval and makes `resolved` harder to reach",
+    "not_corrected_because": "the formula is what was registered before the FP8/FP4 cells existed, and the correction runs in the resolution-friendly direction. Changing it after seeing the data is exactly what pre-registration exists to prevent. It is disclosed instead.",
+    "magnitude": "immaterial here: inflation factors span [1.0001, 1.0081] and no classification depends on the launch term"
+  },
+  "floor_side_sensitivity": {
+    "question": "does carrying the floor's own trajectory-sampling uncertainty change any classification?",
+    "method": "floor_hi recomputed as mean + t(df) * sqrt(se_jackknife^2 + se_trajectory^2); the floor's trajectory SE is a single pooled figure, so this is indicative",
+    "floor_trajectory_se_nats": 1.917295195935002e-05,
+    "classifications_changed": 0,
+    "not_adopted": "the registered rule is what adjudicates; this is a sensitivity check and is reported beside it, never in place of it",
+    "by_comparison": {
+      "BF16||FP8": {
+        "1": {
+          "floor_hi_as_used": 0.00034341684871866136,
+          "floor_hi_with_trajectory_uncertainty": 0.0003858322761672182,
+          "class_as_used": "resolved",
+          "class_if_widened": "resolved"
+        },
+        "8": {
+          "floor_hi_as_used": 0.0006764209862271392,
+          "floor_hi_with_trajectory_uncertainty": 0.0006862353451335614,
+          "class_as_used": "resolved",
+          "class_if_widened": "resolved"
+        },
+        "32": {
+          "floor_hi_as_used": 0.0006364425727868118,
+          "floor_hi_with_trajectory_uncertainty": 0.0006458467894481101,
+          "class_as_used": "resolved",
+          "class_if_widened": "resolved"
+        },
+        "64": {
+          "floor_hi_as_used": 0.00035501324862455947,
+          "floor_hi_with_trajectory_uncertainty": 0.00038172457980400695,
+          "class_as_used": "resolved",
+          "class_if_widened": "resolved"
+        },
+        "128": {
+          "floor_hi_as_used": 0.0005510839193571452,
+          "floor_hi_with_trajectory_uncertainty": 0.0005622505861115109,
+          "class_as_used": "resolved",
+          "class_if_widened": "resolved"
+        },
+        "256": {
+          "floor_hi_as_used": 0.0004272313363150531,
+          "floor_hi_with_trajectory_uncertainty": 0.0004387976986621157,
+          "class_as_used": "resolved",
+          "class_if_widened": "resolved"
+        },
+        "512": {
+          "floor_hi_as_used": 0.000440793876982475,
+          "floor_hi_with_trajectory_uncertainty": 0.00045593731631904405,
+          "class_as_used": "resolved",
+          "class_if_widened": "resolved"
+        },
+        "1024": {
+          "floor_hi_as_used": 6.94936557354475e-05,
+          "floor_hi_with_trajectory_uncertainty": 0.0001328450297449865,
+          "class_as_used": "resolved",
+          "class_if_widened": "resolved"
+        },
+        "1536": {
+          "floor_hi_as_used": 9.845132952963478e-05,
+          "floor_hi_with_trajectory_uncertainty": 0.0001389939107448753,
+          "class_as_used": "resolved",
+          "class_if_widened": "resolved"
+        },
+        "2048": {
+          "floor_hi_as_used": 9.272391261424332e-05,
+          "floor_hi_with_trajectory_uncertainty": 0.00013331933008014395,
+          "class_as_used": "noise_limited",
+          "class_if_widened": "noise_limited"
+        }
+      },
+      "BF16||FP4": {
+        "1": {
+          "floor_hi_as_used": 0.00034341684871866136,
+          "floor_hi_with_trajectory_uncertainty": 0.0003858322761672182,
+          "class_as_used": "resolved",
+          "class_if_widened": "resolved"
+        },
+        "8": {
+          "floor_hi_as_used": 0.0006764209862271392,
+          "floor_hi_with_trajectory_uncertainty": 0.0006862353451335614,
+          "class_as_used": "resolved",
+          "class_if_widened": "resolved"
+        },
+        "32": {
+          "floor_hi_as_used": 0.0006364425727868118,
+          "floor_hi_with_trajectory_uncertainty": 0.0006458467894481101,
+          "class_as_used": "resolved",
+          "class_if_widened": "resolved"
+        },
+        "64": {
+          "floor_hi_as_used": 0.00035501324862455947,
+          "floor_hi_with_trajectory_uncertainty": 0.00038172457980400695,
+          "class_as_used": "resolved",
+          "class_if_widened": "resolved"
+        },
+        "128": {
+          "floor_hi_as_used": 0.0005510839193571452,
+          "floor_hi_with_trajectory_uncertainty": 0.0005622505861115109,
+          "class_as_used": "resolved",
+          "class_if_widened": "resolved"
+        },
+        "256": {
+          "floor_hi_as_used": 0.0004272313363150531,
+          "floor_hi_with_trajectory_uncertainty": 0.0004387976986621157,
+          "class_as_used": "resolved",
+          "class_if_widened": "resolved"
+        },
+        "512": {
+          "floor_hi_as_used": 0.000440793876982475,
+          "floor_hi_with_trajectory_uncertainty": 0.00045593731631904405,
+          "class_as_used": "resolved",
+          "class_if_widened": "resolved"
+        },
+        "1024": {
+          "floor_hi_as_used": 6.94936557354475e-05,
+          "floor_hi_with_trajectory_uncertainty": 0.0001328450297449865,
+          "class_as_used": "resolved",
+          "class_if_widened": "resolved"
+        },
+        "1536": {
+          "floor_hi_as_used": 9.845132952963478e-05,
+          "floor_hi_with_trajectory_uncertainty": 0.0001389939107448753,
+          "class_as_used": "resolved",
+          "class_if_widened": "resolved"
+        },
+        "2048": {
+          "floor_hi_as_used": 9.272391261424332e-05,
+          "floor_hi_with_trajectory_uncertainty": 0.00013331933008014395,
+          "class_as_used": "resolved",
+          "class_if_widened": "resolved"
+        }
+      }
     }
   },
   "G2_G2prime": {
@@ -828,18 +1927,57 @@
     "threshold_relaxed": false,
     "floor_subtracted": false,
     "averaged_reference_used": false,
-    "floor_fraction_of_signal": {
-      "BF16||FP8": 0.03356059622872416,
-      "BF16||FP4": 0.003520620601888992
+    "primary_floor": {
+      "which": "the PRE-REGISTERED production floor, the denominator G2' was adjudicated against",
+      "source": "results/quality/gates/replication_floor_production.json",
+      "floor_nats": 0.00020840602957329884,
+      "fraction_of_signal": {
+        "BF16||FP8": 0.037497956362397264,
+        "BF16||FP4": 0.003933663061242012
+      },
+      "passes_bound": {
+        "BF16||FP8": false,
+        "BF16||FP4": true
+      }
     },
+    "this_run_floor": {
+      "which": "this run's own BF16<->BF16 mean over six ordered pairs of its three launches",
+      "floor_nats": 0.00018652298121384566,
+      "fraction_of_signal": {
+        "BF16||FP8": 0.03356059622872416,
+        "BF16||FP4": 0.003520620601888992
+      },
+      "passes_bound": {
+        "BF16||FP8": false,
+        "BF16||FP4": true
+      }
+    },
+    "move_from_the_smoke_figure": {
+      "smoke_fraction": 0.05647859880035199,
+      "smoke_signal_nats": 0.00369,
+      "production_signal_nats": 0.005557797005233256,
+      "signal_effect_only": 0.037497956362397264,
+      "signal_and_floor_effect": 0.03356059622872416,
+      "reading": "the fall from the smoke figure is mostly the signal -- the production BF16->FP8 KL is larger than the n=4 estimate -- but NOT entirely: part of it is a smaller floor in this run. Both floors are within each other's launch-level intervals, so the difference is not itself resolvable."
+    },
+    "conclusion": "G2' fails on every floor/signal combination in this run's artifacts. The bound is unchanged at 0.01 and no result was averaged or re-referenced.",
     "floor_not_applicable_to": [
       "FP8||FP4"
     ],
     "floor_not_applicable_because": "the BF16 replication floor bounds BF16-anchored comparisons. FP8||FP4 uses FP8 as its reference, whose own replication floor is ~1e-11 nats."
   },
   "git": {
-    "git_head": "429e465488074ff0abce4ced8c2c4a8da5ba24a5",
-    "git_dirty": false
+    "git_head": "579ba12dcb70b4e9cd6ab62aeae050b52c9668f4",
+    "git_dirty": false,
+    "allow_dirty": false,
+    "stage": "p13:analyze",
+    "run_scoped": true,
+    "run_outputs": [
+      "results/quality/kl"
+    ],
+    "dirty_paths": [],
+    "dirty_paths_outside_run_outputs": [],
+    "head_pinned_to": null
   },
   "gpu": {
     "name": "NVIDIA RTX PRO 4000 Blackwell",
@@ -857,9 +1995,9 @@
     "transformers": "5.15.1",
     "compressed_tensors": "0.15.0.1",
     "nvcc": "Cuda compilation tools, release 12.9, V12.9.86",
-    "git_head": "429e465488074ff0abce4ced8c2c4a8da5ba24a5",
-    "git_dirty": false,
+    "git_head": "579ba12dcb70b4e9cd6ab62aeae050b52c9668f4",
+    "git_dirty": true,
     "git_untracked_files": 1
   },
-  "timestamp": "2026-09-16T20:33:06-0400"
+  "timestamp": "2026-09-16T20:57:36-0400"
 }

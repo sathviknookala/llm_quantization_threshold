@@ -1,6 +1,6 @@
 {
   "artifact": "BF16 launch-variance supplement to the KL analysis",
-  "supplements": "results/quality/smoke/kl_summary.json",
+  "supplements": "results/quality/kl/kl_summary.json",
   "supersedes": null,
   "question": "what is the expected BF16->FP8 / BF16->FP4 KL over BF16 launch identity, how much of its uncertainty is launch-to-launch, and does the effect stay resolvable once that is carried?",
   "contract_position": {
@@ -132,7 +132,12 @@
       "L3": "3aea394b"
     },
     "collection_git_head_note": "all launches collected at one commit",
-    "session_confound": "launch identity is confounded with SESSION: the launches were not all collected in one sitting, so the launch variance component absorbs any between-session drift and rests on fewer independent sessions than launches.",
+    "session_confound": {
+      "decided_from_timestamps": true,
+      "span_seconds": 427.0,
+      "one_sitting": true,
+      "note": "all launches were collected inside one sitting, so sigma2_A is a WITHIN-SESSION variance and a lower bound on what a differently-dated deployment launch would show"
+    },
     "shared_identity": {
       "kl_spec_hash": "5565ff73dbe5e36a",
       "trajectory_set_hash": "1dd71faeb242c7c1be0011491fb51942fb662dfeb2ba2d2d5c2cb428f7a041ad",
@@ -5430,10 +5435,10 @@
         "note": "the floor is reported beside the estimate and is never subtracted from it; G2/G2' adjudicate the floor and are unchanged by this analysis"
       },
       "pooling_evidence": null,
-      "reproduces_committed_smoke_headline": {
+      "reproduces_committed_headline": {
         "artifact": "results/quality/kl/kl_summary.json",
         "committed_headline_nats": 0.005557797005233256,
-        "reference_launch": "the P10 smoke's BF16 collection",
+        "reference_launch": "the reference launch 'L1' of results/quality/kl",
         "recomputed_nats": 0.005557797005233256,
         "recomputed_bit_identical": true,
         "relative_difference": 0.0,
@@ -5795,9 +5800,9 @@
           "mean": null,
           "mean_undefined_because": "4 of 64 trajectories reproduce bit-identically across every BF16 launch pair, so their floor is exactly 0.0 and their ratio is infinite. The mean and its bootstrap do not exist; they are reported as null rather than computed over a denominator-selected subset.",
           "median": 23.243113866164343,
+          "min": 6.012614207584403,
           "ratio_of_means": 29.509466317659232,
           "ratio_of_means_note": "a different estimand from the mean of ratios, and defined whenever the pooled floor is non-zero",
-          "min": 6.012614207584403,
           "max": null,
           "bootstrap_ci": null,
           "phi_used": "the launch-pair-averaged BF16->BF16 KL on THESE trajectories, a different quantity from the production floor headline above",
@@ -8341,10 +8346,10 @@
         "note": "the floor is reported beside the estimate and is never subtracted from it; G2/G2' adjudicate the floor and are unchanged by this analysis"
       },
       "pooling_evidence": null,
-      "reproduces_committed_smoke_headline": {
+      "reproduces_committed_headline": {
         "artifact": "results/quality/kl/kl_summary.json",
         "committed_headline_nats": 0.05298014251060355,
-        "reference_launch": "the P10 smoke's BF16 collection",
+        "reference_launch": "the reference launch 'L1' of results/quality/kl",
         "recomputed_nats": 0.05298014251060355,
         "recomputed_bit_identical": true,
         "relative_difference": 0.0,
@@ -8706,9 +8711,9 @@
           "mean": null,
           "mean_undefined_because": "4 of 64 trajectories reproduce bit-identically across every BF16 launch pair, so their floor is exactly 0.0 and their ratio is infinite. The mean and its bootstrap do not exist; they are reported as null rather than computed over a denominator-selected subset.",
           "median": 216.54552853318194,
+          "min": 41.33818242626307,
           "ratio_of_means": 284.08067295326276,
           "ratio_of_means_note": "a different estimand from the mean of ratios, and defined whenever the pooled floor is non-zero",
-          "min": 41.33818242626307,
           "max": null,
           "bootstrap_ci": null,
           "phi_used": "the launch-pair-averaged BF16->BF16 KL on THESE trajectories, a different quantity from the production floor headline above",
@@ -11055,14 +11060,26 @@
     }
   },
   "scale_limit": {
-    "bf16_to_bf16_scale": "production: 64 trajectories x 10 positions x 3 launches",
+    "bf16_to_bf16_scale": "64 trajectories x 10 positions x 3 launches",
     "bf16_to_quantized_scale": "64 trajectories x 10 positions x 3 BF16 launches",
-    "why": "FP8/FP4 full-vocabulary distributions exist only on the P10 smoke's 4 trajectories. P13 would supply 64 and is not authorised.",
-    "consequence": "every BF16->FP8 / BF16->FP4 number here is n=4 in trajectories and is NOT a result. The estimator, its tests and its behaviour on real artifacts are what this delivers."
+    "quantized_root": "results/quality/kl",
+    "is_production_scale": true,
+    "consequence": "production scale: 64 of 64 trajectories"
   },
   "git": {
-    "git_head": "429e465488074ff0abce4ced8c2c4a8da5ba24a5",
-    "git_dirty": false
+    "git_head": "579ba12dcb70b4e9cd6ab62aeae050b52c9668f4",
+    "git_dirty": true,
+    "allow_dirty": false,
+    "stage": "launch_variance",
+    "run_scoped": true,
+    "run_outputs": [
+      "results/quality/kl"
+    ],
+    "dirty_paths": [
+      "results/quality/kl/kl_summary.json"
+    ],
+    "dirty_paths_outside_run_outputs": [],
+    "head_pinned_to": null
   },
   "gpu": {
     "name": "NVIDIA RTX PRO 4000 Blackwell",
@@ -11080,9 +11097,9 @@
     "transformers": "5.15.1",
     "compressed_tensors": "0.15.0.1",
     "nvcc": "Cuda compilation tools, release 12.9, V12.9.86",
-    "git_head": "429e465488074ff0abce4ced8c2c4a8da5ba24a5",
-    "git_dirty": false,
+    "git_head": "579ba12dcb70b4e9cd6ab62aeae050b52c9668f4",
+    "git_dirty": true,
     "git_untracked_files": 1
   },
-  "timestamp": "2026-09-16T20:33:06-0400"
+  "timestamp": "2026-09-16T20:57:35-0400"
 }

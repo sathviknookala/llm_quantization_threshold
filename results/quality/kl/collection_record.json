@@ -1,0 +1,74 @@
+{
+  "artifact": "P13 collection record",
+  "registration": {
+    "registration_file": "scripts/harness/quality/p13.py",
+    "registration_hash": "b42d228a8afdd8df",
+    "committed": true,
+    "git_head": "fcc211376cf3196a498779a642eccc613836fb60",
+    "git_dirty": false
+  },
+  "steps": [
+    {
+      "step": "BF16 launch 1",
+      "config_id": "BF16_REFERENCE",
+      "root": "results/quality/kl",
+      "engine_identity_hash": "ca16377ea4206028",
+      "kv_cache_tokens": 44688,
+      "cells": 640,
+      "seconds": 85.69,
+      "wall_seconds": null,
+      "dispatch_evidence_ok": true,
+      "launched": false
+    },
+    {
+      "step": "FP8",
+      "config_id": "FP8_PRIMARY",
+      "root": "results/quality/kl",
+      "engine_identity_hash": "176a222edae755ff",
+      "kv_cache_tokens": 97888,
+      "cells": 640,
+      "seconds": 79.13,
+      "wall_seconds": null,
+      "dispatch_evidence_ok": true,
+      "launched": false
+    },
+    {
+      "step": "BF16 launch 2",
+      "config_id": "BF16_REFERENCE",
+      "root": "results/quality/kl/bf16_launch2",
+      "engine_identity_hash": "ca16377ea4206028",
+      "kv_cache_tokens": 44688,
+      "cells": 640,
+      "seconds": 85.46,
+      "wall_seconds": null,
+      "dispatch_evidence_ok": true,
+      "launched": false
+    },
+    {
+      "step": "FP4",
+      "config_id": "FP4_PRIMARY",
+      "root": "results/quality/kl",
+      "engine_identity_hash": "434ad8fac783fb7f",
+      "kv_cache_tokens": 120944,
+      "cells": 640,
+      "seconds": 76.36,
+      "wall_seconds": null,
+      "dispatch_evidence_ok": true,
+      "launched": false
+    },
+    {
+      "step": "BF16 launch 3",
+      "config_id": "BF16_REFERENCE",
+      "root": "results/quality/kl/bf16_launch3",
+      "engine_identity_hash": "ca16377ea4206028",
+      "kv_cache_tokens": 44688,
+      "cells": 640,
+      "seconds": 84.71,
+      "wall_seconds": null,
+      "dispatch_evidence_ok": true,
+      "launched": false
+    }
+  ],
+  "collection_git_head": "fcc211376cf3196a498779a642eccc613836fb60",
+  "timestamp": "2026-09-16T20:55:06-0400"
+}

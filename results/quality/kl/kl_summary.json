@@ -874,8 +874,17 @@
     }
   },
   "git": {
-    "git_head": "429e465488074ff0abce4ced8c2c4a8da5ba24a5",
-    "git_dirty": false
+    "git_head": "579ba12dcb70b4e9cd6ab62aeae050b52c9668f4",
+    "git_dirty": false,
+    "allow_dirty": false,
+    "stage": "analyze_kl",
+    "run_scoped": true,
+    "run_outputs": [
+      "results/quality/kl"
+    ],
+    "dirty_paths": [],
+    "dirty_paths_outside_run_outputs": [],
+    "head_pinned_to": null
   },
   "gpu": {
     "name": "NVIDIA RTX PRO 4000 Blackwell",
@@ -893,9 +902,9 @@
     "transformers": "5.15.1",
     "compressed_tensors": "0.15.0.1",
     "nvcc": "Cuda compilation tools, release 12.9, V12.9.86",
-    "git_head": "429e465488074ff0abce4ced8c2c4a8da5ba24a5",
+    "git_head": "579ba12dcb70b4e9cd6ab62aeae050b52c9668f4",
     "git_dirty": false,
     "git_untracked_files": 1
   },
-  "timestamp": "2026-09-16T20:32:50-0400"
+  "timestamp": "2026-09-16T20:57:19-0400"
 }
