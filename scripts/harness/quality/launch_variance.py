@@ -1081,7 +1081,7 @@ def production_floor_positions(path=PRODUCTION_FLOOR):
 def analyze(n_traj=4, sources=BF16_LAUNCH_SOURCES, quantized=("FP8_PRIMARY", "FP4_PRIMARY"),
             smoke_root=SMOKE_ROOT, out=None, allow_dirty=False, floor_path=PRODUCTION_FLOOR,
             committed_launch="S", own_outputs=()):
-    q.require_clean_tree(allow_dirty, stage="launch_variance", own_outputs=own_outputs)
+    git = q.require_clean_tree(allow_dirty, stage="launch_variance", own_outputs=own_outputs)
     traj_full = T.load()
     traj = C.subset(traj_full, n_traj)
 
@@ -1279,7 +1279,7 @@ def analyze(n_traj=4, sources=BF16_LAUNCH_SOURCES, quantized=("FP8_PRIMARY", "FP
                 "BF16->FP4 number here is n=%d in trajectories and is NOT a result; the "
                 "estimator and its behaviour on real artifacts are what it delivers." % n_traj),
         },
-        "git": q.git_state(),
+        "git": git,
         "gpu": common.gpu_identity(),
         "software": common.software_identity(),
         "timestamp": common.now_iso(),

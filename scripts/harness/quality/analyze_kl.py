@@ -105,7 +105,7 @@ def summarise(grid, idx, cells, label):
 def analyze(root=None, out=None, n_traj=None, floor_path=None, allow_dirty=False,
             configs=None, own_outputs=()):
     root = C.run_dir(root)
-    q.require_clean_tree(allow_dirty, stage="analyze_kl", own_outputs=own_outputs)
+    git = q.require_clean_tree(allow_dirty, stage="analyze_kl", own_outputs=own_outputs)
     traj = C.subset(T.load(), n_traj)
     n = traj["n_trajectories"]
     ladder = list(configs or q.LADDER)
@@ -229,7 +229,7 @@ def analyze(root=None, out=None, n_traj=None, floor_path=None, allow_dirty=False
         "replication_floor_source": floor_desc,
         "replication_floor_omitted": floor_path is None,
         "pairs": pairs,
-        "git": q.git_state(),
+        "git": git,
         "gpu": common.gpu_identity(),
         "software": common.software_identity(),
         "timestamp": common.now_iso(),

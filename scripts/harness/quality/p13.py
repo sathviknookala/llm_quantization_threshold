@@ -573,7 +573,7 @@ def analyze_all(n_traj=None, allow_dirty=False, out=None, floor_path=L.PRODUCTIO
     """The locked headline, the launch-variance supplement, the prediction test, the rule."""
     n = n_traj or q.N_TRAJECTORIES
     scope = [os.path.relpath(ROOT, common.REPO)]
-    q.require_clean_tree(allow_dirty, stage="p13:analyze", own_outputs=scope)
+    git = q.require_clean_tree(allow_dirty, stage="p13:analyze", own_outputs=scope)
 
     locked = A.analyze(root=ROOT, n_traj=n, floor_path=floor_path, allow_dirty=allow_dirty,
                        own_outputs=scope)
@@ -672,7 +672,7 @@ def analyze_all(n_traj=None, allow_dirty=False, out=None, floor_path=L.PRODUCTIO
         },
         "floor_side_sensitivity": floor_side_sensitivity(lv, res),
         "G2_G2prime": g2_restatement(locked, lv, floor_path),
-        "git": q.git_state(),
+        "git": git,
         "gpu": common.gpu_identity(),
         "software": common.software_identity(),
         "timestamp": common.now_iso(),
