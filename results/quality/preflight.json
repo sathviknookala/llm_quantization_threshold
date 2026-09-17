@@ -88,7 +88,9 @@
         "vllm:prefix_cache_queries": 10719,
         "vllm:prefix_cache_hits": 8048
       },
-      "seconds": 1.82
+      "seconds": 1.79,
+      "positive_dispatch_evidence_ok": true,
+      "probe_launched_this_run": true
     },
     "FP8": {
       "engine_identity_hash": "176a222edae755ff",
@@ -104,7 +106,9 @@
         "vllm:prefix_cache_queries": 10719,
         "vllm:prefix_cache_hits": 8048
       },
-      "seconds": 1.8
+      "seconds": 1.64,
+      "positive_dispatch_evidence_ok": true,
+      "probe_launched_this_run": true
     },
     "FP4": {
       "engine_identity_hash": "434ad8fac783fb7f",
@@ -120,7 +124,9 @@
         "vllm:prefix_cache_queries": 10719,
         "vllm:prefix_cache_hits": 8048
       },
-      "seconds": 1.58
+      "seconds": 1.75,
+      "positive_dispatch_evidence_ok": true,
+      "probe_launched_this_run": true
     }
   },
   "projection": {
@@ -132,6 +138,8 @@
       "FP4": 0.1298
     },
     "projected_scoring_minutes_total": 4.4,
+    "projection_incomplete": false,
+    "configs_without_usable_reference": {},
     "projected_bytes_gib": 0.92,
     "shards_per_config": 8
   },
@@ -150,7 +158,7 @@
       "detail": {
         "cells": 640,
         "expected": 640,
-        "every_cell_rederive_checked": true
+        "contract_enforced_by_build_all": true
       }
     },
     {
@@ -250,7 +258,7 @@
       "ok": true,
       "detail": {
         "required_gib": 0.92,
-        "free_gib": 4229.9
+        "free_gib": 4228.7
       }
     },
     {
@@ -335,10 +343,17 @@
       }
     },
     {
+      "check": "verify_cells_refuses_context_len_mismatch",
+      "ok": true,
+      "detail": {
+        "raised": "ABORT: trajectory 0 position 1: stored context_len 513 differs from re-derivation 512"
+      }
+    },
+    {
       "check": "verify_cells_refuses_position_scramble",
       "ok": true,
       "detail": {
-        "raised": "ABORT: trajectory 0 position 32 fails re-derivation: ['context_len 519 != 543', 'target 315 != 89230']"
+        "raised": "ABORT: trajectory 0 position 32: stored context_len 519 differs from re-derivation 543"
       }
     },
     {
@@ -401,6 +416,21 @@
       }
     },
     {
+      "check": "BF16_positive_dispatch_evidence",
+      "ok": true,
+      "detail": {
+        "required_missing": [],
+        "forbidden_present": [],
+        "evidence": {
+          "quantization_method_is_none": "Initializing a V1 LLM engine (v0.19.1) with config: model='/home/sathvik/.cache/huggingface/hub/models--NousResearch--Meta-Llama-3.1-8B-Instruct/snapshots/d10aef7999a2b5ba950ab3974312feeedbfe0b77', speculative_config=None, tokenizer='/home/sathvik/.cache/huggingface/hub/models--NousResearch--Meta-Llama-3.1-8B-Instruct/snapshots/d10aef7999a2b5ba950ab3974312feeedbfe0b77', skip_tokenizer_init=False, ",
+          "weights_are_bfloat16": "Initializing a V1 LLM engine (v0.19.1) with config: model='/home/sathvik/.cache/huggingface/hub/models--NousResearch--Meta-Llama-3.1-8B-Instruct/snapshots/d10aef7999a2b5ba950ab3974312feeedbfe0b77', speculative_config=None, tokenizer='/home/sathvik/.cache/huggingface/hub/models--NousResearch--Meta-Llama-3.1-8B-Instruct/snapshots/d10aef7999a2b5ba950ab3974312feeedbfe0b77', skip_tokenizer_init=False, ",
+          "attention_backend_chosen": "Using FLASH_ATTN attention backend out of potential backends: ['FLASH_ATTN', 'FLASHINFER', 'TRITON_ATTN', 'FLEX_ATTENTION'].",
+          "torch_compile_ran": "Dynamo bytecode transform time: 1.07 s"
+        },
+        "probe_launched_this_run": true
+      }
+    },
+    {
       "check": "BF16_engine_identity_matches_smoke",
       "ok": true,
       "detail": {
@@ -418,6 +448,20 @@
         "expected_present": true,
         "forbidden_present": [],
         "ok": true
+      }
+    },
+    {
+      "check": "FP8_positive_dispatch_evidence",
+      "ok": true,
+      "detail": {
+        "required_missing": [],
+        "forbidden_present": [],
+        "evidence": {
+          "quantization_method_resolved": "Initializing a V1 LLM engine (v0.19.1) with config: model='/home/sathvik/llm_quantization_threshold/checkpoints/llama31-8b-instruct-FP8_DYNAMIC', speculative_config=None, tokenizer='/home/sathvik/llm_quantization_threshold/checkpoints/llama31-8b-instruct-FP8_DYNAMIC', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.bfloat",
+          "fp8_gemm_kernel": "Selected CutlassFP8ScaledMMLinearKernel for CompressedTensorsW8A8Fp8",
+          "attention_backend_chosen": "Using FLASH_ATTN attention backend out of potential backends: ['FLASH_ATTN', 'FLASHINFER', 'TRITON_ATTN', 'FLEX_ATTENTION']."
+        },
+        "probe_launched_this_run": true
       }
     },
     {
@@ -441,6 +485,21 @@
       }
     },
     {
+      "check": "FP4_positive_dispatch_evidence",
+      "ok": true,
+      "detail": {
+        "required_missing": [],
+        "forbidden_present": [],
+        "evidence": {
+          "quantization_method_resolved": "Initializing a V1 LLM engine (v0.19.1) with config: model='/home/sathvik/llm_quantization_threshold/checkpoints/llama31-8b-instruct-NVFP4', speculative_config=None, tokenizer='/home/sathvik/llm_quantization_threshold/checkpoints/llama31-8b-instruct-NVFP4', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.bfloat16, max_seq_",
+          "fp4_backend": "Using NvFp4LinearBackend.FLASHINFER_CUTLASS for NVFP4 GEMM",
+          "fp4_gemm_kernel": "Using NvFp4LinearBackend.FLASHINFER_CUTLASS for NVFP4 GEMM",
+          "attention_backend_chosen": "Using FLASH_ATTN attention backend out of potential backends: ['FLASH_ATTN', 'FLASHINFER', 'TRITON_ATTN', 'FLEX_ATTENTION']."
+        },
+        "probe_launched_this_run": true
+      }
+    },
+    {
       "check": "FP4_engine_identity_matches_smoke",
       "ok": true,
       "detail": {
@@ -451,15 +510,20 @@
       }
     }
   ],
-  "checks_total": 35,
+  "checks_total": 39,
   "checks_failed": [],
   "passed": true,
   "authorises": "nothing on its own; P13 remains a separate decision and the BF16 replication-floor question is not settled by this artifact",
   "git": {
-    "git_head": "c415642d67fdbe501c9f974ca3ee9b75baa256c9",
+    "git_head": "3d5f5248c05a25b4ec102082927ae3160a46de48",
     "git_dirty": false,
     "allow_dirty": false,
-    "stage": "preflight"
+    "stage": "preflight",
+    "run_scoped": false,
+    "run_outputs": [],
+    "dirty_paths": [],
+    "dirty_paths_outside_run_outputs": [],
+    "head_pinned_to": null
   },
   "gpu": {
     "name": "NVIDIA RTX PRO 4000 Blackwell",
@@ -477,9 +541,9 @@
     "transformers": "5.15.1",
     "compressed_tensors": "0.15.0.1",
     "nvcc": "Cuda compilation tools, release 12.9, V12.9.86",
-    "git_head": "c415642d67fdbe501c9f974ca3ee9b75baa256c9",
+    "git_head": "3d5f5248c05a25b4ec102082927ae3160a46de48",
     "git_dirty": false,
-    "git_untracked_files": 3
+    "git_untracked_files": 1
   },
-  "timestamp": "2026-08-26T19:04:50-0400"
+  "timestamp": "2026-09-16T20:21:05-0400"
 }
