@@ -31,7 +31,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from harness import common  # noqa: E402
-from harness.quality import positions as P, qcommon as q  # noqa: E402
+from harness.quality import kl_math as K, positions as P, qcommon as q  # noqa: E402
 from harness.quality import analyze_kl as A, collect_kl as C  # noqa: E402
 from harness.quality import launch_variance as L  # noqa: E402
 
