@@ -1,0 +1,865 @@
+{
+  "artifact": "P13 production KL result",
+  "registration": {
+    "hash": "b42d228a8afdd8df",
+    "registered_on": "2026-09-16",
+    "registered_before": "any production FP8 or FP4 cell was collected",
+    "design": {
+      "n_trajectories": 64,
+      "n_positions": 10,
+      "n_bf16_launches": 3,
+      "engine_profile": "graph_2048 (G9, locked)",
+      "storage_dtype": "float32 (G4, locked)",
+      "designated_reference_launch_for_locked_headline": 1,
+      "collection_order": [
+        "BF16 launch 1",
+        "FP8",
+        "BF16 launch 2",
+        "FP4",
+        "BF16 launch 3"
+      ],
+      "why_interleaved": "the three floor64 launches ran consecutively inside one call, so their variance component is a WITHIN-SESSION one and a documented lower bound on what a differently-dated deployment launch would show. Interleaving the BF16 launches around the quantized collections makes any within-run drift land ON the launch factor instead of hiding underneath it. It cannot be removed -- launch identity and launch order are the same thing at R=3 -- so it is made conservative instead."
+    },
+    "estimator": {
+      "reported_headline": "the locked single-reference mean of 64 per-trajectory means (analyze_kl.py, reference launch 1) -- unchanged",
+      "supplementary_estimand": "E_r[KL(B_r || Q)], the divergence a randomly drawn BF16 launch of the locked profile exhibits",
+      "model": "Y_{r,t} = mu + A_r + S_t + E_{rt}, Y = mean over the ten retained positions",
+      "launch_summary": "F ratio and a one-sided 95% upper bound on sigma2_A, with the untruncated moment estimate beside them. At 2 df a truncated point estimate reports exactly 0.0 about 63% of the time under a null.",
+      "trajectory_summary": "the pre-registered percentile bootstrap, unchanged in draws, seed, unit and shared index matrix",
+      "floor_treatment": "reported beside, never subtracted; a spread, not a bias",
+      "fp8_fp4": "measured directly with FP8 as reference; unchanged and carries no launch term"
+    },
+    "nuisance_model_prediction": {
+      "law": "SD_launch(config) = sigma_proj * sqrt(2 * signal(config))",
+      "sigma_proj_pooled_nats": 0.0021,
+      "sigma_proj_measured_at_n4": {
+        "BF16||FP8": 0.00205,
+        "BF16||FP4": 0.00211
+      },
+      "predicted_launch_cv": {
+        "BF16||FP8": 0.05,
+        "BF16||FP4": 0.018
+      },
+      "predicted_quantity": "SD of the three per-launch headlines, i.e. sqrt(sigma2_A + sigma2_E/T) -- NOT sigma_A",
+      "falsified_if": "the registered sigma_proj falls outside the 95% chi-square interval of the observed per-launch-headline SD, for both comparisons",
+      "power_caveat": "at R=3 that interval spans a factor of ~12. The test can embarrass the model but cannot confirm it, and this is stated before the run rather than after."
+    },
+    "resolution_rule": {
+      "applies_to": "the BF16-anchored comparisons, at the headline and at every position",
+      "classes": [
+        "resolved",
+        "noise_limited"
+      ],
+      "rule": "RESOLVED iff the lower end of the launch-inflated 95% interval on the signal exceeds the upper end of the 95% launch-level interval on the BF16<->BF16 replication floor, both evaluated at the same position",
+      "signal_interval": "the pre-registered percentile bootstrap interval, SCALED about the point estimate by sqrt(1 + var_launch/var_bootstrap). Scaled rather than rebuilt symmetrically: the percentile form was chosen for a right-skewed non-negative statistic and theta +/- z*SE can cross zero at the long positions.",
+      "var_launch_per_position": "from the pooled scaling law, var = (sigma_proj * sqrt(2*theta_p))^2. Per-position variance COMPONENTS are not estimable -- raw KL cells have kurtosis ~45, an effective df near 5% of nominal -- so the pooled coupling constant is what makes a per-position statement possible at all.",
+      "sigma_proj_used": "this run's own pooled estimate; the registered 2.1e-03 is applied as a stated sensitivity check, never as the primary",
+      "floor_interval": "delete-one-launch jackknife over the ordered pairs of THIS run's three BF16 launches; six ordered pairs are a U-statistic carrying R-1 = 2 df, not five",
+      "every_position_is_reported": true,
+      "no_position_is_dropped": "classification is a label on a reported number. Positions are never selected, filtered or reordered by outcome, and the headline is computed over all ten regardless of class.",
+      "why_not_post_hoc_selection": "the rule is fixed here, before the FP8/FP4 cells exist. Which positions it lands on is data; the rule is not."
+    },
+    "what_is_not_changed": {
+      "G2_G2prime": "recorded failures; thresholds unchanged; not re-adjudicated",
+      "floor_subtracted_from_any_reported_kl": false,
+      "averaged_or_pooled_bf16_distribution": false,
+      "locked_headline_definition": false,
+      "bootstrap_draws_seed_unit": false,
+      "fp8_fp4_direct_measurement": false
+    }
+  },
+  "n_trajectories": 64,
+  "n_positions": 10,
+  "n_bf16_launches": 3,
+  "trajectory_set_hash": "1dd71faeb242c7c1be0011491fb51942fb662dfeb2ba2d2d5c2cb428f7a041ad",
+  "kl_spec_hash": "5565ff73dbe5e36a",
+  "engine_profile_name": "graph_2048",
+  "locked_headline": {
+    "definition": "EVALUATION_RIG.md A.1: mean of per-trajectory means, single reference launch (launch 1). This is THE headline; everything else supplements.",
+    "artifact": "results/quality/kl/kl_summary.json",
+    "pairs": {
+      "BF16||FP8": {
+        "headline_nats": 0.005557797005233256,
+        "ci_95": [
+          0.003610931407269243,
+          0.00875193491125087
+        ],
+        "std_error_nats": 0.0014043198913429545,
+        "worst_cell_nats": 0.3382751809117317,
+        "vs_replication_floor": {
+          "floor_source": "results/quality/gates/replication_floor_production.json",
+          "floor_configs": [
+            "BF16"
+          ],
+          "floor_rule": "max over both sides of the pair",
+          "headline": {
+            "value_nats": 0.005557797005233256,
+            "replication_floor_nats": 0.00020840602957329884,
+            "excess_over_floor_nats": 0.005349390975659957,
+            "ratio_to_floor": 26.668119999275326,
+            "above_replication_floor": true,
+            "interpretation": "ratio is a reproducibility diagnostic only; read value_nats for magnitude. No materiality threshold is applied here."
+          },
+          "worst_cell": {
+            "value_nats": 0.3382751809117317,
+            "replication_floor_nats": 0.006425088922453055,
+            "excess_over_floor_nats": 0.3318500919892786,
+            "ratio_to_floor": 52.649104937613934,
+            "above_replication_floor": true,
+            "interpretation": "ratio is a reproducibility diagnostic only; read value_nats for magnitude. No materiality threshold is applied here."
+          }
+        }
+      },
+      "BF16||FP4": {
+        "headline_nats": 0.05298014251060355,
+        "ci_95": [
+          0.03649696496013759,
+          0.07717466648544098
+        ],
+        "std_error_nats": 0.010738013398159623,
+        "worst_cell_nats": 2.4477387883138113,
+        "vs_replication_floor": {
+          "floor_source": "results/quality/gates/replication_floor_production.json",
+          "floor_configs": [
+            "BF16"
+          ],
+          "floor_rule": "max over both sides of the pair",
+          "headline": {
+            "value_nats": 0.05298014251060355,
+            "replication_floor_nats": 0.00020840602957329884,
+            "excess_over_floor_nats": 0.05277173648103026,
+            "ratio_to_floor": 254.2159774315446,
+            "above_replication_floor": true,
+            "interpretation": "ratio is a reproducibility diagnostic only; read value_nats for magnitude. No materiality threshold is applied here."
+          },
+          "worst_cell": {
+            "value_nats": 2.4477387883138113,
+            "replication_floor_nats": 0.006425088922453055,
+            "excess_over_floor_nats": 2.4413136993913582,
+            "ratio_to_floor": 380.9657450436159,
+            "above_replication_floor": true,
+            "interpretation": "ratio is a reproducibility diagnostic only; read value_nats for magnitude. No materiality threshold is applied here."
+          }
+        }
+      },
+      "FP8||FP4": {
+        "headline_nats": 0.056794990747744266,
+        "ci_95": [
+          0.03848251881764624,
+          0.0853533775270066
+        ],
+        "std_error_nats": 0.012387721895570353,
+        "worst_cell_nats": 2.6035934681518427,
+        "vs_replication_floor": null
+      }
+    }
+  },
+  "launch_variance_supplement": "results/quality/kl/launch_variance_p13.json",
+  "expected_over_launches": {
+    "BF16||FP8": {
+      "expected_kl_over_launches_nats": 0.005504193631599363,
+      "per_launch_headline_nats": {
+        "L1": 0.005557797005233256,
+        "L2": 0.005404061226803552,
+        "L3": 0.005550722662761281
+      },
+      "se_launch_point_nats": 4.131408407439009e-05,
+      "se_launch_upper_95_nats": 0.00022124595741429028,
+      "f_launch": 3.1231063665092043,
+      "launch_effect_separable_at_0_05": true,
+      "se_trajectory_nats": 0.0013895758805658365,
+      "se_total_anova_nats": 0.0013966728310127509,
+      "ci_launch_inflated_point": [
+        0.0035858346642315807,
+        0.00866601281859657
+      ],
+      "ci_launch_inflated_upper_95": [
+        0.003562529171821245,
+        0.008704424687448479
+      ],
+      "launch_share_of_variance": 0.0008831774968275615
+    },
+    "BF16||FP4": {
+      "expected_kl_over_launches_nats": 0.052987574024478054,
+      "per_launch_headline_nats": {
+        "L1": 0.05298014251060355,
+        "L2": 0.05308288612643956,
+        "L3": 0.05289969343639106
+      },
+      "se_launch_point_nats": null,
+      "se_launch_upper_95_nats": 0.0002340758612681596,
+      "f_launch": 0.8568926036788315,
+      "launch_effect_separable_at_0_05": false,
+      "se_trajectory_nats": 0.010753730605338838,
+      "se_total_anova_nats": 0.010774969493695621,
+      "ci_launch_inflated_point": [
+        0.03649225573023771,
+        0.07720890684473355
+      ],
+      "ci_launch_inflated_upper_95": [
+        0.036488348453010425,
+        0.07721464419762697
+      ],
+      "launch_share_of_variance": 0.0
+    }
+  },
+  "marginal_step": {
+    "pair": "FP8||FP4",
+    "headline_nats": 0.056794990747744266,
+    "ci_95": [
+      0.03848251881764624,
+      0.0853533775270066
+    ],
+    "launch_component": null,
+    "why_no_launch_component": "FP8 is the reference; no BF16 distribution enters it"
+  },
+  "replication_floor_this_run": {
+    "mean_nats": 0.00018652298121384566,
+    "per_pair_nats": {
+      "L1||L2": 0.00018635709078779357,
+      "L1||L3": 0.00016918175487727654,
+      "L2||L1": 0.00018657540143917538,
+      "L2||L3": 0.00020421800928120454,
+      "L3||L1": 0.0001691543587865696,
+      "L3||L2": 0.00020365127211105426
+    },
+    "launch_level_ci_95": [
+      0.00010015765413387369,
+      0.00027288830829381766
+    ],
+    "subtracted_from_anything": false
+  },
+  "nuisance_model_prediction_test": {
+    "registered": {
+      "law": "SD_launch(config) = sigma_proj * sqrt(2 * signal(config))",
+      "sigma_proj_pooled_nats": 0.0021,
+      "sigma_proj_measured_at_n4": {
+        "BF16||FP8": 0.00205,
+        "BF16||FP4": 0.00211
+      },
+      "predicted_launch_cv": {
+        "BF16||FP8": 0.05,
+        "BF16||FP4": 0.018
+      },
+      "predicted_quantity": "SD of the three per-launch headlines, i.e. sqrt(sigma2_A + sigma2_E/T) -- NOT sigma_A",
+      "falsified_if": "the registered sigma_proj falls outside the 95% chi-square interval of the observed per-launch-headline SD, for both comparisons",
+      "power_caveat": "at R=3 that interval spans a factor of ~12. The test can embarrass the model but cannot confirm it, and this is stated before the run rather than after."
+    },
+    "per_comparison": {
+      "BF16||FP8": {
+        "observed_sd_launch_headlines_nats": 8.678931643927647e-05,
+        "observed_sd_ci_95": [
+          4.518757505982186e-05,
+          0.0005454478065969031
+        ],
+        "observed_sigma_proj": 0.0008271883671393666,
+        "registered_sigma_proj": 0.0021,
+        "predicted_sd_launch_nats": 0.00022033381000360878,
+        "observed_cv_launch": 0.015767853067708656,
+        "predicted_cv_launch_registered": 0.05,
+        "predicted_sd_inside_observed_ci": true,
+        "ratio_observed_over_predicted": 0.39389922244731745
+      },
+      "BF16||FP4": {
+        "observed_sd_launch_headlines_nats": 9.182217036561463e-05,
+        "observed_sd_ci_95": [
+          4.780797206134271e-05,
+          0.0005770779570309655
+        ],
+        "observed_sigma_proj": 0.00028206262142654414,
+        "registered_sigma_proj": 0.0021,
+        "predicted_sd_launch_nats": 0.0006836303115689768,
+        "observed_cv_launch": 0.001732900063007161,
+        "predicted_cv_launch_registered": 0.018,
+        "predicted_sd_inside_observed_ci": false,
+        "ratio_observed_over_predicted": 0.13431553401264007
+      }
+    },
+    "pooled_observed": {
+      "sigma_proj_pooled": 0.0006179805486974107,
+      "per_comparison": {
+        "BF16||FP8": 0.0008271883671393666,
+        "BF16||FP4": 0.00028206262142654414
+      },
+      "spread_ratio": 2.932640854558555,
+      "rule": "root-mean-square over the BF16-anchored comparisons, equal weights",
+      "why_pooled": "sigma_proj is a property of the launch perturbation rather than of the configuration; agreement across configurations whose signals differ by nearly an order of magnitude is the evidence for pooling it"
+    },
+    "pooled_ratio_observed_over_registered": 0.2942764517606718,
+    "verdict": "MIXED",
+    "verdict_meaning": {
+      "CONSISTENT": "the registered sigma_proj sits inside the observed interval for every comparison. At 2 df that interval spans a factor of ~12, so this is a failure to embarrass the model, not a confirmation of it.",
+      "FALSIFIED": "the registered value is outside the observed interval for every comparison; the nuisance model as registered is wrong",
+      "MIXED": "the comparisons disagree; the pooled coupling constant is not supported"
+    }
+  },
+  "resolution": {
+    "BF16||FP8": {
+      "rule": "RESOLVED iff the lower end of the launch-inflated 95% interval on the signal exceeds the upper end of the 95% launch-level interval on the BF16<->BF16 replication floor, both evaluated at the same position",
+      "sigma_proj_used": 0.0006179805486974107,
+      "headline": {
+        "expected_kl_over_launches_nats": 0.005504193631599363,
+        "predicted_launch_sd_nats": 6.4839051810772e-05,
+        "trajectory_ci": [
+          0.003586681977090226,
+          0.00866461628640451
+        ],
+        "launch_inflated_ci_low_nats": 0.003584595658667291,
+        "inflation_factor": 1.0010880342854913,
+        "replication_floor_nats": 0.00018652298121384566,
+        "replication_floor_ci_high_nats": 0.00027288830829381766,
+        "class": "resolved",
+        "margin_nats": 0.0033117073503734734,
+        "ratio_signal_low_to_floor_high": 13.1357612243606
+      },
+      "headline_under_registered_sigma_proj": {
+        "expected_kl_over_launches_nats": 0.005504193631599363,
+        "predicted_launch_sd_nats": 0.0002203338100036088,
+        "trajectory_ci": [
+          0.003586681977090226,
+          0.00866461628640451
+        ],
+        "launch_inflated_ci_low_nats": 0.0035627266884202136,
+        "inflation_factor": 1.012492903818175,
+        "replication_floor_nats": 0.00018652298121384566,
+        "replication_floor_ci_high_nats": 0.00027288830829381766,
+        "class": "resolved",
+        "margin_nats": 0.003289838380126396,
+        "ratio_signal_low_to_floor_high": 13.055622319239273
+      },
+      "by_position": {
+        "1": {
+          "expected_kl_over_launches_nats": 0.012119216201643678,
+          "predicted_launch_sd_nats": 9.621151870008738e-05,
+          "trajectory_ci": [
+            0.006009501381260531,
+            0.021163068093379502
+          ],
+          "launch_inflated_ci_low_nats": 0.0060077227411037305,
+          "inflation_factor": 1.0002911167229716,
+          "replication_floor_nats": 0.0002844019658124293,
+          "replication_floor_ci_high_nats": 0.00034341684871866136,
+          "class": "resolved",
+          "margin_nats": 0.005664305892385069,
+          "ratio_signal_low_to_floor_high": 17.49396619158153,
+          "class_under_registered_sigma_proj": "resolved",
+          "per_launch_nats": [
+            0.012241455111794815,
+            0.01195574304522022,
+            0.012160450447916
+          ]
+        },
+        "8": {
+          "expected_kl_over_launches_nats": 0.01135777456845017,
+          "predicted_launch_sd_nats": 9.31400411973262e-05,
+          "trajectory_ci": [
+            0.005051230219058713,
+            0.022596403545028475
+          ],
+          "launch_inflated_ci_low_nats": 0.005050143040928233,
+          "inflation_factor": 1.0001723888821277,
+          "replication_floor_nats": 0.00033462434533303647,
+          "replication_floor_ci_high_nats": 0.0006764209862271392,
+          "class": "resolved",
+          "margin_nats": 0.0043737220547010935,
+          "ratio_signal_low_to_floor_high": 7.465976283640049,
+          "class_under_registered_sigma_proj": "resolved",
+          "per_launch_nats": [
+            0.011651549152431055,
+            0.010785106495108299,
+            0.011636668057811156
+          ]
+        },
+        "32": {
+          "expected_kl_over_launches_nats": 0.004700505995541368,
+          "predicted_launch_sd_nats": 5.9918662283925236e-05,
+          "trajectory_ci": [
+            0.0035081273604918636,
+            0.00608827076188448
+          ],
+          "launch_inflated_ci_low_nats": 0.0035031124103239992,
+          "inflation_factor": 1.0042058369887314,
+          "replication_floor_nats": 0.00027932020921652264,
+          "replication_floor_ci_high_nats": 0.0006364425727868118,
+          "class": "resolved",
+          "margin_nats": 0.0028666698375371877,
+          "ratio_signal_low_to_floor_high": 5.504208172286161,
+          "class_under_registered_sigma_proj": "resolved",
+          "per_launch_nats": [
+            0.0047858292455258584,
+            0.004557688716387931,
+            0.004758000024710314
+          ]
+        },
+        "64": {
+          "expected_kl_over_launches_nats": 0.005586975922941859,
+          "predicted_launch_sd_nats": 6.532481723654313e-05,
+          "trajectory_ci": [
+            0.003981204326854572,
+            0.007476541938017603
+          ],
+          "launch_inflated_ci_low_nats": 0.0039769523499294255,
+          "inflation_factor": 1.0026479338254006,
+          "replication_floor_nats": 0.00024098193734454262,
+          "replication_floor_ci_high_nats": 0.00035501324862455947,
+          "class": "resolved",
+          "margin_nats": 0.0036219391013048658,
+          "ratio_signal_low_to_floor_high": 11.202264606567429,
+          "class_under_registered_sigma_proj": "resolved",
+          "per_launch_nats": [
+            0.0057187974456078166,
+            0.005451022971403234,
+            0.005591107351814527
+          ]
+        },
+        "128": {
+          "expected_kl_over_launches_nats": 0.005091728577715957,
+          "predicted_launch_sd_nats": 6.236234333106834e-05,
+          "trajectory_ci": [
+            0.0033291992865681426,
+            0.007381282135524428
+          ],
+          "launch_inflated_ci_low_nats": 0.003326047346513986,
+          "inflation_factor": 1.0017883050624958,
+          "replication_floor_nats": 0.0002519500258334749,
+          "replication_floor_ci_high_nats": 0.0005510839193571452,
+          "class": "resolved",
+          "margin_nats": 0.002774963427156841,
+          "ratio_signal_low_to_floor_high": 6.03546434523786,
+          "class_under_registered_sigma_proj": "resolved",
+          "per_launch_nats": [
+            0.004974952733939891,
+            0.00487823510039254,
+            0.00542199789881544
+          ]
+        },
+        "256": {
+          "expected_kl_over_launches_nats": 0.007467712807139979,
+          "predicted_launch_sd_nats": 7.552376065381167e-05,
+          "trajectory_ci": [
+            0.0032459753382585365,
+            0.013964356739117943
+          ],
+          "launch_inflated_ci_low_nats": 0.0032444507074403115,
+          "inflation_factor": 1.0003611382350188,
+          "replication_floor_nats": 0.00013882731973228893,
+          "replication_floor_ci_high_nats": 0.0004272313363150531,
+          "class": "resolved",
+          "margin_nats": 0.0028172193711252583,
+          "ratio_signal_low_to_floor_high": 7.594130934833294,
+          "class_under_registered_sigma_proj": "resolved",
+          "per_launch_nats": [
+            0.007518531095757069,
+            0.007493566242819749,
+            0.007391041082843117
+          ]
+        },
+        "512": {
+          "expected_kl_over_launches_nats": 0.0073409637002789,
+          "predicted_launch_sd_nats": 7.488008724605352e-05,
+          "trajectory_ci": [
+            0.0017417646809950828,
+            0.017660591820941925
+          ],
+          "launch_inflated_ci_low_nats": 0.0017410815423897887,
+          "inflation_factor": 1.0001220064875247,
+          "replication_floor_nats": 0.00022366923464934012,
+          "replication_floor_ci_high_nats": 0.000440793876982475,
+          "class": "resolved",
+          "margin_nats": 0.0013002876654073137,
+          "ratio_signal_low_to_floor_high": 3.9498768773936717,
+          "class_under_registered_sigma_proj": "resolved",
+          "per_launch_nats": [
+            0.007328642019193373,
+            0.007529799128494191,
+            0.007164449953149135
+          ]
+        },
+        "1024": {
+          "expected_kl_over_launches_nats": 0.000436138807352977,
+          "predicted_launch_sd_nats": 1.825165156681185e-05,
+          "trajectory_ci": [
+            0.0001953493721835037,
+            0.00075269351044098
+          ],
+          "launch_inflated_ci_low_nats": 0.00019340234360666674,
+          "inflation_factor": 1.008086021612479,
+          "replication_floor_nats": 4.7458183664110706e-05,
+          "replication_floor_ci_high_nats": 6.94936557354475e-05,
+          "class": "resolved",
+          "margin_nats": 0.00012390868787121923,
+          "ratio_signal_low_to_floor_high": 2.7830215803140654,
+          "class_under_registered_sigma_proj": "resolved",
+          "per_launch_nats": [
+            0.00040532646540074405,
+            0.00042753675103251993,
+            0.00047555320562566686
+          ]
+        },
+        "1536": {
+          "expected_kl_over_launches_nats": 0.0005364395207986592,
+          "predicted_launch_sd_nats": 2.0241849261736685e-05,
+          "trajectory_ci": [
+            0.00018588769478537545,
+            0.0009878324298506248
+          ],
+          "launch_inflated_ci_low_nats": 0.0001842075367218223,
+          "inflation_factor": 1.0047928949127467,
+          "replication_floor_nats": 3.479417687777311e-05,
+          "replication_floor_ci_high_nats": 9.845132952963478e-05,
+          "class": "resolved",
+          "margin_nats": 8.575620719218752e-05,
+          "ratio_signal_low_to_floor_high": 1.8710517938345779,
+          "class_under_registered_sigma_proj": "resolved",
+          "per_launch_nats": [
+            0.0004823104510027049,
+            0.0005514543649015397,
+            0.0005755537464917329
+          ]
+        },
+        "2048": {
+          "expected_kl_over_launches_nats": 0.0004044802141300854,
+          "predicted_launch_sd_nats": 1.7576744693941372e-05,
+          "trajectory_ci": [
+            6.085770982730836e-05,
+            0.0010412304339069685
+          ],
+          "launch_inflated_ci_low_nats": 6.0258326693537936e-05,
+          "inflation_factor": 1.0017443069829974,
+          "replication_floor_nats": 2.920241367493759e-05,
+          "replication_floor_ci_high_nats": 9.272391261424332e-05,
+          "class": "noise_limited",
+          "margin_nats": -3.246558592070538e-05,
+          "ratio_signal_low_to_floor_high": 0.6498682485954724,
+          "class_under_registered_sigma_proj": "noise_limited",
+          "per_launch_nats": [
+            0.00047057633167923844,
+            0.0004104594522752973,
+            0.00033240485843572036
+          ]
+        }
+      },
+      "resolved_positions": [
+        "1",
+        "8",
+        "32",
+        "64",
+        "128",
+        "256",
+        "512",
+        "1024",
+        "1536"
+      ],
+      "noise_limited_positions": [
+        "2048"
+      ],
+      "n_resolved": 9,
+      "n_positions": 10,
+      "all_positions_reported": true,
+      "reading": "a noise-limited position is one where this rig cannot separate the quantization effect from BF16 relaunch noise. It is a statement about resolution, not about the effect being absent, and the position still contributes to the headline."
+    },
+    "BF16||FP4": {
+      "rule": "RESOLVED iff the lower end of the launch-inflated 95% interval on the signal exceeds the upper end of the 95% launch-level interval on the BF16<->BF16 replication floor, both evaluated at the same position",
+      "sigma_proj_used": 0.0006179805486974107,
+      "headline": {
+        "expected_kl_over_launches_nats": 0.052987574024478054,
+        "predicted_launch_sd_nats": 0.00020117630240456104,
+        "trajectory_ci": [
+          0.03649225573023771,
+          0.07720890684473355
+        ],
+        "launch_inflated_ci_low_nats": 0.036489369519424386,
+        "inflation_factor": 1.0001749715138468,
+        "replication_floor_nats": 0.00018652298121384566,
+        "replication_floor_ci_high_nats": 0.00027288830829381766,
+        "class": "resolved",
+        "margin_nats": 0.036216481211130566,
+        "ratio_signal_low_to_floor_high": 133.71540080836456
+      },
+      "headline_under_registered_sigma_proj": {
+        "expected_kl_over_launches_nats": 0.052987574024478054,
+        "predicted_launch_sd_nats": 0.0006836303115689768,
+        "trajectory_ci": [
+          0.03649225573023771,
+          0.07720890684473355
+        ],
+        "launch_inflated_ci_low_nats": 0.03645895782582593,
+        "inflation_factor": 1.0020186275777054,
+        "replication_floor_nats": 0.00018652298121384566,
+        "replication_floor_ci_high_nats": 0.00027288830829381766,
+        "class": "resolved",
+        "margin_nats": 0.03618606951753211,
+        "ratio_signal_low_to_floor_high": 133.60395706865802
+      },
+      "by_position": {
+        "1": {
+          "expected_kl_over_launches_nats": 0.12412088497941394,
+          "predicted_launch_sd_nats": 0.0003079018052272687,
+          "trajectory_ci": [
+            0.05674285741126217,
+            0.211203265504259
+          ],
+          "launch_inflated_ci_low_nats": 0.056740850934178244,
+          "inflation_factor": 1.0000297793977702,
+          "replication_floor_nats": 0.0002844019658124293,
+          "replication_floor_ci_high_nats": 0.00034341684871866136,
+          "class": "resolved",
+          "margin_nats": 0.05639743408545958,
+          "ratio_signal_low_to_floor_high": 165.22442374591313,
+          "class_under_registered_sigma_proj": "resolved",
+          "per_launch_nats": [
+            0.12403078894256636,
+            0.12465794134375191,
+            0.12367392465192353
+          ]
+        },
+        "8": {
+          "expected_kl_over_launches_nats": 0.077797926688211,
+          "predicted_launch_sd_nats": 0.0002437663839783145,
+          "trajectory_ci": [
+            0.047669467373161085,
+            0.12447674623062795
+          ],
+          "launch_inflated_ci_low_nats": 0.04766732794437603,
+          "inflation_factor": 1.0000710102286572,
+          "replication_floor_nats": 0.00033462434533303647,
+          "replication_floor_ci_high_nats": 0.0006764209862271392,
+          "class": "resolved",
+          "margin_nats": 0.04699090695814889,
+          "ratio_signal_low_to_floor_high": 70.46991284266504,
+          "class_under_registered_sigma_proj": "resolved",
+          "per_launch_nats": [
+            0.07726721132636843,
+            0.0787725224842547,
+            0.07735404625400986
+          ]
+        },
+        "32": {
+          "expected_kl_over_launches_nats": 0.04864047821170331,
+          "predicted_launch_sd_nats": 0.00019274748565827965,
+          "trajectory_ci": [
+            0.03761182013196563,
+            0.06040860586238981
+          ],
+          "launch_inflated_ci_low_nats": 0.03760571602831951,
+          "inflation_factor": 1.0005534765519053,
+          "replication_floor_nats": 0.00027932020921652264,
+          "replication_floor_ci_high_nats": 0.0006364425727868118,
+          "class": "resolved",
+          "margin_nats": 0.0369692734555327,
+          "ratio_signal_low_to_floor_high": 59.087367244548304,
+          "class_under_registered_sigma_proj": "resolved",
+          "per_launch_nats": [
+            0.04841952358056667,
+            0.049114683039258894,
+            0.048387228015284375
+          ]
+        },
+        "64": {
+          "expected_kl_over_launches_nats": 0.08237307823027719,
+          "predicted_launch_sd_nats": 0.00025083171714633914,
+          "trajectory_ci": [
+            0.04257969088063433,
+            0.1489500110413203
+          ],
+          "launch_inflated_ci_low_nats": 0.04257817140948237,
+          "inflation_factor": 1.0000381840112935,
+          "replication_floor_nats": 0.00024098193734454262,
+          "replication_floor_ci_high_nats": 0.00035501324862455947,
+          "class": "resolved",
+          "margin_nats": 0.04222315816085781,
+          "ratio_signal_low_to_floor_high": 119.9340350661405,
+          "class_under_registered_sigma_proj": "resolved",
+          "per_launch_nats": [
+            0.0825162319610439,
+            0.0822456284308516,
+            0.08235737429893605
+          ]
+        },
+        "128": {
+          "expected_kl_over_launches_nats": 0.09496080766952915,
+          "predicted_launch_sd_nats": 0.00026931590563726647,
+          "trajectory_ci": [
+            0.04017808282746399,
+            0.18341332730385526
+          ],
+          "launch_inflated_ci_low_nats": 0.04017678273272642,
+          "inflation_factor": 1.000023731837752,
+          "replication_floor_nats": 0.0002519500258334749,
+          "replication_floor_ci_high_nats": 0.0005510839193571452,
+          "class": "resolved",
+          "margin_nats": 0.039625698813369276,
+          "ratio_signal_low_to_floor_high": 72.90501740568617,
+          "class_under_registered_sigma_proj": "resolved",
+          "per_launch_nats": [
+            0.09479221602778892,
+            0.09481061272876255,
+            0.09527959425203597
+          ]
+        },
+        "256": {
+          "expected_kl_over_launches_nats": 0.050488713012778956,
+          "predicted_launch_sd_nats": 0.00019637534166870208,
+          "trajectory_ci": [
+            0.024255298765816734,
+            0.08533996273437996
+          ],
+          "launch_inflated_ci_low_nats": 0.024253278576775984,
+          "inflation_factor": 1.000077008239253,
+          "replication_floor_nats": 0.00013882731973228893,
+          "replication_floor_ci_high_nats": 0.0004272313363150531,
+          "class": "resolved",
+          "margin_nats": 0.023826047240460932,
+          "ratio_signal_low_to_floor_high": 56.768491716840956,
+          "class_under_registered_sigma_proj": "resolved",
+          "per_launch_nats": [
+            0.05075432429616544,
+            0.05048719963723048,
+            0.05022461510494094
+          ]
+        },
+        "512": {
+          "expected_kl_over_launches_nats": 0.03744340821007853,
+          "predicted_launch_sd_nats": 0.0001691131931227538,
+          "trajectory_ci": [
+            0.017355541376320643,
+            0.06822557062780346
+          ],
+          "launch_inflated_ci_low_nats": 0.017353915075987922,
+          "inflation_factor": 1.0000809593346163,
+          "replication_floor_nats": 0.00022366923464934012,
+          "replication_floor_ci_high_nats": 0.000440793876982475,
+          "class": "resolved",
+          "margin_nats": 0.016913121199005447,
+          "ratio_signal_low_to_floor_high": 39.369682706998844,
+          "class_under_registered_sigma_proj": "resolved",
+          "per_launch_nats": [
+            0.03801903677838053,
+            0.03664903747727273,
+            0.03766215037458233
+          ]
+        },
+        "1024": {
+          "expected_kl_over_launches_nats": 0.003290738110646308,
+          "predicted_launch_sd_nats": 5.013447412938775e-05,
+          "trajectory_ci": [
+            0.001640490240575605,
+            0.005158232257937259
+          ],
+          "launch_inflated_ci_low_nats": 0.0016379402463424675,
+          "inflation_factor": 1.0015452189209784,
+          "replication_floor_nats": 4.7458183664110706e-05,
+          "replication_floor_ci_high_nats": 6.94936557354475e-05,
+          "class": "resolved",
+          "margin_nats": 0.0015684465906070201,
+          "ratio_signal_low_to_floor_high": 23.569637098642126,
+          "class_under_registered_sigma_proj": "resolved",
+          "per_launch_nats": [
+            0.003121059853623238,
+            0.0033602243798752144,
+            0.003390930098440473
+          ]
+        },
+        "1536": {
+          "expected_kl_over_launches_nats": 0.008602644054023879,
+          "predicted_launch_sd_nats": 8.105984712309796e-05,
+          "trajectory_ci": [
+            0.0026073674440267305,
+            0.01589347430937212
+          ],
+          "launch_inflated_ci_low_nats": 0.00260571339040987,
+          "inflation_factor": 1.0002758927943545,
+          "replication_floor_nats": 3.479417687777311e-05,
+          "replication_floor_ci_high_nats": 9.845132952963478e-05,
+          "class": "resolved",
+          "margin_nats": 0.0025072620608802354,
+          "ratio_signal_low_to_floor_high": 26.46702084023686,
+          "class_under_registered_sigma_proj": "resolved",
+          "per_launch_nats": [
+            0.00881323916094113,
+            0.00850649667651398,
+            0.008488196324616525
+          ]
+        },
+        "2048": {
+          "expected_kl_over_launches_nats": 0.002157061078118304,
+          "predicted_launch_sd_nats": 4.0590184438181276e-05,
+          "trajectory_ci": [
+            0.00047324957042346624,
+            0.005134322614129468
+          ],
+          "launch_inflated_ci_low_nats": 0.0004724734413289809,
+          "inflation_factor": 1.0004609358535315,
+          "replication_floor_nats": 2.920241367493759e-05,
+          "replication_floor_ci_high_nats": 9.272391261424332e-05,
+          "class": "resolved",
+          "margin_nats": 0.0003797495287147376,
+          "ratio_signal_low_to_floor_high": 5.095486460915415,
+          "class_under_registered_sigma_proj": "resolved",
+          "per_launch_nats": [
+            0.0020677931785909836,
+            0.00222451506662344,
+            0.002178874989140489
+          ]
+        }
+      },
+      "resolved_positions": [
+        "1",
+        "8",
+        "32",
+        "64",
+        "128",
+        "256",
+        "512",
+        "1024",
+        "1536",
+        "2048"
+      ],
+      "noise_limited_positions": [],
+      "n_resolved": 10,
+      "n_positions": 10,
+      "all_positions_reported": true,
+      "reading": "a noise-limited position is one where this rig cannot separate the quantization effect from BF16 relaunch noise. It is a statement about resolution, not about the effect being absent, and the position still contributes to the headline."
+    }
+  },
+  "G2_G2prime": {
+    "status": "RECORDED FAILURES; unchanged by this run",
+    "bound": 0.01,
+    "threshold_relaxed": false,
+    "floor_subtracted": false,
+    "averaged_reference_used": false,
+    "floor_fraction_of_signal": {
+      "BF16||FP8": 0.03356059622872416,
+      "BF16||FP4": 0.003520620601888992
+    },
+    "floor_not_applicable_to": [
+      "FP8||FP4"
+    ],
+    "floor_not_applicable_because": "the BF16 replication floor bounds BF16-anchored comparisons. FP8||FP4 uses FP8 as its reference, whose own replication floor is ~1e-11 nats."
+  },
+  "git": {
+    "git_head": "429e465488074ff0abce4ced8c2c4a8da5ba24a5",
+    "git_dirty": false
+  },
+  "gpu": {
+    "name": "NVIDIA RTX PRO 4000 Blackwell",
+    "uuid": "GPU-fdc11a18-6edb-7e2f-82b2-6bd0b9ed714d",
+    "driver_version": "575.64.03",
+    "memory_total_mib": "24467",
+    "power_limit_w": "145.00"
+  },
+  "software": {
+    "python": "3.12.13",
+    "kernel": "6.8.0-65-generic",
+    "torch": "2.10.0+cu128",
+    "torch_cuda": "12.8",
+    "vllm": "0.19.1",
+    "transformers": "5.15.1",
+    "compressed_tensors": "0.15.0.1",
+    "nvcc": "Cuda compilation tools, release 12.9, V12.9.86",
+    "git_head": "429e465488074ff0abce4ced8c2c4a8da5ba24a5",
+    "git_dirty": false,
+    "git_untracked_files": 1
+  },
+  "timestamp": "2026-09-16T20:33:06-0400"
+}
