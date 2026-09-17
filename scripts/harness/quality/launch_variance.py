@@ -249,13 +249,23 @@ def check_exchangeability(meta, n_traj, mats=None):
                 f"launch {m['launch']}'s first {n_traj * N_POS} cells differ from "
                 f"{meta[0]['launch']}'s; the launches would not be scored on the same contexts")
 
-    # a launch that did not launch is the previous launch's data under a new directory name
-    not_launched = [m["launch"] for m in meta if not m["summary"].get("launched")]
+    # A launch that did not launch may be the previous launch's data under a new directory name --
+    # or it may be a finished launch whose root was merely RE-ASSEMBLED. `launched` cannot tell
+    # them apart, because it describes the last call rather than the cells. `cells_scored_by_launch`
+    # can: it comes from the per-shard `observed` block, which only an engine launch writes. The
+    # byte-distinctness check below is what actually rules out duplicated data, and it is unaffected
+    # by either.
+    not_launched = [m["launch"] for m in meta
+                    if not (m["summary"].get("launched")
+                            or m["summary"].get("cells_scored_by_launch"))]
     if not_launched:
         raise LaunchDesignError(
-            f"launches {not_launched} record launched=false: their shards were reused rather than "
-            "rescored, so they are not independent realizations")
-    stamps = {m["launch"]: m["summary"]["timestamp"] for m in meta}
+            f"launches {not_launched} record neither launched=true nor cells_scored_by_launch: "
+            "their shards were reused rather than rescored, so they are not independent "
+            "realizations")
+    # the first collection's timestamp, not the re-assembly's, for the same reason
+    stamps = {m["launch"]: (m["summary"].get("cells_first_collected_timestamp")
+                            or m["summary"]["timestamp"]) for m in meta}
     if len(set(stamps.values())) != len(stamps):
         raise LaunchDesignError(f"BF16 launches share a collection timestamp: {stamps}")
 

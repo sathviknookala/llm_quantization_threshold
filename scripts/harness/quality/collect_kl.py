@@ -275,9 +275,22 @@ def collect(config_id, root=None, allow_dirty=False, n_traj=None,
     elif evidence.get("ok") is False:
         raise SystemExit(f"ABORT: stored dispatch evidence for {config_id} failed: {evidence}")
 
-    # `git` below is this call's state; on a resume the cells predate it, so the shards' own
-    # heads travel separately. Without this a resumed summary names only the resume commit.
+    # `git` and `timestamp` below are this call's state; on a resume the cells predate both, so the
+    # facts that establish an INDEPENDENT REALIZATION have to survive re-assembly on their own.
+    # Without this, resuming a finished root silently converts three real launches into three
+    # "launched=false" directories and the exchangeability guard rejects its own data.
     cell_heads = sorted({(m.get("git") or {}).get("git_head") for m in final} - {None})
+    # `observed` is written only by an engine launch; resume_provenance aborts if no shard has one
+    scored_by_launch = all(m.get("observed") for m in final)
+    prior = os.path.join(run_dir(root), f"collection_{short}.json")
+    first_seen = None
+    if os.path.exists(prior):
+        try:
+            pr = json.load(open(prior))
+            if pr.get("provenance") == prov:
+                first_seen = pr.get("cells_first_collected_timestamp") or pr.get("timestamp")
+        except (ValueError, OSError):
+            first_seen = None
     cells = [c for m in final for c in m["index"]]
     P.assert_complete_grid(cells, n)
     bad = [c for m in final for c in m["per_context"]
@@ -320,6 +333,8 @@ def collect(config_id, root=None, allow_dirty=False, n_traj=None,
         "provenance_source": prov_src["provenance_source"],
         "git": git,
         "cells_collected_at_git_head": cell_heads,
+        "cells_scored_by_launch": scored_by_launch,
+        "cells_first_collected_timestamp": first_seen,
         "git_is_this_assembly_not_the_collection": bool(
             cell_heads and cell_heads != [git["git_head"]]),
         "gpu": common.gpu_identity(),

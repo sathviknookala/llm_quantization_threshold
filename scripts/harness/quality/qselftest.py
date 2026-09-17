@@ -1142,6 +1142,32 @@ def test_launch_variance_guards(tmp):
     check("unparseable stamps fall back to the conservative reading",
           _L._session_confound({"A": "not-a-time"})["decided_from_timestamps"], False)
 
+    # A finished root that is merely RE-ASSEMBLED (every shard reused) records launched=false.
+    # That must stay usable -- otherwise resuming a completed run rejects its own data -- while a
+    # root whose cells were never scored by any launch must still abort.
+    def reassembled(**over):
+        out = []
+        for m in meta():
+            sm = dict(m["summary"], launched=False, cells_scored_by_launch=True,
+                      cells_first_collected_timestamp=m["summary"]["timestamp"],
+                      timestamp="2026-09-17T00:00:00-0400")
+            sm.update(over)
+            out.append(dict(m, summary=sm))
+        return out
+
+    ra = LV.check_exchangeability(reassembled(), 4)
+    check("a RE-ASSEMBLED root is still exchangeable", ra["n_launches"], 3)
+    check("and its timestamps are the FIRST collection's, not the re-assembly's",
+          sorted(ra["distinct_collection_timestamps"].values()),
+          [f"2026-08-26T00:0{i}:00-0400" for i in range(3)])
+    raises("a root whose cells were never scored by a launch still aborts",
+           lambda: LV.check_exchangeability(
+               reassembled(cells_scored_by_launch=False), 4), LV.LaunchDesignError)
+    raises("re-assembly does not excuse a shared first-collection timestamp",
+           lambda: LV.check_exchangeability(
+               reassembled(cells_first_collected_timestamp="2026-09-16T20:00:00-0400"), 4),
+           LV.LaunchDesignError)
+
     print("launch variance: byte-identical launches are the same run twice")
     same = np.zeros((4, 3))
     raises("two launches with byte-identical matrices abort",
