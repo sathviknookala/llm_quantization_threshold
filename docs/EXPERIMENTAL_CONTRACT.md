@@ -862,6 +862,55 @@ Two rules follow from what those gates measured, and both are binding on how res
   and FP4 replicate to ~1e-11 nats, so a few nanonats reads as many multiples of the floor while
   being numerically nothing. Absolute nats are reported first.
 
+### Provenance under a multi-launch run — amended 2026-09-16
+
+A quality run of R independent launches writes a **tracked** collection summary after each one, so
+an unscoped clean-tree check fails launch 2 on the run's own output. The only escape was
+`--allow-dirty`, which drops the guard for the source tree as well — trading the provenance of the
+code for the provenance of the artifact. That is now a defect rather than a workaround:
+
+- A run declares the output roots it will write. `require_clean_tree` excuses **only** paths under
+  those roots, and the source tree is held to full strength throughout. `--allow-dirty` is not an
+  acceptable substitute and is not used by any multi-launch runner.
+- **HEAD is pinned at the start of the run** and re-checked at every launch, so the scope cannot be
+  widened by committing mid-run either.
+- Every record carries the raw `git_dirty` fact, the full dirty-path list, and the paths that fell
+  outside the declared scope — so the excusal is auditable rather than implicit.
+- A pre-registration that governs a run must be **committed** before the run collects a cell.
+  `p13.require_registration_committed()` enforces this; an uncommitted registration could be edited
+  after seeing the first cells with nothing recording that it had been.
+
+Prefix-matching is on path *segments*: `results/quality/kl` does not excuse
+`results/quality/kl_other/`.
+
+### Dispatch verification must be positive — amended 2026-09-16
+
+The inherited verdict decides dispatch from lines pre-filtered by `server.KERNEL_PATTERNS`, and two
+consequences were live for P13:
+
+- **BF16 names no expected pattern and logs no line matching any of them, so its verdict was `ok` by
+  silence.** There was no positive evidence of what the *reference* configuration dispatched, and
+  every KL number is anchored on it.
+- **FP4's forbidden list contains `"emulation"`, which is not in `KERNEL_PATTERNS`**, so the string
+  could never reach the blob the forbidden scan searched. That pattern was unenforceable.
+
+Neither is fixable in place. The kernel patterns are hashed into `KL_SPEC`, so editing them changes
+`spec_hash()` and strands every committed artifact behind the manifest guard; `server.py` is the
+frozen serving path. The resolution is therefore **additive**:
+`scripts/harness/quality/dispatch_verify.py` scans the **whole** engine log, requires named positive
+evidence per configuration, and both verdicts must pass. For an unquantized configuration the
+positive evidence is not a kernel-class line — none exists, because the GEMMs go through
+torch.compile/inductor — but the resolved quantization method, the weight dtype, the chosen
+attention backend and the compile step, each recorded with the line that proves it.
+
+Because `results/quality/**/logs/` is gitignored, the matched evidence lines are copied into the
+tracked collection artifact. Evidence that cannot be established is recorded as **unavailable**,
+never as a pass; a production run requires `ok == true` for every configuration.
+
+**The serving path is unchanged.** `server.py` carries the same truncate-before-normalise pattern
+and the same silence for BF16; the 124 completed sweep cells are not re-adjudicated by any of this,
+and those three gaps remain open against the serving write-up.
+
 ## Measurement hazards found during model qualification (2026-08-22)
 
 These were observed on this exact stack while qualifying Llama 3.1 8B Instruct. Each is a way to

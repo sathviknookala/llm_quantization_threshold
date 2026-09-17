@@ -353,6 +353,65 @@ nothing. `above_replication_floor` says a difference is reproducible, not that i
 post-hoc materiality threshold is applied to KL values; the raw numbers are preserved and the
 thresholds that exist are correctness trip-wires with pre-registered bounds.
 
+### The P13 estimator and the resolution rule — REGISTERED 2026-09-16
+
+Registered before any production FP8/FP4 cell existed. The decision and its reasoning live in
+`DECISIONS.md` D13; this section owns the arithmetic. Machine-readable copy:
+`scripts/harness/quality/p13.py`, `REGISTERED`.
+
+**The headline is unchanged.** A.1's single-reference mean of 64 per-trajectory means, computed
+against the designated reference launch, remains the point estimate and is what
+`analyze_kl.py` writes. Everything below supplements it and is named so it cannot be mistaken for
+it.
+
+**The supplementary estimand** is `E_r[KL(B_r || Q)]` over R=3 independent BF16 launches of the
+locked `graph_2048` profile, with
+
+```text
+Y_{r,t} = mu + A_r + S_t + E_{rt}          Y = mean over the ten retained positions
+  A_r   BF16 scoring launch     nuisance component, R-1 = 2 df
+  S_t   trajectory              the locked resampling unit, unchanged
+  E_rt  launch x trajectory     NOT replicate error: scoring is deterministic given a launch
+```
+
+Reported per comparison: the mean over launches; `MS_A`, its F ratio against `MS_E`, and a
+**one-sided 95% upper bound** on `sigma2_A` with the untruncated moment estimate beside it; the
+pre-registered trajectory bootstrap, unchanged in draws, seed, unit and shared index matrix; the
+ANOVA-unbiased total `(MS_A + MS_S - MS_E)/(RT)` with its Satterthwaite df; and the per-position
+equivalents. **The floor is never subtracted from any of them.**
+
+**Position is still a fixed factor** — ten pre-registered strided levels, not a sample — so
+averaging within trajectory first is correct, and per-position variance *components* remain
+inestimable: raw KL cells have kurtosis ~45, an effective df near 5% of nominal. What makes a
+per-position statement possible is the pooled coupling constant from the first-order scaling law,
+`SD_launch = sigma_proj*sqrt(2*signal)`, pooled in quadrature across the BF16-anchored comparisons.
+
+**The resolution rule.** At the headline and at every position `p`:
+
+```text
+var_launch(p) = (sigma_proj_pooled * sqrt(2 * theta_p))^2
+infl(p)       = sqrt(1 + var_launch(p) / var_bootstrap(p))
+signal_lo(p)  = theta_p + (ci_low(p) - theta_p) * infl(p)
+floor_hi(p)   = upper end of the delete-one-launch jackknife 95% interval on the
+                BF16<->BF16 mean at p, from this run's own three launches
+
+RESOLVED  iff  signal_lo(p) > floor_hi(p)          otherwise NOISE_LIMITED
+```
+
+The interval is **scaled about the point estimate, not rebuilt symmetrically**: the percentile form
+was chosen for a right-skewed non-negative statistic, and `theta +/- z*SE` can cross zero at the
+long positions where this question actually bites. The floor side uses a **delete-one-launch
+jackknife** because six ordered pairs from three launches are a U-statistic carrying `R-1 = 2` df,
+not five; the naive over-pairs SE understates it 3.2x. `sigma_proj` is this run's own pooled
+estimate; the registered `2.1e-03` is applied beside it as a stated sensitivity check and never as
+the primary.
+
+**Reporting obligations that travel with the rule.** Every position is reported regardless of
+class. The headline is computed over all ten positions regardless of class. No position is dropped,
+filtered or reordered by outcome — the classification is a *label on a reported number*. And
+`noise_limited` means this rig cannot separate the effect from BF16 relaunch noise at that
+position; it is not a claim that the effect is absent.
+
 ### Persisted distribution precision — LOCKED 2026-08-26 (G4)
 
 Full-vocabulary distributions are persisted as **fp32 by default**, and KL is computed in **float64**
@@ -693,7 +752,7 @@ Use paired examples whenever possible. Quantify uncertainty on aggregate KL, per
 
 Calibration-dependent methods should separate calibration-draw variation from evaluation-sample uncertainty where the experiment supports doing so.
 
-### Reference run-to-run variation — the quality analogue, PROPOSED 2026-09-12, not adopted
+### Reference run-to-run variation — the quality analogue, ADOPTED for P13 2026-09-16
 
 The serving clause below says not to treat thousands of requests inside one benchmark process as
 thousands of independent hardware experiments when the dominant noise is at the run level. The
@@ -701,8 +760,9 @@ quality axis has the same hazard on the **reference** side and has had no clause
 independent BF16 launch produces a different reference distribution, and the locked analysis
 conditions on whichever launch happened to run.
 
-The proposed treatment — `scripts/harness/quality/launch_variance.py`, registered as a fourth
-disposition in `DECISIONS.md` D13 and **not adopted** — is:
+The treatment — `scripts/harness/quality/launch_variance.py`, registered as the fourth
+disposition in `DECISIONS.md` D13 and **adopted for P13 on 2026-09-16**, as a supplement that
+leaves the locked headline and the failed G2/G2' bounds exactly as they stand — is:
 
 ```text
 Y_{r,t} = mu + A_r + S_t + E_{rt}      Y = mean over the ten retained positions

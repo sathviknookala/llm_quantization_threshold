@@ -255,8 +255,24 @@ therefore do not track each other, and their ordering flips across the ladder �
 per-launch BF16→FP4 headlines (5.18e-04) **exceeds the floor (2.08e-04) by 2.5x**, while for
 BF16→FP8 it sits below it. So "BF16→FP4 sits 141x above the floor" understates the reference-side
 nuisance on that pair by roughly a factor of 2.5. Averaging launches shrinks this first-order term
-by `sqrt(R)` and cannot touch the floor. See `DECISIONS.md` D13's fourth disposition, which is
-proposed and **not adopted**; every BF16→FP8/FP4 figure supporting it is n=4 and is not a result.
+by `sqrt(R)` and cannot touch the floor. See `DECISIONS.md` D13's fourth disposition, **adopted
+for P13 on 2026-09-16** as a supplement that carries the nuisance rather than removing it.
+
+**What the adopted disposition does and does not buy.** P13 runs R=3 BF16 launches and reports the
+launch component beside the locked headline, so the reference-side nuisance is quantified instead of
+being an unmodelled residual. It buys nothing at all on G2': the floor is second order in the launch
+perturbation and the signal first order, so averaging R launches shrinks the first-order term by
+`sqrt(R)` and leaves the floor untouched. **No value of R moves the G2' ratio toward a pass**, and
+the estimator measurably moves it the wrong way (5.65% → 6.00% at R=3). G2 and G2' stay recorded
+failures; the 1% bound was not relaxed, no floor is subtracted from any reported KL, and no pooled
+or averaged BF16 distribution is constructed anywhere.
+
+**A position this rig cannot resolve is now labelled, not dropped.** P13 classifies each retained
+position as `resolved` or `noise_limited` under a rule registered before the FP8/FP4 cells existed
+(`EVALUATION_RIG.md` A.1). All ten positions are reported either way and the headline is computed
+over all ten. **`noise_limited` is a statement about this rig's resolution, not a claim that the
+effect is absent** — and because the classification depends on a floor measured at 2 df, the
+boundary between the two classes is itself uncertain.
 
 ## Quality analysis must run under the pinned interpreter, or it drifts in the last bits
 

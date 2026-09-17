@@ -944,6 +944,79 @@ sanity trip-wire and likewise stays unchanged. **None of the three is the qualit
 their outputs is a quality result, and the production implementation lives under
 `scripts/harness/quality/`.
 
+### The floor disposition is TAKEN, and P13 is registered — 2026-09-16
+
+**Status:** REGISTERED, before any production FP8 or FP4 cell existed. Machine-readable copy:
+`scripts/harness/quality/p13.py`, `REGISTERED`, hashed into every P13 artifact. The registration
+file must be committed before `collect_all()` will run — a pre-registration that lives only in the
+working tree could be edited after seeing the first cells with nothing recording that it had been.
+
+**The disposition is 1 + 4, with 2 as a pre-registered rule. 3 stays barred.** Read as one
+decision: the floor is accepted as a stated resolution limit (1), the limit is quantified by
+carrying BF16 launch identity as a nuisance variance component (4), and where that limit bites at a
+given position it is *named* rather than routed around (2). None of the three is a way of making
+the failed bound pass, and 4 is admitted only because it provably cannot.
+
+**What does not change, and these are the load-bearing negatives:**
+
+- **G2 and G2' remain recorded failures.** The 1% bound is not relaxed, not restated and not
+  re-adjudicated. The floor is 5.6% of the provisional BF16→FP8 signal and that is a fact about
+  the rig, reported beside the number it bounds.
+- **No floor is subtracted from any reported KL.** The floor is a spread, not a bias, and
+  `KL(B||Q)` and `KL(B||B')` are different functionals of the same perturbation — first order and
+  second order respectively.
+- **No pooled or averaged BF16 probability distribution is constructed anywhere.** Launches are
+  averaged at the **KL-value** level, against real launches. Averaging the logit matrices builds a
+  reference no launch produced and is convex-barred by Jensen; it measures 0.335x the floor, which
+  is exactly why it would rescue G2' and exactly why it stays barred.
+- **The locked headline is still the locked headline.** `EVALUATION_RIG.md` A.1's single-reference
+  mean of 64 per-trajectory means is the point estimate. The launch-averaged value supplements it
+  and is named so it can never be rendered as "the BF16→Q KL".
+- **`FP8||FP4` is untouched** — FP8 is its reference, no BF16 distribution enters it, and it carries
+  no launch component at all.
+
+**The design.** R=3 independent BF16 launches over the same frozen 64x10 grid, collected in the
+registered order `BF16 L1 → FP8 → BF16 L2 → FP4 → BF16 L3`. The interleaving is deliberate and is
+the one improvement on the floor64 design: those three launches ran consecutively inside a single
+call, making their variance component a documented *within-session* lower bound. Interleaving puts
+any within-run drift **on** the launch factor rather than underneath it. It cannot be removed —
+at R=3 launch identity and launch order are the same thing — so it is made conservative instead.
+Launch 1 is the designated reference for the locked headline, fixed here because it is the first
+launch and not because of anything it will show.
+
+For each launch `r`, `KL(B_r || FP8)` and `KL(B_r || FP4)` are computed on the same cells. Reported:
+the mean over launches, the launch variance as an F ratio with a one-sided 95% upper bound (a
+truncated point estimate would read `0.0` about 63% of the time under a null at 2 df), the
+pre-registered trajectory bootstrap unchanged in draws, seed, unit and shared index matrix, and the
+per-position equivalents.
+
+**The falsifiable prediction, registered before the run.** `SD_launch = sigma_proj * sqrt(2*signal)`
+with `sigma_proj = 2.1e-03` pooled across configurations, predicting a launch CV of ≈5% for
+BF16→FP8 and ≈1.8% for BF16→FP4 at production scale. Falsified if the registered value falls
+outside the 95% chi-square interval of the observed per-launch-headline SD for both comparisons.
+**Its power is stated in advance and it is poor**: at R=3 that interval spans a factor of ~12, so
+the test can embarrass the model but cannot confirm it. Registering it is what turns P13 into a
+test of the nuisance model rather than a first look at it.
+
+**The position rule, and why it is a rule rather than a list.** Restricting FP8 claims to the
+positions that clear the floor is disposition 2, and choosing those positions after seeing the data
+is precisely what pre-registration exists to prevent. So the *rule* is fixed here and the positions
+it lands on are data:
+
+> A position is **resolved** iff the lower end of the launch-inflated 95% interval on the signal
+> exceeds the upper end of the 95% launch-level interval on the BF16↔BF16 floor, both at that
+> position. Otherwise it is **noise-limited**.
+
+Every position is reported regardless of class, the headline is computed over all ten regardless of
+class, and no position is ever dropped, filtered or reordered by outcome. A noise-limited position
+is a statement about this rig's resolution, **not** a claim that the effect is absent there.
+Operational detail — which interval, which inflation, which floor — is owned by `EVALUATION_RIG.md`
+A.1 and is not restated here so the two cannot drift.
+
+**Two harness defects were fixed first, because P13 could not run correctly without them.** Both
+are recorded in `EXPERIMENTAL_CONTRACT.md` under quality-run validity: the repeated-launch
+clean-tree defect, and dispatch verification that BF16 satisfied by silence.
+
 ---
 
 ## D14 — Perplexity corpus and token budget
