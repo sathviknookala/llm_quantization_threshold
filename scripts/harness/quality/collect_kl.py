@@ -177,8 +177,9 @@ def collect(config_id, root=None, allow_dirty=False, n_traj=None,
             own_outputs=(), head=None):
     root = run_dir(root)
     short = q.QUALITY_CONFIGS[config_id]["short"]
-    q.require_clean_tree(allow_dirty, stage=f"collect_kl:{config_id}",
-                         own_outputs=own_outputs, head=head)
+    # kept, not discarded: the contract requires the excusal to be auditable from the record
+    git = q.require_clean_tree(allow_dirty, stage=f"collect_kl:{config_id}",
+                               own_outputs=own_outputs, head=head)
     traj = traj if traj is not None else subset(T.load(), n_traj)
     n = traj["n_trajectories"]
     os.makedirs(dist_dir(short, root), exist_ok=True)
@@ -249,7 +250,22 @@ def collect(config_id, root=None, allow_dirty=False, n_traj=None,
     if len(identities) != 1 or None in identities:
         raise SystemExit(f"ABORT: shards span engine identities {sorted(identities)}")
     prov_src = resume_provenance(meta, final, plan)
-    evidence = next((m["dispatch_evidence"] for m in final if m.get("dispatch_evidence")), None)
+    # The LOG is authoritative when it is still on disk, even on a full-reuse resume: a shard's
+    # stored verdict was extracted by whatever version of the verifier ran at the time.
+    log_path = os.path.join(run_dir(root), "logs", f"collect_{short}.log")
+    if os.path.exists(log_path):
+        evidence = DV.require(open(log_path, errors="replace").read(), config_id)
+        evidence["rederived_from_log_at_assembly"] = True
+    else:
+        # consensus, not first-wins: on a mixed resume the plan-order first shard is a REUSED one,
+        # so an older {"ok": true} would mask this launch's "unavailable", and vice versa
+        verdicts = [m.get("dispatch_evidence") for m in final]
+        distinct = {json.dumps(v, sort_keys=True) for v in verdicts if v is not None}
+        if len(distinct) > 1:
+            raise SystemExit(
+                f"ABORT: shards of {config_id} carry {len(distinct)} different dispatch verdicts; "
+                "a configuration must not be assembled from shards that disagree about dispatch")
+        evidence = json.loads(distinct.pop()) if distinct else None
     if evidence is None:
         # pre-2026-09 shards carry none; the log is gitignored, so it is recorded as absent
         # rather than reconstructed from a file that may no longer exist
@@ -259,6 +275,9 @@ def collect(config_id, root=None, allow_dirty=False, n_traj=None,
     elif evidence.get("ok") is False:
         raise SystemExit(f"ABORT: stored dispatch evidence for {config_id} failed: {evidence}")
 
+    # `git` below is this call's state; on a resume the cells predate it, so the shards' own
+    # heads travel separately. Without this a resumed summary names only the resume commit.
+    cell_heads = sorted({(m.get("git") or {}).get("git_head") for m in final} - {None})
     cells = [c for m in final for c in m["index"]]
     P.assert_complete_grid(cells, n)
     bad = [c for m in final for c in m["per_context"]
@@ -299,7 +318,10 @@ def collect(config_id, root=None, allow_dirty=False, n_traj=None,
         "observed": prov_src["observed"],
         "dispatch_evidence": evidence,
         "provenance_source": prov_src["provenance_source"],
-        "git": q.git_state(),
+        "git": git,
+        "cells_collected_at_git_head": cell_heads,
+        "git_is_this_assembly_not_the_collection": bool(
+            cell_heads and cell_heads != [git["git_head"]]),
         "gpu": common.gpu_identity(),
         "software": common.software_identity(),
         "timestamp": common.now_iso(),
@@ -365,9 +387,13 @@ def main():
     ap.add_argument("--allow-dirty", action="store_true")
     a = ap.parse_args()
     configs = [c for c in (a.config.split(",") if a.config else list(q.LADDER)) if c]
+    root = a.root or None
+    scope = [os.path.relpath(run_dir(root), common.REPO)]
+    head = q.require_clean_tree(a.allow_dirty, stage="collect_kl:start")["git_head"]
     for c in configs:
-        rec = collect(c, root=a.root or None, allow_dirty=a.allow_dirty,
-                      n_traj=a.n_traj or None, shard_trajectories=a.shard_trajectories)
+        rec = collect(c, root=root, allow_dirty=a.allow_dirty,
+                      n_traj=a.n_traj or None, shard_trajectories=a.shard_trajectories,
+                      own_outputs=scope, head=head)
         print(json.dumps({k: v for k, v in rec.items()
                           if k in ("config_id", "cells", "launched", "seconds",
                                    "engine_identity_hash", "shard_reuse")}, indent=2))

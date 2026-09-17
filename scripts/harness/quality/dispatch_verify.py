@@ -32,8 +32,11 @@ from harness.quality import qcommon as q, qengine as E  # noqa: E402
 
 # Verified present in every tracked engine log of the relevant configuration, on both the serving
 # path (results/sweep/server_logs/) and the quality path (results/quality/*/logs/).
-QUANT_KERNELS = (r"CutlassFP8ScaledMMLinearKernel", r"NvFp4LinearBackend", r"FLASHINFER_CUTLASS",
-                 r"Marlin", r"CT_EMULATIONS")
+# FLASHINFER_CUTLASS is anchored to its NvFp4LinearBackend prefix: every engine, BF16 included,
+# logs the attention-backend enumeration ['FLASH_ATTN', 'FLASHINFER', ...], and a future backend
+# enum named FLASHINFER_CUTLASS in that list would otherwise fail every BF16 collection.
+QUANT_KERNELS = (r"CutlassFP8ScaledMMLinearKernel", r"NvFp4LinearBackend",
+                 r"NvFp4LinearBackend\.FLASHINFER_CUTLASS", r"Marlin", r"CT_EMULATIONS")
 
 EVIDENCE = {
     "BF16_REFERENCE": {
@@ -78,19 +81,36 @@ EVIDENCE = {
 FORBIDDEN_FLAGS = re.IGNORECASE
 
 
-def _lines_matching(log_text, pattern, flags=0, limit=4):
+EVIDENCE_WINDOW = 160
+
+
+def _lines_matching(log_text, pattern, flags=0, limit=4, window=EVIDENCE_WINDOW):
+    """Matched lines, quoted as a window CENTRED on the match.
+
+    vLLM's config dump is one ~3.5 kB line and `quantization=None` sits about 1.1 kB into it, so
+    truncating from the start stored a "proof" that did not contain the thing it proved. The logs
+    are gitignored, which makes the stored quote the only durable record.
+    """
     rx = re.compile(pattern, flags)
     out = []
     for line in log_text.splitlines():
-        if rx.search(line):
-            out.append(E._strip_log_prefix(line.strip())[:400])
-            if len(out) >= limit:
-                break
+        m = rx.search(line)
+        if not m:
+            continue
+        stripped = E._strip_log_prefix(line.strip())
+        m2 = rx.search(stripped) or m
+        lo, hi = max(0, m2.start() - window), min(len(stripped), m2.end() + window)
+        out.append(("..." if lo else "") + stripped[lo:hi] + ("..." if hi < len(stripped) else ""))
+        if len(out) >= limit:
+            break
     return out
 
 
 def verify(log_text, config_id):
     """Positive evidence verdict for one engine log. Pure; reads nothing from disk."""
+    if config_id not in EVIDENCE:
+        raise SystemExit(f"ABORT: no positive-evidence specification for {config_id!r}; "
+                         f"known: {sorted(EVIDENCE)}")
     spec = EVIDENCE[config_id]
     required, missing = {}, []
     for name, pattern in spec["required"].items():
@@ -111,6 +131,9 @@ def verify(log_text, config_id):
         "required_evidence": required,
         "required_missing": missing,
         "forbidden_present": forbidden,
+        "evidence_window_chars": EVIDENCE_WINDOW,
+        "evidence_contains_its_match": all(
+            bool(re.search(v["pattern"], (v["evidence"] or [""])[0])) for v in required.values()),
         "ok": not missing and not forbidden,
         "note": spec.get("what_positive_evidence_means_here"),
     }

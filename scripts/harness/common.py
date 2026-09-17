@@ -231,7 +231,9 @@ def write_json(path, obj):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     tmp = path + ".tmp"
     with open(tmp, "w") as fh:
-        json.dump(obj, fh, indent=2, default=str)
+        # allow_nan=False: NaN/Infinity are not JSON, and a non-finite statistic reaching an
+        # artifact is a defect that must fail loudly rather than serialise
+        json.dump(obj, fh, indent=2, default=str, allow_nan=False)
     os.replace(tmp, path)
     return path
 

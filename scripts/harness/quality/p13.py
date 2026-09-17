@@ -188,7 +188,10 @@ def collect_all(allow_dirty=False, n_traj=None, require_cool=True):
                     "launched": rec["launched"]})
         print(f"{label:15s} engine={rec['engine_identity_hash']} kv={obs.get('kv_cache_tokens')} "
               f"cells={rec['cells']} scoring={rec['seconds']}s", flush=True)
-    return {"registration": reg, "steps": out}
+    report = {"artifact": "P13 collection record", "registration": reg, "steps": out,
+              "collection_git_head": head, "timestamp": common.now_iso()}
+    common.write_json(COLLECTION_RECORD, report)
+    return report
 
 
 def _scaled_lower(boot, theta, var_launch):
@@ -201,8 +204,20 @@ def _scaled_lower(boot, theta, var_launch):
 
 
 def classify(theta, boot, sigma_proj, floor_point, floor_hi):
-    """The registered resolution rule, at one position or at the headline."""
-    var_launch = (sigma_proj ** 2) * 2.0 * theta if (sigma_proj and theta > 0) else 0.0
+    """The registered resolution rule, at one position or at the headline.
+
+    `sigma_proj is None` means the coupling constant could not be estimated, which is NOT the same
+    as a measured absence of launch variance; it takes the same arithmetic branch as 0.0, so it is
+    given its own class rather than being allowed to read as `resolved` under an un-inflated rule.
+    """
+    if sigma_proj is None:
+        return {"expected_kl_over_launches_nats": theta, "class": "not_evaluable",
+                "not_evaluable_because": "no pooled sigma_proj could be estimated, so the "
+                                         "registered launch inflation cannot be applied",
+                "trajectory_ci": [boot["ci_low"], boot["ci_high"]],
+                "replication_floor_nats": floor_point,
+                "replication_floor_ci_high_nats": floor_hi}
+    var_launch = (sigma_proj ** 2) * 2.0 * theta if theta > 0 else 0.0
     lo, infl = _scaled_lower(boot, theta, var_launch)
     resolved = bool(lo is not None and floor_hi is not None and lo > floor_hi)
     return {
@@ -216,6 +231,13 @@ def classify(theta, boot, sigma_proj, floor_point, floor_hi):
         "class": "resolved" if resolved else "noise_limited",
         "margin_nats": (lo - floor_hi) if (lo is not None and floor_hi is not None) else None,
         "ratio_signal_low_to_floor_high": (lo / floor_hi) if (lo and floor_hi) else None,
+        # which uncertainty actually binds. The class is named for the floor comparison, but the
+        # inflation factor says how much of the interval width the LAUNCH term contributed: at
+        # 1.00 the classification is decided entirely by trajectory sampling.
+        "class_depends_on_launch_term": bool(
+            lo is not None and floor_hi is not None
+            and (lo > floor_hi) != (boot["ci_low"] > floor_hi)),
+        "binding_uncertainty": ("launch" if (infl or 1.0) > 1.05 else "trajectory_sampling"),
     }
 
 
@@ -244,9 +266,15 @@ def resolution(rec, sigma_proj, registered_sigma_proj):
                 "per_launch_nats": pos["per_launch_nats"],
             }
         klass = {p: v["class"] for p, v in positions.items()}
+        n_launch_dependent = sum(1 for v in positions.values()
+                                 if v.get("class_depends_on_launch_term"))
         out[label] = {
             "rule": REGISTERED["resolution_rule"]["rule"],
             "sigma_proj_used": sigma_proj,
+            "classifications_that_depend_on_the_launch_term": n_launch_dependent,
+            "inflation_factor_range": [
+                min(v["inflation_factor"] for v in positions.values() if v.get("inflation_factor")),
+                max(v["inflation_factor"] for v in positions.values() if v.get("inflation_factor"))],
             "headline": head,
             "headline_under_registered_sigma_proj": head_sens,
             "by_position": positions,
@@ -255,12 +283,34 @@ def resolution(rec, sigma_proj, registered_sigma_proj):
             "n_resolved": sum(1 for k in klass.values() if k == "resolved"),
             "n_positions": len(klass),
             "all_positions_reported": len(klass) == N_POS,
-            "reading": "a noise-limited position is one where this rig cannot separate the "
-                       "quantization effect from BF16 relaunch noise. It is a statement about "
-                       "resolution, not about the effect being absent, and the position still "
-                       "contributes to the headline.",
+            "what_resolved_licenses": (
+                "the estimated divergence at this position, after trajectory-sampling "
+                "uncertainty and the registered launch inflation, exceeds the upper launch-level "
+                "bound on the typical BF16<->BF16 divergence. It does NOT license 'separable from "
+                "relaunch noise': the floor is SECOND order in the launch perturbation while the "
+                "signal is FIRST order, so the floor is not the noise the signal is exposed to. "
+                "Separability from relaunch noise would be theta against its own SD_launch, "
+                "against which every position clears by one to three orders of magnitude."),
+            "what_noise_limited_means": (
+                "this rig cannot put the position's divergence above the floor's upper launch "
+                "bound. It is a statement about resolution, not about the effect being absent, "
+                "and the position still contributes to the headline. Read `binding_uncertainty` "
+                "before attributing it to launch noise -- where the inflation factor is ~1.00 the "
+                "limit is trajectory sampling, not relaunching."),
+            "multiplicity": "no multiplicity correction is applied and none is implied. The ten "
+                            "positions are repeated measures on the same 64 trajectories sharing "
+                            "one bootstrap index matrix, so they are strongly dependent and must "
+                            "not be read as ten independent tests.",
+            "floor_side_uncertainty_is_launch_only": (
+                "floor_hi covers launch sampling (delete-one-launch jackknife, 2 df) and not the "
+                "floor's own trajectory sampling. Carrying both would widen floor_hi; see "
+                "floor_side_sensitivity."),
         }
     return out
+
+
+def rec_theta(rec, label):
+    return rec["comparisons"][label]["expected_kl_over_launches_nats"]
 
 
 def prediction_test(rec, pooled):
@@ -283,20 +333,56 @@ def prediction_test(rec, pooled):
             "registered_sigma_proj": reg_sigma,
             "predicted_sd_launch_nats": float(sd_pred),
             "observed_cv_launch": (sd_obs / theta) if (sd_obs and theta) else None,
-            "predicted_cv_launch_registered": pred["predicted_launch_cv"].get(label),
+            # the registered CV was computed at the n=4 signal; at the OBSERVED signal the same
+            # law predicts a different CV, and that is the number to compare against
+            "predicted_cv_launch_at_observed_signal": (float(sd_pred / theta) if theta else None),
+            "predicted_cv_launch_as_registered": pred["predicted_launch_cv"].get(label),
+            "predicted_cv_registered_was_computed_at": "the n=4 signal, not this run's",
+            "sigma_A_share_of_sd_headlines": (
+                None if not vc or vc.get("var_level_moment") is None or not sd_obs else
+                float(max(0.0, vc["var_level_moment"]) / (sd_obs ** 2))),
             "predicted_sd_inside_observed_ci": inside,
             "ratio_observed_over_predicted": (sd_obs / sd_pred) if (sd_obs and sd_pred) else None,
         }
     inside_all = [v["predicted_sd_inside_observed_ci"] for v in per.values()]
+
+    # POST-HOC, and labelled as such: the registered conjunction is close to unfalsifiable -- two
+    # arms computed from the SAME three launches, each against an interval spanning ~12x. The
+    # law's sharpest consequence is the SD RATIO between configurations, which carries almost no
+    # launch-sampling error because both SDs are functions of the same three perturbations.
+    sharp = None
+    labels = [l for l in per if per[l]["observed_sd_launch_headlines_nats"]]
+    if len(labels) == 2:
+        a, b = sorted(labels, key=lambda l: rec_theta(rec, l))
+        ta, tb = rec_theta(rec, a), rec_theta(rec, b)
+        obs = (per[b]["observed_sd_launch_headlines_nats"]
+               / per[a]["observed_sd_launch_headlines_nats"])
+        sharp = {
+            "status": "POST HOC -- not registered before the run; reported as a diagnostic, "
+                      "never as the adjudication",
+            "statistic": f"SD_launch({b}) / SD_launch({a})",
+            "predicted_by_the_law": float(np.sqrt(tb / ta)),
+            "observed": float(obs),
+            "why_it_is_sharp": "both SDs are functions of the same three launch perturbations, so "
+                               "the ratio carries far less sampling error than either SD alone",
+            "reading": "the law says the ratio is sqrt(signal ratio); a ratio near 1 says the "
+                       "launch spread does not scale with the signal at all",
+        }
     return {
         "registered": pred,
         "per_comparison": per,
+        "sharp_post_hoc_diagnostic": sharp,
         "pooled_observed": pooled,
         "pooled_ratio_observed_over_registered": (pooled["sigma_proj_pooled"] / reg_sigma
                                                   if pooled else None),
         "verdict": ("CONSISTENT" if all(x is True for x in inside_all) else
                     "FALSIFIED" if all(x is False for x in inside_all) else
                     "MIXED" if any(x is not None for x in inside_all) else "NOT_EVALUABLE"),
+        "verdict_is_weak_by_construction": (
+            "the registered criterion is a CONJUNCTION over two arms computed from the SAME three "
+            "BF16 launches, each tested against a chi-square interval spanning ~12x at 2 df. It is "
+            "close to unfalsifiable as written. Read the verdict's own gloss and the pooled ratio "
+            "rather than the label."),
         "verdict_meaning": {
             "CONSISTENT": "the registered sigma_proj sits inside the observed interval for every "
                           "comparison. At 2 df that interval spans a factor of ~12, so this is a "
@@ -305,6 +391,181 @@ def prediction_test(rec, pooled):
                          "comparison; the nuisance model as registered is wrong",
             "MIXED": "the comparisons disagree; the pooled coupling constant is not supported",
         },
+    }
+
+
+SMOKE_FP8_HEADLINE = 3.690e-03
+
+
+def g2_restatement(locked, lv, floor_path):
+    """G2' restated at production scale, with BOTH floors named.
+
+    There are two defensible denominators and they are not the same number: the PRE-REGISTERED
+    floor that G2' was actually adjudicated against, and this run's own BF16<->BF16 mean. Quoting
+    one without the other makes the move from the smoke's 5.6% look like a pure signal effect when
+    part of it is a change of floor. Both are reported, the pre-registered one is primary because
+    it is the one the bound was registered against, and the move is decomposed.
+    """
+    registered = json.load(open(floor_path))["headline"]["mean_nats"]
+    this_run = lv["bf16_to_bf16"]["mean_nats"]
+    bound = q.GATES["replication_floor_max_frac_of_fp8"]
+    # BF16-anchored pairs only: FP8||FP4 has no BF16 reference, and FP8/FP4 replicate to ~1e-11
+    # under CUDA graphs, so quoting the BF16 floor against it invents a bound
+    pairs = {label: p["headline_nats"] for label, p in locked["pairs"].items()
+             if p["headline_nats"] > 0 and label.startswith("BF16||")}
+    fp8 = pairs.get("BF16||FP8")
+    return {
+        "status": "RECORDED FAILURES; unchanged by this run",
+        "bound": bound,
+        "threshold_relaxed": False,
+        "floor_subtracted": False,
+        "averaged_reference_used": False,
+        "primary_floor": {
+            "which": "the PRE-REGISTERED production floor, the denominator G2' was adjudicated "
+                     "against",
+            "source": os.path.relpath(floor_path, common.REPO),
+            "floor_nats": registered,
+            "fraction_of_signal": {k: registered / v for k, v in pairs.items()},
+            "passes_bound": {k: bool(registered / v <= bound) for k, v in pairs.items()},
+        },
+        "this_run_floor": {
+            "which": "this run's own BF16<->BF16 mean over six ordered pairs of its three launches",
+            "floor_nats": this_run,
+            "fraction_of_signal": {k: this_run / v for k, v in pairs.items()},
+            "passes_bound": {k: bool(this_run / v <= bound) for k, v in pairs.items()},
+        },
+        "move_from_the_smoke_figure": {
+            "smoke_fraction": registered / SMOKE_FP8_HEADLINE,
+            "smoke_signal_nats": SMOKE_FP8_HEADLINE,
+            "production_signal_nats": fp8,
+            "signal_effect_only": registered / fp8 if fp8 else None,
+            "signal_and_floor_effect": this_run / fp8 if fp8 else None,
+            "reading": "the fall from the smoke figure is mostly the signal -- the production "
+                       "BF16->FP8 KL is larger than the n=4 estimate -- but NOT entirely: part of "
+                       "it is a smaller floor in this run. Both floors are within each other's "
+                       "launch-level intervals, so the difference is not itself resolvable.",
+        },
+        "conclusion": "G2' fails on every floor/signal combination in this run's artifacts. The "
+                      "bound is unchanged at %g and no result was averaged or re-referenced."
+                      % bound,
+        "floor_not_applicable_to": ["FP8||FP4"],
+        "floor_not_applicable_because": "the BF16 replication floor bounds BF16-anchored "
+                                        "comparisons. FP8||FP4 uses FP8 as its reference, whose "
+                                        "own replication floor is ~1e-11 nats.",
+    }
+
+
+def floor_side_sensitivity(lv, res):
+    """What carrying the floor's OWN trajectory uncertainty would do to the classifications.
+
+    `floor_hi` is a launch-level jackknife and covers launch sampling only, while the signal side
+    covers trajectory sampling. The floor is itself a mean over 64 trajectories. Widening it is the
+    anti-conservative direction of the rule, so the effect is measured rather than argued.
+    """
+    phi = lv["bf16_to_bf16"]
+    se_traj = phi["trajectory_bootstrap"]["std_error"]
+    tc = L.t_crit_975(phi["launch_level_uncertainty"]["df"])
+    out, flips = {}, 0
+    for label, r in res.items():
+        rows = {}
+        for p, v in r["by_position"].items():
+            f = phi["by_position"][p]
+            jk = f["launch_level_uncertainty"]
+            wider = f["mean_over_ordered_pairs_nats"] + tc * float(
+                (jk["se_launch_level_nats"] ** 2 + se_traj ** 2) ** 0.5)
+            lo = v.get("launch_inflated_ci_low_nats")
+            klass = "resolved" if (lo is not None and lo > wider) else "noise_limited"
+            flips += int(klass != v["class"])
+            rows[p] = {"floor_hi_as_used": v["replication_floor_ci_high_nats"],
+                       "floor_hi_with_trajectory_uncertainty": wider,
+                       "class_as_used": v["class"], "class_if_widened": klass}
+        out[label] = rows
+    return {
+        "question": "does carrying the floor's own trajectory-sampling uncertainty change any "
+                    "classification?",
+        "method": "floor_hi recomputed as mean + t(df) * sqrt(se_jackknife^2 + se_trajectory^2); "
+                  "the floor's trajectory SE is a single pooled figure, so this is indicative",
+        "floor_trajectory_se_nats": se_traj,
+        "classifications_changed": flips,
+        "not_adopted": "the registered rule is what adjudicates; this is a sensitivity check and "
+                       "is reported beside it, never in place of it",
+        "by_comparison": out,
+    }
+
+
+COLLECTION_RECORD = os.path.join(ROOT, "collection_record.json")
+
+
+def _collection_record():
+    """The collect-time record, read back so the analysis names the commit the CELLS were taken at.
+
+    Analysis runs at a later commit than collection, and every summary records only its own HEAD.
+    Without this the artifact cannot say which commit produced the data it summarises, nor that the
+    registration was committed before the first cell.
+    """
+    if not os.path.exists(COLLECTION_RECORD):
+        return {"available": False,
+                "why": f"{os.path.relpath(COLLECTION_RECORD, common.REPO)} is absent; this "
+                       "analysis cannot name the commit the cells were collected at"}
+    rec = json.load(open(COLLECTION_RECORD))
+    return {"available": True, **rec}
+
+
+def marginal_step_durability(n, locked):
+    """The marginal step's own cells and matrix digests.
+
+    `dist/*.npy` is gitignored and a launch provably does not regenerate itself, so a number whose
+    inputs carry no digest is not reproducible from the tree. The BF16 arm was already covered by
+    launch_variance's exchangeability block; FP8, FP4 and the FP8||FP4 grid were not -- which left
+    the study's own marginal quantity as the least durable number in the run.
+    """
+    mats, digests = {}, {}
+    for cfg in ("FP8_PRIMARY", "FP4_PRIMARY"):
+        mat, _, _ = C.load_matrix(cfg, root=ROOT, n_traj=n)
+        mats[cfg] = mat
+        digests[q.QUALITY_CONFIGS[cfg]["short"]] = L.matrix_digest(mat)
+    grid = A.pair_grid(mats["FP8_PRIMARY"], mats["FP4_PRIMARY"], n)
+    del mats
+    idx = K.bootstrap_indices(n, q.BOOTSTRAP["draws"], q.BOOTSTRAP["seed"])
+    return {
+        "matrix_sha256": digests,
+        "matrix_sha256_note": "SHA-256 of the exact float32 bytes consumed; the BF16 launches' "
+                              "digests are in launch_variance_p13.json",
+        "kl_cells_nats": {
+            "pair": "FP8||FP4",
+            "axes": ["trajectory", "position"],
+            "position_order": list(P.RETAINED_POSITIONS),
+            "values": [[float(v) for v in row] for row in grid],
+        },
+        "_grid": grid,
+        "_idx": idx,
+    }
+
+
+def paired_marginal(marginal, locked, n):
+    """Is the direct FP8||FP4 step larger than the BF16-anchored FP4 divergence?
+
+    The two marginal CIs overlap, so the comparison needs a PAIRED interval: both are measured on
+    the same 64 trajectories with the same bootstrap index matrix, and the paired difference is
+    far better determined than either margin. This is a comparison of two separately measured
+    divergences, not the barred subtraction proxy -- nothing here is used as a divergence.
+    """
+    import numpy as _np
+    fp84 = K.trajectory_means(marginal["_grid"])
+    b4 = _np.asarray(locked["pairs"]["BF16||FP4"]["trajectory_means_nats"], dtype=float)
+    diff = fp84 - b4
+    draws = diff[marginal["_idx"]].mean(axis=1)
+    lo, hi = K.percentile_ci(draws, tuple(q.BOOTSTRAP["ci"]))
+    return {
+        "quantity": "FP8||FP4 minus BF16||FP4, paired on the same 64 trajectories",
+        "point_nats": float(diff.mean()),
+        "ci_95": [lo, hi],
+        "p_le_zero": float((draws <= 0).mean()),
+        "why_paired": "the two marginal intervals overlap; the paired one is the interval the "
+                      "shared trajectories support",
+        "not_a_divergence": "a difference of two KLs is not a KL. This is a comparison of "
+                            "magnitudes and is never reported as the marginal step, which is the "
+                            "directly measured FP8||FP4.",
     }
 
 
@@ -321,6 +582,7 @@ def analyze_all(n_traj=None, allow_dirty=False, out=None, floor_path=L.PRODUCTIO
                       out=os.path.join(ROOT, "launch_variance_p13.json"),
                       allow_dirty=allow_dirty, floor_path=floor_path,
                       committed_launch="L1", own_outputs=scope)
+    marginal = marginal_step_durability(n, locked)
     pooled = L.pooled_sigma_proj(lv["comparisons"])
     sigma = pooled["sigma_proj_pooled"] if pooled else None
     pred = prediction_test(lv, pooled)
@@ -329,6 +591,7 @@ def analyze_all(n_traj=None, allow_dirty=False, out=None, floor_path=L.PRODUCTIO
     rec = {
         "artifact": "P13 production KL result",
         "registration": {"hash": registration_hash(), **REGISTERED},
+        "collection_record": _collection_record(),
         "n_trajectories": n,
         "n_positions": N_POS,
         "n_bf16_launches": len(BF16_LAUNCH_ROOTS),
@@ -376,6 +639,10 @@ def analyze_all(n_traj=None, allow_dirty=False, out=None, floor_path=L.PRODUCTIO
                      if "FP8||FP4" in locked["pairs"] else None,
             "launch_component": None,
             "why_no_launch_component": "FP8 is the reference; no BF16 distribution enters it",
+            "larger_than_bf16_to_fp4": paired_marginal(marginal, locked, n),
+            "matrix_sha256": marginal["matrix_sha256"],
+            "matrix_sha256_note": marginal["matrix_sha256_note"],
+            "kl_cells_nats": marginal["kl_cells_nats"],
         },
         "replication_floor_this_run": {
             "mean_nats": lv["bf16_to_bf16"]["mean_nats"],
@@ -385,28 +652,34 @@ def analyze_all(n_traj=None, allow_dirty=False, out=None, floor_path=L.PRODUCTIO
         },
         "nuisance_model_prediction_test": pred,
         "resolution": res,
-        "G2_G2prime": {
-            "status": "RECORDED FAILURES; unchanged by this run",
-            "bound": q.GATES["replication_floor_max_frac_of_fp8"],
-            "threshold_relaxed": False,
-            "floor_subtracted": False,
-            "averaged_reference_used": False,
-            # BF16-anchored pairs only: FP8||FP4 has no BF16 reference, and FP8/FP4 replicate to
-            # ~1e-11 under CUDA graphs, so quoting the BF16 floor against it invents a bound
-            "floor_fraction_of_signal": {
-                label: (lv["bf16_to_bf16"]["mean_nats"] / p["headline_nats"])
-                for label, p in locked["pairs"].items()
-                if p["headline_nats"] > 0 and label.startswith("BF16||")},
-            "floor_not_applicable_to": ["FP8||FP4"],
-            "floor_not_applicable_because": "the BF16 replication floor bounds BF16-anchored "
-                                            "comparisons. FP8||FP4 uses FP8 as its reference, "
-                                            "whose own replication floor is ~1e-11 nats.",
+        "resolution_rule_conservatism": {
+            "registered_var_launch": "(sigma_proj * sqrt(2*theta))^2, i.e. the variance of the "
+                                     "SPREAD OF PER-LAUNCH HEADLINES, sigma2_A + sigma2_E/T",
+            "what_a_ci_on_the_mean_would_use": "sigma2_A / R -- the launch term of Var(mean over "
+                                               "R launches). sigma2_E/(R*T) is already inside the "
+                                               "trajectory bootstrap, so the registered form "
+                                               "double-counts it and omits the 1/R.",
+            "direction": "CONSERVATIVE -- the registered form is larger, so it widens the interval "
+                         "and makes `resolved` harder to reach",
+            "not_corrected_because": "the formula is what was registered before the FP8/FP4 cells "
+                                     "existed, and the correction runs in the resolution-friendly "
+                                     "direction. Changing it after seeing the data is exactly what "
+                                     "pre-registration exists to prevent. It is disclosed instead.",
+            "magnitude": "immaterial here: inflation factors span "
+                         + str([round(x, 4) for x in
+                                res[list(res)[0]]["inflation_factor_range"]])
+                         + " and no classification depends on the launch term",
         },
+        "floor_side_sensitivity": floor_side_sensitivity(lv, res),
+        "G2_G2prime": g2_restatement(locked, lv, floor_path),
         "git": q.git_state(),
         "gpu": common.gpu_identity(),
         "software": common.software_identity(),
         "timestamp": common.now_iso(),
     }
+    # scratch arrays used to build the durability block; never serialised
+    for k in ("_grid", "_idx"):
+        marginal.pop(k, None)
     out = out or SUMMARY
     common.write_json(out, rec)
     return rec, out
@@ -440,18 +713,24 @@ def main():
               f"95% CI [{p['ci_95'][0]:.6e}, {p['ci_95'][1]:.6e}]")
     print("\nEXPECTED OVER BF16 LAUNCHES (supplement; floor never subtracted)")
     for label, c in rec["expected_over_launches"].items():
+        up = c.get("se_launch_upper_95_nats")
+        share = c.get("launch_share_of_variance")
         print(f"  {label:12s} {c['expected_kl_over_launches_nats']:.6e} nats   "
-              f"SE_launch {c['se_launch_upper_95_nats']:.2e} (95% upper)  "
+              f"SE_launch {('%.2e' % up) if up else 'n/a':>8} (95% upper)  "
               f"SE_traj {c['se_trajectory_nats']:.2e}  "
-              f"launch share {c['launch_share_of_variance']:.1%}"
-              if c["se_launch_upper_95_nats"] else f"  {label}: launch SE not estimable")
+              f"launch share {('%.1f%%' % (100 * share)) if share is not None else 'n/a'}")
     f = rec["replication_floor_this_run"]
     print(f"\nBF16<->BF16 floor, this run: {f['mean_nats']:.4e} nats  "
           f"95% [{f['launch_level_ci_95'][0]:.4e}, {f['launch_level_ci_95'][1]:.4e}]")
     pt = rec["nuisance_model_prediction_test"]
+    po = (pt.get("pooled_observed") or {}).get("sigma_proj_pooled")
     print(f"nuisance model vs registration: {pt['verdict']}  "
-          f"(pooled sigma_proj {pt['pooled_observed']['sigma_proj_pooled']:.3e} against "
+          f"(pooled sigma_proj {('%.3e' % po) if po else 'not estimable'} against "
           f"{pt['registered']['sigma_proj_pooled_nats']:.3e} registered)")
+    sharp = pt.get("sharp_post_hoc_diagnostic")
+    if sharp:
+        print(f"  post-hoc SD ratio {sharp['statistic']}: predicted "
+              f"{sharp['predicted_by_the_law']:.3f}, observed {sharp['observed']:.3f}")
     print("\nRESOLUTION (all positions reported; class is a label, not a filter)")
     for label, r in rec["resolution"].items():
         print(f"  {label:12s} headline {r['headline']['class']:14s} "
@@ -459,7 +738,12 @@ def main():
         if r["noise_limited_positions"]:
             print(f"               noise-limited at p = "
                   f"{', '.join(r['noise_limited_positions'])}")
+    g2 = rec["G2_G2prime"]
     print("\nG2/G2' remain recorded failures; no threshold moved, no floor subtracted.")
+    for which in ("primary_floor", "this_run_floor"):
+        b = g2[which]
+        print(f"  {b['which'][:52]:54s} " + "  ".join(
+            f"{k}={v:.2%}" for k, v in b["fraction_of_signal"].items()))
     print("WROTE", out)
     return 0
 

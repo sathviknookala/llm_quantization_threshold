@@ -518,18 +518,32 @@ def test_analysis_floor_plumbing(tmp):
     _write_json(floor_path, {**json.load(open(PRODUCTION_FLOOR)),
                              "trajectory_set_hash": traj["trajectory_set_hash"]})
 
-    def fake_load_matrix(config_id, root=None, n_traj=None):
+    def fake_load_matrix(config_id, root=None, n_traj=None, evidence_ok=True):
         return (mats[config_id], [dict(c) for c in index],
                 {"provenance": {"subset_n": traj["n_trajectories"],
                                 "trajectory_set_hash": traj["trajectory_set_hash"],
                                 "kl_spec_hash": q.spec_hash(),
                                 "checkpoint_content_hash": "synthetic-checkpoint"},
+                 "dispatch_evidence": {"ok": evidence_ok},
                  "engine_identity_hash": "synthetic-engine"})
 
     real_load_matrix, real_load, real_soft = C.load_matrix, T.load, A.common.software_identity
     C.load_matrix, T.load = fake_load_matrix, lambda: traj
     A.common.software_identity = lambda: {"synthetic": True}
     try:
+        C.load_matrix = lambda *a, **k: fake_load_matrix(*a, **k, evidence_ok=None)
+        _raises_msg("analysis refuses an UNAVAILABLE dispatch verdict",
+                    lambda: A.analyze(root=os.path.join(tmp, "root"),
+                                      out=os.path.join(tmp, "kl_unavailable.json"),
+                                      floor_path=floor_path, allow_dirty=True),
+                    "positive dispatch evidence")
+        C.load_matrix = lambda *a, **k: fake_load_matrix(*a, **k, evidence_ok=False)
+        _raises_msg("analysis refuses a FAILED dispatch verdict",
+                    lambda: A.analyze(root=os.path.join(tmp, "root"),
+                                      out=os.path.join(tmp, "kl_failed.json"),
+                                      floor_path=floor_path, allow_dirty=True),
+                    "positive dispatch evidence")
+        C.load_matrix = fake_load_matrix
         rec = A.analyze(root=os.path.join(tmp, "root"),
                         out=os.path.join(tmp, "kl_summary.json"),
                         floor_path=floor_path, allow_dirty=True)
@@ -1115,7 +1129,18 @@ def test_launch_variance_guards(tmp):
           ["contexts_hash", "subset_n", "substitute"])
     check("the record says engine_identity_hash is not a launch nonce",
           "cannot distinguish" in ok["engine_identity_hash_is_not_a_launch_nonce"], True)
-    check("the record carries the session confound", "SESSION" in ok["session_confound"], True)
+    sc = ok["session_confound"]
+    check("the session confound is decided from the timestamps", sc["decided_from_timestamps"], True)
+    # the stub stamps are one minute apart, so this run is one sitting and the caveat must say so
+    check("one-sitting launches are reported as a within-session LOWER bound",
+          sc["one_sitting"] and "lower bound" in sc["note"], True)
+    from harness.quality import launch_variance as _L
+    spread = _L._session_confound({"A": "2026-08-26T00:00:00-0400",
+                                   "B": "2026-08-27T00:00:00-0400"})
+    check("launches spanning sittings are reported as confounded with session",
+          (not spread["one_sitting"]) and "between-session" in spread["note"], True)
+    check("unparseable stamps fall back to the conservative reading",
+          _L._session_confound({"A": "not-a-time"})["decided_from_timestamps"], False)
 
     print("launch variance: byte-identical launches are the same run twice")
     same = np.zeros((4, 3))

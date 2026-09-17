@@ -124,6 +124,14 @@ def analyze(root=None, out=None, n_traj=None, floor_path=None, allow_dirty=False
         if summary["provenance"]["kl_spec_hash"] != q.spec_hash():
             raise SystemExit(f"ABORT: {cfg} was collected under KL_SPEC "
                              f"{summary['provenance']['kl_spec_hash']}, now {q.spec_hash()}")
+        # collect-time enforcement is not enough: a collection assembled entirely from reused
+        # pre-2026-09 shards carries ok=None and would otherwise build a headline in silence
+        ev = summary.get("dispatch_evidence") or {}
+        if ev.get("ok") is not True:
+            raise SystemExit(
+                f"ABORT: {cfg} carries no passing positive dispatch evidence "
+                f"(ok={ev.get('ok')!r}); re-collect it, or verify its engine log with "
+                "dispatch_verify.py and record the verdict. A KL result must name what dispatched.")
         mats[cfg], cells_by_cfg[cfg], summaries[cfg] = mat, cells, summary
         summaries[cfg]["cells_reverified"] = checked
 

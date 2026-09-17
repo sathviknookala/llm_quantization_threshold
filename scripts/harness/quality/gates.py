@@ -519,7 +519,12 @@ def replayability(out_dir=None, n_traj=None, allow_dirty=False):
 
 def _score_contexts(config_id, contexts, out_stem, overrides, allow_dirty, contexts_hash,
                     own_outputs=(), head=None):
-    """One scoring launch into a bare .npy/.json pair, reused only under matching identity."""
+    """One scoring launch into a bare .npy/.json pair, reused only under matching identity.
+
+    Returns (matrix, meta); `meta["_reused"]` says whether this call launched an engine. The
+    reuse path returns the STORED json, which carries `returncode` from the launch that wrote it,
+    so no field of the returned meta can distinguish the two on its own.
+    """
     npy, js = out_stem + ".npy", out_stem + ".json"
     ident = q.config_identity(config_id)
     if os.path.exists(npy) and os.path.exists(js):
@@ -531,6 +536,7 @@ def _score_contexts(config_id, contexts, out_stem, overrides, allow_dirty, conte
                 and prior.get("engine_overrides") == dict(overrides or {})):
             mat = np.load(npy)
             _assert_scored(mat, prior, contexts, npy)
+            prior["_reused"] = True
             return mat, prior
         raise SystemExit(f"ABORT: {npy} was produced under a different spec, context set, "
                          "checkpoint or engine override; move it aside rather than mixing.")
@@ -548,6 +554,7 @@ def _score_contexts(config_id, contexts, out_stem, overrides, allow_dirty, conte
     common.write_json(js, meta)
     mat = np.load(npy)
     _assert_scored(mat, meta, contexts, npy)
+    meta["_reused"] = False
     return mat, meta
 
 

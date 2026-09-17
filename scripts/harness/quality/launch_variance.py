@@ -287,10 +287,7 @@ def check_exchangeability(meta, n_traj, mats=None):
             "gates.py edit separate them; collect_kl.py, qengine.py, positions.py, kl_math.py and "
             "qcommon.py -- the whole collection path -- are byte-identical across the two."
             if len(set(heads.values())) > 1 else "all launches collected at one commit"),
-        "session_confound": (
-            "launch identity is confounded with SESSION: the launches were not all collected in "
-            "one sitting, so the launch variance component absorbs any between-session drift and "
-            "rests on fewer independent sessions than launches."),
+        "session_confound": _session_confound(stamps),
         "shared_identity": {k: v for k, v in checked.items() if k != "tokenizer_identity"},
         "cells_identical_across_launches": n_traj * N_POS,
         "distinct_collection_timestamps": stamps,
@@ -298,6 +295,38 @@ def check_exchangeability(meta, n_traj, mats=None):
         "grid_regime": {m["launch"]: m["summary"]["n_trajectories"] * N_POS for m in meta},
         "prefix_cache": {
             m["launch"]: _cache_ratio(m["summary"].get("engine_metrics") or {}) for m in meta},
+    }
+
+
+SAME_SITTING_SECONDS = 3600
+
+
+def _session_confound(stamps):
+    """Whether launch identity is confounded with SESSION, decided from the timestamps.
+
+    Both readings are real and they point OPPOSITE ways, so the artifact must say which one
+    applies: launches spread over sittings absorb between-session drift (a larger, more
+    representative nuisance), launches inside one sitting do not (a within-session LOWER bound on
+    what a differently-dated deployment launch would show).
+    """
+    import datetime as _dt
+    try:
+        times = sorted(_dt.datetime.fromisoformat(v) for v in stamps.values() if v)
+    except (TypeError, ValueError):
+        return {"decided_from_timestamps": False,
+                "note": "collection timestamps are unparseable; treat the launch component as a "
+                        "within-session lower bound, which is the conservative reading"}
+    span = (times[-1] - times[0]).total_seconds() if len(times) > 1 else 0.0
+    one_sitting = span <= SAME_SITTING_SECONDS
+    return {
+        "decided_from_timestamps": True,
+        "span_seconds": span,
+        "one_sitting": one_sitting,
+        "note": ("all launches were collected inside one sitting, so sigma2_A is a WITHIN-SESSION "
+                 "variance and a lower bound on what a differently-dated deployment launch would "
+                 "show" if one_sitting else
+                 "the launches span sittings, so launch identity is confounded with session and "
+                 "the component absorbs between-session drift as well"),
     }
 
 
@@ -374,9 +403,11 @@ def crossed_anova(Y):
 
 
 # F, upper 5%, for the small (df1, df2) this design produces. scipy is not a dependency.
-_F95 = {(1, 3): 10.13, (1, 9): 5.12, (2, 6): 5.14, (2, 9): 4.26, (2, 63): 3.14, (2, 126): 3.07,
-        (2, 189): 3.04, (3, 9): 3.86, (3, 12): 3.49, (3, 63): 2.75, (3, 189): 2.65,
-        (5, 105): 2.30, (5, 315): 2.24}
+# Rounded UP from the exact quantile, never nearest: an entry below the true critical value calls
+# a borderline effect separable when it is not. The (2,126) entry actually used is 3.0681 exact.
+_F95 = {(1, 3): 10.129, (1, 9): 5.118, (2, 6): 5.144, (2, 9): 4.257, (2, 63): 3.143,
+        (2, 126): 3.069, (2, 189): 3.044, (3, 9): 3.863, (3, 12): 3.491, (3, 63): 2.751,
+        (3, 189): 2.653, (5, 105): 2.301, (5, 315): 2.243}
 
 
 def _f_exceeds_95(f, df1, df2):
@@ -869,11 +900,11 @@ def resolvability(theta_rec, floor_mean, floor_ci, per_traj_q, per_traj_phi, idx
                 "across every BF16 launch pair, so their floor is exactly 0.0 and their ratio is "
                 "infinite. The mean and its bootstrap do not exist; they are reported as null "
                 "rather than computed over a denominator-selected subset."),
-            "median": float(np.median(ratio_t)),
+            "median": (float(np.median(ratio_t)) if np.isfinite(np.median(ratio_t)) else None),
+            "min": (float(ratio_t.min()) if np.isfinite(ratio_t.min()) else None),
             "ratio_of_means": (float(per_traj_q.mean() / phi_mean) if phi_mean > 0 else None),
             "ratio_of_means_note": "a different estimand from the mean of ratios, and defined "
                                    "whenever the pooled floor is non-zero",
-            "min": float(ratio_t.min()),
             "max": (float(ratio_t.max()) if defined else None),
             "bootstrap_ci": (list(K.percentile_ci(ratio_draws, tuple(q.BOOTSTRAP["ci"])))
                              if defined else None),
@@ -918,7 +949,8 @@ def _pooling_evidence(per_launch, odd="S"):
     }
 
 
-def _check_committed(label, s_headline, smoke_root, single_launch_grid=None):
+def _check_committed(label, s_headline, smoke_root, single_launch_grid=None,
+                     reference_launch="the P10 smoke's BF16 collection"):
     """Recover the committed single-launch headline, and where possible re-derive it.
 
     The committed value is always read -- it is the baseline this estimator has to be shown to move
@@ -935,7 +967,7 @@ def _check_committed(label, s_headline, smoke_root, single_launch_grid=None):
     if committed is None:
         raise LaunchDesignError(f"{_rel(path)} records no headline for {label}")
     rec = {"artifact": _rel(path), "committed_headline_nats": committed,
-           "reference_launch": "the P10 smoke's BF16 collection"}
+           "reference_launch": reference_launch}
     if s_headline is None:
         rec["recomputed_bit_identical"] = None
         rec["not_recomputed_because"] = ("the committed reference launch is not in this launch "
@@ -1093,9 +1125,11 @@ def analyze(n_traj=4, sources=BF16_LAUNCH_SOURCES, quantized=("FP8_PRIMARY", "FP
         # the launch the committed single-reference headline was computed against: "S" for the
         # smoke supplement, the designated reference launch for P13. When it IS in the launch set
         # the recomputation is the end-to-end check that this path produced the tracked number.
-        rec["reproduces_committed_smoke_headline"] = _check_committed(
+        rec["reproduces_committed_headline"] = _check_committed(
             label, rec["per_launch_headline_nats"].get(committed_launch), smoke_root,
-            single_launch_grid=pair_grid(mats[launches[0]], qmat, n_traj))
+            single_launch_grid=pair_grid(mats[launches[0]], qmat, n_traj),
+            reference_launch=f"the reference launch {committed_launch!r} of "
+                             f"{_rel(os.path.join(common.REPO, smoke_root))}")
         rec["quantized_source"] = {
             "config_id": cfg,
             "root": smoke_root,
@@ -1127,7 +1161,7 @@ def analyze(n_traj=4, sources=BF16_LAUNCH_SOURCES, quantized=("FP8_PRIMARY", "FP
         theta = c["expected_kl_over_launches_nats"]
         # read from the tracked artifact, not from per_launch_headline_nats: the committed
         # reference launch is not in the launch set at all under the default R=3
-        committed = ((c.get("reproduces_committed_smoke_headline") or {})
+        committed = ((c.get("reproduces_committed_headline") or {})
                      .get("committed_headline_nats"))
         g2[label] = {
             "committed_single_launch_nats": committed,
@@ -1151,7 +1185,7 @@ def analyze(n_traj=4, sources=BF16_LAUNCH_SOURCES, quantized=("FP8_PRIMARY", "FP
 
     rec = {
         "artifact": "BF16 launch-variance supplement to the KL analysis",
-        "supplements": "results/quality/smoke/kl_summary.json",
+        "supplements": os.path.join(smoke_root, "kl_summary.json"),
         "supersedes": None,
         "question": "what is the expected BF16->FP8 / BF16->FP4 KL over BF16 launch identity, how "
                     "much of its uncertainty is launch-to-launch, and does the effect stay "
@@ -1220,14 +1254,20 @@ def analyze(n_traj=4, sources=BF16_LAUNCH_SOURCES, quantized=("FP8_PRIMARY", "FP
         },
         "comparisons": comparisons,
         "scale_limit": {
-            "bf16_to_bf16_scale": "production: 64 trajectories x 10 positions x 3 launches",
+            "bf16_to_bf16_scale": f"{n_traj} trajectories x {N_POS} positions x "
+                                  f"{len(launches)} launches",
             "bf16_to_quantized_scale": f"{n_traj} trajectories x {N_POS} positions x "
                                        f"{len(launches)} BF16 launches",
-            "why": "FP8/FP4 full-vocabulary distributions exist only on the P10 smoke's 4 "
-                   "trajectories. P13 would supply 64 and is not authorised.",
-            "consequence": "every BF16->FP8 / BF16->FP4 number here is n=4 in trajectories and is "
-                           "NOT a result. The estimator, its tests and its behaviour on real "
-                           "artifacts are what this delivers.",
+            "quantized_root": smoke_root,
+            "is_production_scale": bool(n_traj == q.N_TRAJECTORIES),
+            # derived, never a literal: this block previously carried smoke-era text that declared
+            # a 64-trajectory production artifact "NOT a result" from inside that artifact
+            "consequence": (
+                f"production scale: {n_traj} of {q.N_TRAJECTORIES} trajectories"
+                if n_traj == q.N_TRAJECTORIES else
+                f"{n_traj} of {q.N_TRAJECTORIES} trajectories -- a subset. Every BF16->FP8 / "
+                "BF16->FP4 number here is n=%d in trajectories and is NOT a result; the "
+                "estimator and its behaviour on real artifacts are what it delivers." % n_traj),
         },
         "git": q.git_state(),
         "gpu": common.gpu_identity(),

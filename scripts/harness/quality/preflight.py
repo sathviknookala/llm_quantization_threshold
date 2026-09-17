@@ -278,13 +278,13 @@ def engine_probe(traj, allow_dirty=False, reference=None, head=None):
         ev = (DV.verify_log_file(log, cfg) if os.path.exists(log)
               else {"ok": False, "absent": log})
         observed[short]["positive_dispatch_evidence_ok"] = ev.get("ok")
-        observed[short]["probe_launched_this_run"] = "returncode" in meta
+        observed[short]["probe_launched_this_run"] = meta.get("_reused") is False
         out.append(_rec(f"{short}_positive_dispatch_evidence", ev.get("ok"),
                         {"required_missing": ev.get("required_missing"),
                          "forbidden_present": sorted(ev.get("forbidden_present") or {}),
                          "evidence": {k: (v["evidence"] or [None])[0]
                                       for k, v in (ev.get("required_evidence") or {}).items()},
-                         "probe_launched_this_run": "returncode" in meta}))
+                         "probe_launched_this_run": meta.get("_reused") is False}))
         if reference and short in reference:
             same = obs["engine_identity_hash"] == reference[short]["engine_identity_hash"]
             out.append(_rec(f"{short}_engine_identity_matches_smoke", same,

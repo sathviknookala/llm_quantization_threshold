@@ -236,11 +236,20 @@ def config_identity(config_id):
     }
 
 
+# An untracked .py under scripts/ is imported and changes behaviour while `git status -uno`
+# reports a clean tree -- dispatch_verify.py was in exactly that state before it was committed.
+# Untracked files under results/ are the normal output of a run and must not trip the guard.
+SOURCE_DIR = "scripts"
+
+
 def dirty_paths():
-    """Repo-relative paths of tracked files that differ from HEAD."""
+    """Repo-relative paths that differ from HEAD: tracked everywhere, untracked under scripts/."""
     out = subprocess.run(
         ["git", "-C", common.REPO, "status", "--porcelain", "--untracked-files=no"],
         capture_output=True, text=True).stdout
+    out += subprocess.run(
+        ["git", "-C", common.REPO, "status", "--porcelain", "--untracked-files=normal",
+         "--", SOURCE_DIR], capture_output=True, text=True).stdout
     paths = []
     for line in out.splitlines():
         if not line.strip():
@@ -250,7 +259,7 @@ def dirty_paths():
         if " -> " in path:
             path = path.split(" -> ", 1)[1]
         paths.append(path.strip().strip('"'))
-    return sorted(paths)
+    return sorted(set(paths))
 
 
 def git_state():
@@ -276,6 +285,11 @@ def require_clean_tree(allow_dirty, stage, own_outputs=(), head=None):
     st = git_state()
     paths = dirty_paths()
     own = sorted(own_outputs or ())
+    # a scope is a promise about OUTPUTS; one covering source would excuse the harness itself
+    bad = [o for o in own if not o.startswith("results/")]
+    if bad:
+        raise SystemExit(f"ABORT: run scope {bad} is not under results/; a clean-tree scope may "
+                         "only excuse a run's own output roots")
     foreign = [p for p in paths if not _under(p, own)]
     if foreign and not allow_dirty:
         scoped = (f" Paths under {own} are this run's own outputs and are excused; these are not:"
