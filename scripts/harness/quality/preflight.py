@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from harness import common  # noqa: E402
 from harness.quality import kl_math as K, positions as P, qcommon as q  # noqa: E402
 from harness.quality import analyze_kl as A, collect_kl as C, trajectories as T  # noqa: E402
-from harness.quality import qengine as E  # noqa: E402
+from harness.quality import dispatch_verify as DV, qengine as E  # noqa: E402
 
 PREFLIGHT_DIR = os.path.join(q.QUALITY_DIR, "preflight")
 PRODUCTION_ROOT = q.KL_DIR
@@ -272,6 +272,19 @@ def engine_probe(traj, allow_dirty=False, reference=None, head=None):
                            "seconds": meta.get("generate_seconds")}
         out.append(_rec(f"{short}_dispatch_verified", obs["dispatch_verdict"]["ok"],
                         obs["dispatch_verdict"]))
+        # the inherited verdict above is satisfied by SILENCE for BF16 and cannot enforce FP4's
+        # "emulation" pattern; this is the additive check that P13 depends on
+        log = os.path.join(PREFLIGHT_DIR, "logs", f"{short}_probe.log")
+        ev = (DV.verify_log_file(log, cfg) if os.path.exists(log)
+              else {"ok": False, "absent": log})
+        observed[short]["positive_dispatch_evidence_ok"] = ev.get("ok")
+        observed[short]["probe_launched_this_run"] = "returncode" in meta
+        out.append(_rec(f"{short}_positive_dispatch_evidence", ev.get("ok"),
+                        {"required_missing": ev.get("required_missing"),
+                         "forbidden_present": sorted(ev.get("forbidden_present") or {}),
+                         "evidence": {k: (v["evidence"] or [None])[0]
+                                      for k, v in (ev.get("required_evidence") or {}).items()},
+                         "probe_launched_this_run": "returncode" in meta}))
         if reference and short in reference:
             same = obs["engine_identity_hash"] == reference[short]["engine_identity_hash"]
             out.append(_rec(f"{short}_engine_identity_matches_smoke", same,
