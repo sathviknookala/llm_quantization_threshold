@@ -160,22 +160,21 @@ def analyse_p1(recs):
     for C in concurrencies:
         point = {}
         for cid in common.CONFIGS:
-            vals = tp(groups.get((cid, C), []))
+            g = groups.get((cid, C), [])
+            vals = tp(g)
             point[common.CONFIGS[cid]["short"]] = {
                 "n_reps": len(vals),
                 "mean_tok_s": round(common.mean(vals), 2) if vals else None,
                 "values": [round(v, 2) for v in vals],
                 "cv_pct": round(100 * common.sample_std(vals) / common.mean(vals), 2)
                 if len(vals) > 1 else None,
-                "tpot_ms_p95_mean": mean_of(groups.get((cid, C), []), "tpot_ms_p95"),
-                "meets_slo_all_reps": all(r.get("meets_slo") for r in groups.get((cid, C), [])
-                                          if r["status"] == "OK") if groups.get((cid, C)) else None,
-                "preemptions_total": sum((r.get("num_preemptions_delta") or 0)
-                                         for r in groups.get((cid, C), [])),
-                "recomputed_tokens_total": sum((r.get("recomputed_tokens_delta") or 0)
-                                               for r in groups.get((cid, C), [])),
+                "tpot_ms_p95_mean": mean_of(g, "tpot_ms_p95"),
+                "meets_slo_all_reps": all(r.get("meets_slo") for r in g
+                                          if r["status"] == "OK") if g else None,
+                "preemptions_total": sum((r.get("num_preemptions_delta") or 0) for r in g),
+                "recomputed_tokens_total": sum((r.get("recomputed_tokens_delta") or 0) for r in g),
                 "sustained_pressure_reps": sum(
-                    1 for r in groups.get((cid, C), [])
+                    1 for r in g
                     if (r.get("preemption_nonzero_samples") or 0) >= 2
                     or (r.get("recomputed_tokens_delta") or 0) > 0),
             }
@@ -246,8 +245,8 @@ def analyse_p2(recs):
     clean = [C for C, s in states.items() if s == "clean"]
     press_cs = [C for C, s in states.items() if s == "pressured"]
     last_clean = max(clean) if clean else None
-    first_pressured = min([C for C in press_cs if last_clean is None or C > last_clean]) \
-        if press_cs else None
+    first_pressured = min((C for C in press_cs if last_clean is None or C > last_clean),
+                          default=None)
 
     kv_tokens = next((r.get("kv_cache_tokens") for r in rows if r.get("kv_cache_tokens")), None)
     peak_per_seq = 2560
@@ -338,7 +337,7 @@ def analyse_p3(recs):
             out["cv_all_configs"][f"{common.CONFIGS[cid]['short']}@C{C}"] = {
                 "n": len(vals), "mean": round(common.mean(vals), 2),
                 "sd": round(common.sample_std(vals), 3),
-                "cv_pct": round(100 * common.sample_std(vals) / common.mean(vals), 3),
+                "cv_pct": _cv(vals),
                 "tpot_p95_cv_pct": _cv([r["tpot_ms_p95"] for r in rs
                                         if r["status"] == "OK" and r["tpot_ms_p95"]]),
             }

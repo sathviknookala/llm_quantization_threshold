@@ -115,12 +115,21 @@ def serve(engine, port):
         app.router.add_post("/v1/completions", engine.completions)
         app.router.add_get("/metrics", engine.metrics)
         runner = web.AppRunner(app)
-        loop.run_until_complete(runner.setup())
-        loop.run_until_complete(web.TCPSite(runner, "127.0.0.1", port).start())
-        loop.run_forever()
+        try:
+            loop.run_until_complete(runner.setup())
+            loop.run_until_complete(web.TCPSite(runner, "127.0.0.1", port).start())
+        except Exception as e:
+            err.append(e)
+        finally:
+            ready.set()
+        if not err:
+            loop.run_forever()
+    ready, err = threading.Event(), []
     t = threading.Thread(target=run, daemon=True)
     t.start()
-    time.sleep(1.0)
+    ready.wait(10)
+    if err:
+        raise err[0]
 
 
 RESULTS = []
@@ -134,7 +143,7 @@ def check(name, got, want):
 
 
 def run_case(name, n_out, conc, rate, plan=None, stalled_after=None, **cc_kw):
-    port = 9700 + len(RESULTS) + hash(name) % 50
+    port = 9700 + len(RESULTS)
     eng = StubEngine(rate, n_out)
     eng.plan = plan or []
     serve(eng, port)
@@ -272,7 +281,6 @@ def ceiling_group_case():
 
 def main():
     common.TELEMETRY_PERIOD_S = 0.5
-    driver.common.TELEMETRY_PERIOD_S = 0.5
     print("\n== T1 steady state -> OK, whole-period window ==")
     r = run_case("t1_steady", n_out=40, conc=4, rate=400)
     check("t1.status", r["status"], "OK")

@@ -8,7 +8,6 @@ CRITERION and embedded in the output so a stored verdict names the rule that pro
 """
 
 import argparse
-import json
 import os
 import sys
 
