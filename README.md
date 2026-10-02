@@ -6,6 +6,11 @@ A controlled study of the serving benefit and distributional shift from quantizi
 
 The serving ceilings are measured once at the refined boundary (**n=1**); confirmatory replication remains incomplete. KL measures distributional change, not a proportional loss in task accuracy.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/figures/tradeoff_dark.svg">
+  <img alt="Serving capacity vs. KL divergence from BF16: BF16 at 21 requests, FP8 at 57 with KL 0.0056, NVFP4 at 70 with KL 0.0530" src="docs/figures/tradeoff_light.svg">
+</picture>
+
 ## Project Objective
 
 At what point does the additional serving benefit from further quantization stop justifying the additional change in model behavior?
@@ -105,6 +110,11 @@ Maximum concurrency under **TPOT p95 ≤ 50 ms**, from the refined **n=1** measu
 
 FP8 supports **2.71×** BF16's concurrency. NVFP4 supports **3.33×** BF16's concurrency, or **1.23×** FP8's.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/figures/latency_dark.svg">
+  <img alt="p95 TPOT vs. concurrency for BF16, FP8 and NVFP4, crossing the 50 ms SLO at 21, 57 and 70 requests" src="docs/figures/latency_light.svg">
+</picture>
+
 Source: [serving cell records](results/sweep/cells.jsonl), `SWEEP_REFINE_SLO` entries. The file also contains one subsequent ceiling-replication cell; the original sweep accounts for 124 records.
 
 ### Distributional shift
@@ -116,6 +126,11 @@ Source: [serving cell records](results/sweep/cells.jsonl), `SWEEP_REFINE_SLO` en
 | FP8 → NVFP4 | 0.056795 | [0.038483, 0.085353] | 2.6036 |
 
 Source: [production KL summary](results/quality/kl/kl_summary.json). The arrow denotes the KL direction: the left-hand configuration supplies the reference distribution.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/figures/kl_by_position_dark.svg">
+  <img alt="Mean KL by generation position for BF16→FP8, BF16→NVFP4 and FP8→NVFP4, with the BF16 relaunch floor" src="docs/figures/kl_by_position_light.svg">
+</picture>
 
 ### The marginal tradeoff
 
@@ -173,6 +188,12 @@ print(f"FP8-to-FP4 concurrency ratio: {70 / 57:.2f}x")
 PY
 ```
 
+Regenerate the README figures from the same committed artifacts (needs only `matplotlib`):
+
+```bash
+python scripts/plot_readme_figures.py
+```
+
 ### Recompute or collect measurements
 
 Use the pinned `qnt` environment for serving and quality analysis, and `qnt-quant` for checkpoint production. Model paths are defined in [common.py](scripts/harness/common.py). NVFP4 initialization requires `nvcc` and `ninja` on the serving process's `PATH`.
@@ -191,12 +212,14 @@ conda run -n qnt python scripts/harness/quality/p13.py --collect --analyze
 
 **A clone contains summaries, frozen trajectories, and provenance, but not checkpoints or the full distribution `.npy` files.** Exact distribution-level recomputation requires the original shards. Fresh collection is a new measurement: BF16 relaunches are not bit-reproducible, and regenerating continuations from the same seed does not recreate the frozen trajectory set.
 
-## Scope and Remaining Work
+## Scope and Next Steps
 
-- **Serving replication is incomplete:** 1 of 18 confirmatory cells is recorded. The refined 21/57/70 ceilings remain n=1; FP8 and FP4 clear the SLO by only about 0.34 and 0.43 ms.
-- **KL is a conditional distribution metric:** it covers 64 contexts at ten positions on BF16-generated histories. Perplexity, downstream-task accuracy, and quantized models' own free-running trajectories have not been evaluated.
-- **The BF16 reference has a measurable floor:** production self-KL is approximately `1.865e-4` nats. The pre-registered 1% floor criterion still fails for BF16→FP8: the floor is 3.75% of the signal using the pre-run estimate, or 3.36% using this run's estimate. No floor is subtracted and no threshold was relaxed. See the [P13 analysis](results/quality/kl/p13_summary.json).
-- **The result is deployment-specific:** one model, GPU, software stack, workload shape, and NVFP4 calibration draw. Runtime settings affect the distributions; the observed throughput gains have not been attributed to a single kernel or bandwidth mechanism.
-- **The client is a controlled workload:** fixed-length closed-loop requests do not represent a real user arrival process. The SLO excludes unfinished requests, and the original sweep lacks host/client CPU telemetry.
+The serving sweep and the production KL run are complete, and together they answer the core question for this deployment: FP8 is a candidate knee in the tradeoff. The next stages extend the result in confidence and in breadth.
 
-The serving sweep and production KL run are complete. Confirmatory serving replication and task-level quality evaluation remain open. Detailed qualifications and unresolved measurement issues are tracked in [Limitations](docs/LIMITATIONS.md) and [Decisions](docs/DECISIONS.md).
+- **Confirm the serving ceilings.** The refined 21/57/70 ceilings are single measurements (n=1), and FP8 and FP4 clear the SLO by about 0.34 and 0.43 ms. The pre-registered 18-cell replication is under way (1 cell recorded) and resumes from where it stopped.
+- **Add task-level quality axes.** KL measures conditional next-token distributions over 64 contexts at ten positions on BF16-generated histories. Perplexity, downstream-task accuracy, and each quantized model's own free-running generations are the next quality measurements; their designs are open decisions D14 and D15.
+- **Carry the BF16 reference floor as a stated resolution limit.** BF16 relaunches agree to a self-KL of about `1.865e-4` nats, which is 3.75% of the BF16→FP8 signal using the pre-run estimate (3.36% using this run's), against a pre-registered 1% target. The headline is reported against that limit: no floor is subtracted and the target was not relaxed. The BF16→FP4 signal clears it by a wide margin. See the [P13 analysis](results/quality/kl/p13_summary.json).
+- **Attribute the throughput gains.** The capacity walls match KV-cache footprint arithmetic exactly; the remaining below-wall throughput gap is reproducible, and attributing it to specific kernels or bandwidth effects is follow-on work.
+- **Broaden the workload and deployment envelope.** This study fixes one model, GPU, software stack, workload shape, and NVFP4 calibration draw, under a fixed-length closed-loop client. Natural extensions are calibration sensitivity for NVFP4, open-loop arrival processes, an SLO that also accounts for unfinished requests, and host/client CPU telemetry across the full sweep.
+
+Detailed qualifications and design decisions are tracked in [Limitations](docs/LIMITATIONS.md) and [Decisions](docs/DECISIONS.md).
